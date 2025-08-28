@@ -1,0 +1,318 @@
+{
+  "info": {
+    "_postman_id": "farmy-backend-collection",
+    "name": "Farmy Backend API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"example\",\n  \"password\": \"password\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/login", "host": ["{{baseUrl}}"], "path": ["api", "login"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Managers",
+      "item": [
+        {
+          "name": "Get All Chicken Types",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "url": { "raw": "{{baseUrl}}/api/managers/chicken-types", "host": ["{{baseUrl}}"], "path": ["api", "managers", "chicken-types"] }
+          }
+        },
+        {
+          "name": "Create Chicken Type",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"تسمين\",\n  \"price\": 100,\n  \"stock\": 50\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/managers/chicken-types", "host": ["{{baseUrl}}"], "path": ["api", "managers", "chicken-types"] }
+          }
+        },
+        {
+          "name": "Update Chicken Type",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"تسمين\",\n  \"price\": 120,\n  \"stock\": 60\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/managers/chicken-types/:id", "host": ["{{baseUrl}}"], "path": ["api", "managers", "chicken-types", ":id"] }
+          }
+        },
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chickenType\": \"id\",\n  \"quantity\": 10,\n  \"employee\": \"id\",\n  \"customer\": \"id\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/managers/orders", "host": ["{{baseUrl}}"], "path": ["api", "managers", "orders"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Get All Orders",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api", "orders"] }
+          }
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "url": { "raw": "{{baseUrl}}/api/orders/:id", "host": ["{{baseUrl}}"], "path": ["api", "orders", ":id"] }
+          }
+        },
+        {
+          "name": "Update Order",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"delivered\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/orders/:id", "host": ["{{baseUrl}}"], "path": ["api", "orders", ":id"] }
+          }
+        },
+        {
+          "name": "Delete Order",
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "url": { "raw": "{{baseUrl}}/api/orders/:id", "host": ["{{baseUrl}}"], "path": ["api", "orders", ":id"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Deliveries",
+      "item": [
+        {
+          "name": "Create Delivery",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"id\",\n  \"chickenType\": \"id\",\n  \"quantity\": 10\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/deliveries", "host": ["{{baseUrl}}"], "path": ["api", "deliveries"] }
+          }
+        },
+        {
+          "name": "Get All Deliveries",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "url": { "raw": "{{baseUrl}}/api/deliveries", "host": ["{{baseUrl}}"], "path": ["api", "deliveries"] }
+          }
+        },
+        {
+          "name": "Update Delivery",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 15\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/deliveries/:id", "host": ["{{baseUrl}}"], "path": ["api", "deliveries", ":id"] }
+          }
+        },
+        {
+          "name": "Issue Receipt",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "url": { "raw": "{{baseUrl}}/api/deliveries/:id/issue-receipt", "host": ["{{baseUrl}}"], "path": ["api", "deliveries", ":id", "issue-receipt"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Employees",
+      "item": [
+        {
+          "name": "Create Employee",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"assignedShops\": [\"id1\", \"id2\"]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/employees", "host": ["{{baseUrl}}"], "path": ["api", "employees"] }
+          }
+        },
+        {
+          "name": "Get All Employees",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "url": { "raw": "{{baseUrl}}/api/employees", "host": ["{{baseUrl}}"], "path": ["api", "employees"] }
+          }
+        },
+        {
+          "name": "Update Employee",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/employees/:id", "host": ["{{baseUrl}}"], "path": ["api", "employees", ":id"] }
+          }
+        },
+        {
+          "name": "Add Daily Log",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2023-01-01\",\n  \"ordersDelivered\": 5,\n  \"receiptsIssued\": 3,\n  \"collections\": 1000,\n  \"expenses\": 200,\n  \"balance\": 800\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/employees/:id/daily-logs", "host": ["{{baseUrl}}"], "path": ["api", "employees", ":id", "daily-logs"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "Create Customer",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Customer Name\",\n  \"contactInfo\": {\"phone\": \"123456789\", \"address\": \"Address\"}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/customers", "host": ["{{baseUrl}}"], "path": ["api", "customers"] }
+          }
+        },
+        {
+          "name": "Get All Customers",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "url": { "raw": "{{baseUrl}}/api/customers", "host": ["{{baseUrl}}"], "path": ["api", "customers"] }
+          }
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/customers/:id", "host": ["{{baseUrl}}"], "path": ["api", "customers", ":id"] }
+          }
+        },
+        {
+          "name": "Add Payment",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500,\n  \"date\": \"2023-01-01\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/customers/:id/payments", "host": ["{{baseUrl}}"], "path": ["api", "customers", ":id", "payments"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Finances",
+      "item": [
+        {
+          "name": "Create Financial Record",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2023-01-01\",\n  \"type\": \"daily\",\n  \"employee\": \"id\",\n  \"revenue\": 1000,\n  \"expenses\": 200,\n  \"netProfit\": 800,\n  \"outstandingDebts\": 100\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/finances", "host": ["{{baseUrl}}"], "path": ["api", "finances"] }
+          }
+        },
+        {
+          "name": "Get Daily Reports",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "url": { "raw": "{{baseUrl}}/api/finances/daily", "host": ["{{baseUrl}}"], "path": ["api", "finances", "daily"] }
+          }
+        },
+        {
+          "name": "Get Monthly Summary",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "url": { "raw": "{{baseUrl}}/api/finances/monthly?month=1&year=2023", "host": ["{{baseUrl}}"], "path": ["api", "finances", "monthly"], "query": [{"key": "month", "value": "1"}, {"key": "year", "value": "2023"}] }
+          }
+        },
+        {
+          "name": "Get Consolidated View",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "x-auth-token", "value": "{{token}}"}],
+            "url": { "raw": "{{baseUrl}}/api/finances/consolidated", "host": ["{{baseUrl}}"], "path": ["api", "finances", "consolidated"] }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+    { "key": "token", "value": "", "type": "string" }
+  ]
+}
