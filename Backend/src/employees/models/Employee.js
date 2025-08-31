@@ -5,6 +5,13 @@ const employeeSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+  },
   assignedShops: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Customer'

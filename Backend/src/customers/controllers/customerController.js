@@ -72,3 +72,27 @@ exports.addPayment = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+exports.deleteCustomer = async (req, res) => {
+  try {
+    const customer = await Customer.findByIdAndDelete(req.params.id);
+    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    logger.info(`Deleted customer: ${customer.name}`);
+    res.json({ message: 'Customer deleted successfully', customer });
+  } catch (err) {
+    logger.error(`Error deleting customer: ${err.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getCustomerById = async (req, res) => {
+  try {
+    const customer = await Customer.findById(req.params.id).populate('orders receipts');
+    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    logger.info(`Fetched customer with ID: ${req.params.id}`);
+    res.json(customer);
+  } catch (err) {
+    logger.error(`Error fetching customer ${req.params.id}: ${err.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

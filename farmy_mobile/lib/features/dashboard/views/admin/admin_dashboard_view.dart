@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../authentication/cubit/auth_cubit.dart';
+import '../../../authentication/cubit/auth_cubit.dart';
+import 'employee_management_view.dart';
+import 'customer_management_view.dart';
+import 'inventory_management_view.dart';
+import 'financial_dashboard_view.dart';
 
 class AdminDashboardView extends StatelessWidget {
   const AdminDashboardView({super.key});
@@ -112,9 +116,9 @@ class AdminDashboardView extends StatelessWidget {
             // Statistics Cards
             Text(
               'Overview',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Row(
@@ -173,9 +177,9 @@ class AdminDashboardView extends StatelessWidget {
             // Management Actions
             Text(
               'Management',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             GridView.count(
@@ -187,31 +191,51 @@ class AdminDashboardView extends StatelessWidget {
               children: [
                 _buildActionCard(
                   context,
-                  'Manage Orders',
-                  Icons.assignment,
+                  'Financial Dashboard',
+                  Icons.analytics,
                   Colors.blue,
-                  () => _showFeatureDialog(context, 'Order Management'),
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FinancialDashboardView(),
+                    ),
+                  ),
                 ),
                 _buildActionCard(
                   context,
                   'Employee Management',
                   Icons.group,
                   Colors.green,
-                  () => _showFeatureDialog(context, 'Employee Management'),
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const EmployeeManagementView(),
+                    ),
+                  ),
                 ),
                 _buildActionCard(
                   context,
-                  'Financial Reports',
-                  Icons.bar_chart,
+                  'Customer Management',
+                  Icons.person,
                   Colors.orange,
-                  () => _showFeatureDialog(context, 'Financial Reports'),
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CustomerManagementView(),
+                    ),
+                  ),
                 ),
                 _buildActionCard(
                   context,
-                  'System Settings',
-                  Icons.settings,
+                  'Inventory Management',
+                  Icons.inventory,
                   Colors.purple,
-                  () => _showFeatureDialog(context, 'System Settings'),
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const InventoryManagementView(),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -220,9 +244,9 @@ class AdminDashboardView extends StatelessWidget {
             // Recent Activities
             Text(
               'Recent Activities',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Card(
@@ -318,17 +342,11 @@ class AdminDashboardView extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               value,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             Text(
               title,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
             ),
           ],
         ),
@@ -353,11 +371,7 @@ class AdminDashboardView extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 48,
-                color: color,
-              ),
+              Icon(icon, size: 48, color: color),
               const SizedBox(height: 12),
               Text(
                 title,
@@ -460,7 +474,9 @@ class AdminDashboardView extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(feature),
-        content: Text('$feature feature will be implemented in future updates.'),
+        content: Text(
+          '$feature feature will be implemented in future updates.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

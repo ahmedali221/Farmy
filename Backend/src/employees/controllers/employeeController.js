@@ -5,6 +5,7 @@ const logger = require('../../utils/logger');
 // Validation schemas
 const employeeSchema = Joi.object({
   name: Joi.string().required(),
+  email: Joi.string().email().required(),
   assignedShops: Joi.array().items(Joi.string())
 });
 
@@ -69,6 +70,30 @@ exports.addDailyLog = async (req, res) => {
     res.json(employee);
   } catch (err) {
     logger.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.deleteEmployee = async (req, res) => {
+  try {
+    const employee = await Employee.findByIdAndDelete(req.params.id);
+    if (!employee) return res.status(404).json({ message: 'Employee not found' });
+    logger.info(`Deleted employee: ${employee.name}`);
+    res.json({ message: 'Employee deleted successfully', employee });
+  } catch (err) {
+    logger.error(`Error deleting employee: ${err.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getEmployeeById = async (req, res) => {
+  try {
+    const employee = await Employee.findById(req.params.id).populate('assignedShops');
+    if (!employee) return res.status(404).json({ message: 'Employee not found' });
+    logger.info(`Fetched employee with ID: ${req.params.id}`);
+    res.json(employee);
+  } catch (err) {
+    logger.error(`Error fetching employee ${req.params.id}: ${err.message}`);
     res.status(500).json({ message: 'Server error' });
   }
 };
