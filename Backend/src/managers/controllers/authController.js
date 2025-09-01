@@ -8,6 +8,56 @@ const loginSchema = Joi.object({
   password: Joi.string().required()
 });
 
+const signupSchema = Joi.object({
+  username: Joi.string().min(3).max(30).required(),
+  password: Joi.string().min(6).required(),
+  role: Joi.string().valid('manager', 'employee').default('employee')
+});
+
+exports.signup = async (req, res) => {
+  try {
+    const { error } = signupSchema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.details[0].message });
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ username: req.body.username });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Username already exists' });
+    }
+
+    // Create new user
+    const user = new User({
+      username: req.body.username,
+      password: req.body.password,
+      role: req.body.role || 'employee'
+    });
+
+    await user.save();
+
+    // Generate JWT token
+    const token = jwt.sign({ 
+      id: user._id, 
+      username: user.username,
+      role: user.role 
+    }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+    logger.info(`New user ${user.username} (${user.role}) registered successfully`);
+    
+    res.status(201).json({ 
+      message: 'User created successfully',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        role: user.role
+      }
+    });
+  } catch (err) {
+    logger.error(`Signup error: ${err.message}`);
+    res.status(500).json({ message: err.message });
+  }
+};
+
 exports.login = async (req, res) => {
   try {
     const { error } = loginSchema.validate(req.body);

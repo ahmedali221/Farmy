@@ -35,6 +35,7 @@ const expenseRoutes = require('./src/expenses/routes/expenseRoutes');
 
 // Public routes
 app.post('/api/login', authController.login);
+app.post('/api/signup', authController.signup);
 
 // Protected routes
 app.get('/api/validate', auth(['manager', 'employee']), authController.validate);
