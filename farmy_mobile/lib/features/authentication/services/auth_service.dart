@@ -6,30 +6,29 @@ import '../models/login_response.dart';
 import '../models/user.dart';
 
 class AuthService {
-  static const String baseUrl = 'http://localhost:3000/api';
+  // Use 10.0.2.2 for Android emulator, 127.0.0.1 for other platforms
+  static const String baseUrl = 'http://10.0.2.2:3000/api';
 
   /// Login user with username and password
   Future<LoginResponse> login(LoginRequest request) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/login'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode(request.toJson()),
       );
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body) as Map<String, dynamic>;
-        
+
         // Extract token from response
         final token = responseData['token'] as String;
-        
+
         // Check if user data is provided in response
         if (responseData.containsKey('user') && responseData['user'] != null) {
           final userData = responseData['user'] as Map<String, dynamic>;
           final user = User.fromJson(userData).copyWith(token: token);
-          
+
           return LoginResponse(
             token: token,
             user: user,
@@ -38,7 +37,7 @@ class AuthService {
         } else {
           // If no user data in response, decode from JWT token
           final user = _decodeUserFromToken(token);
-          
+
           return LoginResponse(
             token: token,
             user: user,
@@ -59,7 +58,7 @@ class AuthService {
       // Print detailed error for debugging
       print('Auth Service Error: $e');
       print('Error type: ${e.runtimeType}');
-      
+
       throw AuthException(
         message: 'Network error: Unable to connect to server. Details: $e',
         statusCode: 0,
@@ -155,10 +154,7 @@ class AuthException implements Exception {
   final String message;
   final int statusCode;
 
-  const AuthException({
-    required this.message,
-    required this.statusCode,
-  });
+  const AuthException({required this.message, required this.statusCode});
 
   @override
   String toString() => 'AuthException: $message (Status: $statusCode)';

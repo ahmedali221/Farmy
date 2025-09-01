@@ -9,7 +9,8 @@ const chickenTypeSchema = new mongoose.Schema({
   price: {
     type: Number,
     required: true,
-    min: 0
+    min: 0,
+    description: 'Price per kilo in EGP'
   },
   stock: {
     type: Number,

@@ -6,9 +6,13 @@ const logger = require('../../utils/logger');
 const customerSchema = Joi.object({
   name: Joi.string().required(),
   contactInfo: Joi.object({
-    phone: Joi.string(),
-    address: Joi.string()
-  })
+    phone: Joi.string().required(),
+    address: Joi.string().required()
+  }),
+  outstandingDebts: Joi.number().default(0),
+  orders: Joi.array().default([]),
+  payments: Joi.array().default([]),
+  receipts: Joi.array().default([])
 });
 
 const paymentSchema = Joi.object({

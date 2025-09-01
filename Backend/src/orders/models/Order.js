@@ -21,6 +21,9 @@ const orderSchema = new mongoose.Schema({
     ref: 'Customer',
     required: true
   },
+  offer: {
+    type: String,
+  },
   orderDate: {
     type: Date,
     default: Date.now

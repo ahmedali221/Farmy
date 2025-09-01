@@ -12,25 +12,25 @@ class AuthCubit extends Cubit<AuthState> {
   AuthCubit({
     required AuthService authService,
     required TokenService tokenService,
-  })  : _authService = authService,
-        _tokenService = tokenService,
-        super(const AuthState.initial());
+  }) : _authService = authService,
+       _tokenService = tokenService,
+       super(const AuthState.initial());
 
   /// Initialize authentication state on app start
   Future<void> initialize() async {
     emit(const AuthState.loading());
-    
+
     try {
       final isAuthenticated = await _tokenService.isAuthenticated();
-      
+
       if (isAuthenticated) {
         final user = await _tokenService.getUser();
         final token = await _tokenService.getToken();
-        
+
         if (user != null && token != null) {
           // Validate token with server
           final validatedUser = await _authService.validateToken(token);
-          
+
           if (validatedUser != null) {
             emit(AuthState.authenticated(validatedUser));
           } else {
@@ -66,23 +66,20 @@ class AuthCubit extends Cubit<AuthState> {
       );
 
       final loginResponse = await _authService.login(loginRequest);
-      
+
       // Save authentication data locally
-      await _tokenService.saveAuthData(
-        loginResponse.token,
-        loginResponse.user,
-      );
+      await _tokenService.saveAuthData(loginResponse.token, loginResponse.user);
 
       emit(AuthState.authenticated(loginResponse.user));
     } catch (e) {
       String errorMessage = 'Login failed';
-      
+
       if (e is AuthException) {
         errorMessage = e.message;
       } else {
         errorMessage = 'Network error: Please check your connection';
       }
-      
+
       emit(AuthState.error(errorMessage));
     }
   }
@@ -90,10 +87,10 @@ class AuthCubit extends Cubit<AuthState> {
   /// Logout user
   Future<void> logout() async {
     emit(const AuthState.loading());
-    
+
     try {
       final token = await _tokenService.getToken();
-      
+
       // Attempt server-side logout if token exists
       if (token != null) {
         await _authService.logout(token);
