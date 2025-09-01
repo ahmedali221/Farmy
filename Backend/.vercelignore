@@ -1,0 +1,17 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.log
+combined.log
+error.log
+test_signup.js
+signup_test_data.json
+postman_collection.json
+SIGNUP_TESTING_GUIDE.md
