@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:io';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/payment_api_service.dart';
 import '../../../../core/services/order_api_service.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class PaymentCollectionView extends StatefulWidget {
   const PaymentCollectionView({super.key});
@@ -15,6 +21,7 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
   List<Map<String, dynamic>> orders = [];
   bool isLoading = true;
   bool isSubmitting = false;
+  bool isPaymentSubmitted = false;
 
   // Form controllers
   final _formKey = GlobalKey<FormState>();
@@ -130,28 +137,32 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
         (order) => order['_id'] == selectedOrderId,
       );
 
+      final totalPrice = double.parse(_totalPriceController.text);
+      final paidAmount = double.parse(_paidAmountController.text);
+      final discount = double.tryParse(_discountController.text) ?? 0;
+      final remainingAmount = totalPrice - paidAmount - discount;
+
       final paymentData = {
         'order': selectedOrderId,
         'customer': order['customer']['_id'],
-        'totalPrice': double.parse(_totalPriceController.text),
-        'paidAmount': double.parse(_paidAmountController.text),
-        'discount': double.tryParse(_discountController.text) ?? 0,
+        'totalPrice': totalPrice,
+        'paidAmount': paidAmount,
+        'remainingAmount': remainingAmount,
+        'discount': discount,
         'discountPercentage':
             double.tryParse(_discountPercentageController.text) ?? 0,
-        'offer': _offerController.text.isNotEmpty
-            ? _offerController.text
-            : null,
+        'offer': _offerController.text.isNotEmpty ? _offerController.text : '',
         'paymentMethod': _selectedPaymentMethod,
-        'notes': _notesController.text.isNotEmpty
-            ? _notesController.text
-            : null,
+        'notes': _notesController.text.isNotEmpty ? _notesController.text : '',
       };
 
       await paymentService.createPayment(paymentData);
 
       if (mounted) {
+        setState(() {
+          isPaymentSubmitted = true;
+        });
         _showSuccessDialog();
-        _resetForm();
         _loadOrders(); // Reload orders to update status
       }
     } catch (e) {
@@ -175,13 +186,16 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
     _offerController.clear();
     _notesController.clear();
     _selectedPaymentMethod = 'cash';
+    setState(() {
+      isPaymentSubmitted = false;
+    });
   }
 
   void _showSuccessDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('تم التحصيل بنجاح'),
+        title: const Text('نجح'),
         content: const Text('تم تسجيل الدفع بنجاح'),
         actions: [
           TextButton(
@@ -209,238 +223,539 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
     );
   }
 
+  void _showSuccessDialogWithPath(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('تم إنشاء الملف بنجاح!'),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('حسناً'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _generateReceipt() async {
+    try {
+      // Check if required data is available
+      if (selectedOrderId == null) {
+        _showErrorDialog('يرجى اختيار الطلب أولاً');
+        return;
+      }
+
+      final order = orders.firstWhere(
+        (order) => order['_id'] == selectedOrderId,
+      );
+      final customer = order['customer'];
+      final chickenType = order['chickenType'];
+      final quantity = order['quantity'];
+      final totalPrice = quantity * chickenType['price'];
+      final paidAmount =
+          double.tryParse(_paidAmountController.text) ?? totalPrice;
+      final discount = double.tryParse(_discountController.text) ?? 0;
+      final remaining = totalPrice - paidAmount - discount;
+
+      final pdf = pw.Document();
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Header
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'FARMY',
+                          style: pw.TextStyle(
+                            fontSize: 24,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.blue,
+                          ),
+                        ),
+                        pw.Text(
+                          'Farm Management System',
+                          style: pw.TextStyle(
+                            fontSize: 12,
+                            color: PdfColors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text(
+                          'PAYMENT RECEIPT',
+                          style: pw.TextStyle(
+                            fontSize: 20,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.Text(
+                          'Date: ${DateTime.now().toString().split(' ')[0]}',
+                          style: pw.TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 30),
+
+                // Customer Information
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey),
+                    borderRadius: const pw.BorderRadius.all(
+                      pw.Radius.circular(5),
+                    ),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'Customer Information:',
+                        style: pw.TextStyle(
+                          fontSize: 14,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 5),
+                      pw.Text('Name: ${customer['name']}'),
+                      pw.Text(
+                        'Phone: ${customer['contactInfo']?['phone'] ?? 'N/A'}',
+                      ),
+                      pw.Text(
+                        'Address: ${customer['contactInfo']?['address'] ?? 'N/A'}',
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+
+                // Order Details
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey),
+                    borderRadius: const pw.BorderRadius.all(
+                      pw.Radius.circular(5),
+                    ),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'Order Details:',
+                        style: pw.TextStyle(
+                          fontSize: 14,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 5),
+                      pw.Text('Chicken Type: ${chickenType['name']}'),
+                      pw.Text('Quantity: ${quantity.toStringAsFixed(2)} kg'),
+                      pw.Text('Price per kg: EGP ${chickenType['price']}'),
+                      pw.Text(
+                        'Total Price: EGP ${totalPrice.toStringAsFixed(2)}',
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+
+                // Payment Details
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey),
+                    borderRadius: const pw.BorderRadius.all(
+                      pw.Radius.circular(5),
+                    ),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'Payment Details:',
+                        style: pw.TextStyle(
+                          fontSize: 14,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 5),
+                      pw.Text('Discount: EGP ${discount.toStringAsFixed(2)}'),
+                      pw.Text(
+                        'Paid Amount: EGP ${paidAmount.toStringAsFixed(2)}',
+                      ),
+                      pw.Text('Remaining: EGP ${remaining.toStringAsFixed(2)}'),
+                      pw.Text('Payment Method: Cash'),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+
+                // Total
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(15),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.grey300,
+                    borderRadius: const pw.BorderRadius.all(
+                      pw.Radius.circular(5),
+                    ),
+                  ),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(
+                        'TOTAL PAID:',
+                        style: pw.TextStyle(
+                          fontSize: 16,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.Text(
+                        'EGP ${paidAmount.toStringAsFixed(2)}',
+                        style: pw.TextStyle(
+                          fontSize: 18,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.blue,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      // Save PDF to documents folder with customer name
+      final documentsDir = await getApplicationDocumentsDirectory();
+      final customerName = customer['name']
+          .replaceAll(RegExp(r'[^\w\s-]'), '')
+          .replaceAll(' ', '_');
+      final file = File(
+        '${documentsDir.path}/payment_receipt_${customerName}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
+      await file.writeAsBytes(await pdf.save());
+
+      // Try to open PDF, but handle errors gracefully
+      try {
+        await OpenFile.open(file.path);
+      } catch (openError) {
+        // If opening fails, show success with file path info
+        _showSuccessDialogWithPath(
+          'تم إنشاء الإيصال بنجاح',
+          'تم حفظ الملف في مجلد المستندات: ${file.path}',
+        );
+        return;
+      }
+
+      _showSuccessDialog();
+    } catch (e) {
+      _showErrorDialog('فشل في إنشاء الإيصال: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        body: Stack(
-          children: [
-            // خلفية متدرّجة مع حافة سفلية دائرية
-            Container(
-              height: size.height * 0.34,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFFF6ECD8), // cream
-                    Color(0xFFFFFFFF),
-                  ],
-                ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(36),
-                  bottomRight: Radius.circular(36),
+    return Theme(
+      data: AppTheme.lightTheme,
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          body: Stack(
+            children: [
+              // خلفية متدرّجة مع حافة سفلية دائرية
+              Container(
+                height: size.height * 0.34,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Theme.of(context).colorScheme.surface,
+                      Theme.of(context).colorScheme.background,
+                    ],
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(36),
+                    bottomRight: Radius.circular(36),
+                  ),
                 ),
               ),
-            ),
 
-            // المحتوى
-            SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 36),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    _HeaderBar(onRefresh: _loadOrders),
-                    const SizedBox(height: 18),
+              // المحتوى
+              SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 36),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 8),
+                      _HeaderBar(onRefresh: _loadOrders),
+                      const SizedBox(height: 18),
 
-                    if (isLoading)
-                      const Center(child: CircularProgressIndicator())
-                    else if (orders.isEmpty)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32.0),
-                          child: Text(
-                            'لا توجد طلبات معلقة للتحصيل',
-                            style: TextStyle(fontSize: 18),
+                      if (isLoading)
+                        const Center(child: CircularProgressIndicator())
+                      else if (orders.isEmpty)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32.0),
+                            child: Text(
+                              'لا توجد طلبات معلقة للتحصيل',
+                              style: TextStyle(fontSize: 18),
+                            ),
                           ),
-                        ),
-                      )
-                    else
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            children: [
-                              // Order Selection
-                              _SectionCard(
-                                title: 'اختيار الطلب',
-                                child: _DropdownField(
-                                  label: 'الطلب',
-                                  value: selectedOrderId,
-                                  items: orders.map((order) {
-                                    final customer = order['customer'];
-                                    final chickenType = order['chickenType'];
-                                    final quantity = order['quantity'];
-                                    final totalPrice =
-                                        quantity * chickenType['price'];
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              children: [
+                                // Order Selection
+                                _SectionCard(
+                                  title: 'اختيار الطلب',
+                                  child: _DropdownField(
+                                    label: 'الطلب',
+                                    value: selectedOrderId,
+                                    items: orders.map((order) {
+                                      final customer = order['customer'];
+                                      final chickenType = order['chickenType'];
+                                      final quantity = order['quantity'];
+                                      final totalPrice =
+                                          quantity * chickenType['price'];
 
-                                    return DropdownMenuItem<String>(
-                                      value: order['_id'],
-                                      child: Text(
-                                        '${customer['name']} - ${chickenType['name']} - $quantity كيلو - ${totalPrice.toStringAsFixed(0)} EGP',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: _onOrderSelected,
-                                  validator: (value) {
-                                    if (value == null) {
-                                      return 'يرجى اختيار الطلب';
-                                    }
-                                    return null;
-                                  },
+                                      return DropdownMenuItem<String>(
+                                        value: order['_id'],
+                                        child: Text(
+                                          '${customer['name']} - ${chickenType['name']} - $quantity كيلو - ${totalPrice.toStringAsFixed(0)} EGP',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: _onOrderSelected,
+                                    validator: (value) {
+                                      if (value == null) {
+                                        return 'يرجى اختيار الطلب';
+                                      }
+                                      return null;
+                                    },
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 16),
+                                const SizedBox(height: 16),
 
-                              // Payment Details
-                              _SectionCard(
-                                title: 'تفاصيل الدفع',
-                                child: Column(
-                                  children: [
-                                    _NumField(
-                                      label: 'السعر الإجمالي (EGP)',
-                                      controller: _totalPriceController,
-                                      validator: (value) {
-                                        if (value == null || value.isEmpty) {
-                                          return 'يرجى إدخال السعر الإجمالي';
-                                        }
-                                        final price = double.tryParse(value);
-                                        if (price == null || price < 0) {
-                                          return 'يرجى إدخال سعر صحيح';
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                    const SizedBox(height: 10),
+                                // Payment Details
+                                _SectionCard(
+                                  title: 'تفاصيل الدفع',
+                                  child: Column(
+                                    children: [
+                                      _NumField(
+                                        label: 'السعر الإجمالي (EGP)',
+                                        controller: _totalPriceController,
+                                        enabled: false,
+                                      ),
+                                      const SizedBox(height: 10),
 
-                                    // Discount Percentage
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: _NumField(
-                                            label: 'نسبة الخصم (%)',
-                                            controller:
-                                                _discountPercentageController,
-                                            onChanged: (value) =>
-                                                _calculateDiscount(),
+                                      // Discount Percentage
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: _NumField(
+                                              label: 'نسبة الخصم (%)',
+                                              controller:
+                                                  _discountPercentageController,
+                                              onChanged: (value) =>
+                                                  _calculateDiscount(),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          Expanded(
+                                            child: _NumField(
+                                              label: 'قيمة الخصم (EGP)',
+                                              controller: _discountController,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+
+                                      _NumField(
+                                        label: 'المبلغ المدفوع (EGP)',
+                                        controller: _paidAmountController,
+                                        onChanged: (value) =>
+                                            _calculateRemaining(),
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'يرجى إدخال المبلغ المدفوع';
+                                          }
+                                          final amount = double.tryParse(value);
+                                          if (amount == null || amount < 0) {
+                                            return 'يرجى إدخال مبلغ صحيح';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 10),
+
+                                      // Remaining amount (read-only)
+                                      _NumField(
+                                        label: 'المتبقي (EGP)',
+                                        controller: _remainingController,
+                                        enabled: false,
+                                      ),
+                                      const SizedBox(height: 10),
+
+                                      // Payment Method (cash only)
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: Text(
+                                          'طريقة الدفع: نقداً',
+                                          style: TextStyle(
+                                            color: Theme.of(
+                                              context,
+                                            ).textTheme.bodyMedium?.color,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                        const SizedBox(width: 16),
-                                        Expanded(
-                                          child: _NumField(
-                                            label: 'قيمة الخصم (EGP)',
-                                            controller: _discountController,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      const SizedBox(height: 10),
 
-                                    _NumField(
-                                      label: 'المبلغ المدفوع (EGP)',
-                                      controller: _paidAmountController,
-                                      onChanged: (value) =>
-                                          _calculateRemaining(),
-                                      validator: (value) {
-                                        if (value == null || value.isEmpty) {
-                                          return 'يرجى إدخال المبلغ المدفوع';
-                                        }
-                                        final amount = double.tryParse(value);
-                                        if (amount == null || amount < 0) {
-                                          return 'يرجى إدخال مبلغ صحيح';
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                    const SizedBox(height: 10),
+                                      // Offer
+                                      _NumField(
+                                        label: 'العرض (اختياري)',
+                                        controller: _offerController,
+                                        enabled: true,
+                                      ),
+                                      const SizedBox(height: 10),
 
-                                    // Remaining amount (read-only)
-                                    _NumField(
-                                      label: 'المتبقي (EGP)',
-                                      controller: _remainingController,
-                                      enabled: false,
-                                    ),
-                                    const SizedBox(height: 10),
+                                      // Notes
+                                      _NumField(
+                                        label: 'ملاحظات (اختياري)',
+                                        controller: _notesController,
+                                        enabled: true,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
 
-                                    // Payment Method (cash only)
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: Text(
-                                        'طريقة الدفع: نقداً',
-                                        style: TextStyle(
-                                          color: Colors.grey[700],
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                // Submit Button
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: isSubmitting
+                                        ? null
+                                        : _submitPayment,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
-                                    const SizedBox(height: 10),
-                                    const SizedBox(height: 10),
-
-                                    // Offer
-                                    _NumField(
-                                      label: 'العرض (اختياري)',
-                                      controller: _offerController,
-                                      enabled: true,
-                                    ),
-                                    const SizedBox(height: 10),
-
-                                    // Notes
-                                    _NumField(
-                                      label: 'ملاحظات (اختياري)',
-                                      controller: _notesController,
-                                      enabled: true,
-                                    ),
-                                  ],
+                                    child: isSubmitting
+                                        ? const CircularProgressIndicator(
+                                            color: Colors.white,
+                                          )
+                                        : const Text(
+                                            'تسجيل الدفع',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 24),
 
-                              // Submit Button
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: isSubmitting
-                                      ? null
-                                      : _submitPayment,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF0EA57A),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
+                                const SizedBox(height: 16),
+
+                                // Generate Receipt Button
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    onPressed: isPaymentSubmitted
+                                        ? _generateReceipt
+                                        : null,
+                                    icon: Icon(
+                                      Icons.receipt,
+                                      color: isPaymentSubmitted
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.primary
+                                          : Colors.grey,
                                     ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                    label: Text(
+                                      'إنشاء الإيصال',
+                                      style: TextStyle(
+                                        color: isPaymentSubmitted
+                                            ? Theme.of(
+                                                context,
+                                              ).colorScheme.primary
+                                            : Colors.grey,
+                                      ),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      side: BorderSide(
+                                        color: isPaymentSubmitted
+                                            ? Theme.of(
+                                                context,
+                                              ).colorScheme.primary
+                                            : Colors.grey,
+                                      ),
                                     ),
                                   ),
-                                  child: isSubmitting
-                                      ? const CircularProgressIndicator(
-                                          color: Colors.white,
-                                        )
-                                      : const Text(
-                                          'تسجيل الدفع',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -469,23 +784,23 @@ class _HeaderBar extends StatelessWidget {
           CircleAvatar(
             radius: 18,
             backgroundColor: const Color(0xFFEFEFEF),
-            child: Icon(Icons.person, color: Colors.grey.shade700, size: 22),
+            child: Icon(
+              Icons.person,
+              color: Theme.of(context).textTheme.bodyMedium?.color,
+              size: 22,
+            ),
           ),
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'تحصيل الدفع',
-                style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
               Text(
                 _formatToday(),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade700,
-                  height: 1.1,
-                ),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
           ),
@@ -533,7 +848,11 @@ class _RoundIconButton extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(10),
-          child: Icon(icon, size: 20, color: Colors.black87),
+          child: Icon(
+            icon,
+            size: 20,
+            color: Theme.of(context).textTheme.bodyMedium?.color,
+          ),
         ),
       ),
     );
@@ -565,10 +884,7 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-          ),
+          Text(title, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
           child,
         ],

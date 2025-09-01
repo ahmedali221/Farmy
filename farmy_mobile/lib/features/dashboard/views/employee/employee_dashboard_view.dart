@@ -1,3 +1,4 @@
+import 'package:farmy_mobile/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -11,135 +12,143 @@ class EmployeeDashboardView extends StatelessWidget {
     final authCubit = context.read<AuthCubit>();
     final user = authCubit.currentUser;
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('لوحة تحكم الموظف'),
-          backgroundColor: Theme.of(context).primaryColor,
-          foregroundColor: Colors.white,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () => _showLogoutDialog(context),
-            ),
-          ],
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome Card
-              Card(
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 30,
-                        backgroundColor: Theme.of(context).primaryColor,
-                        child: Text(
-                          user?.username.substring(0, 1).toUpperCase() ?? 'م',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+    return Theme(
+      data: AppTheme.lightTheme,
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('لوحة تحكم الموظف'),
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.logout),
+                onPressed: () => _showLogoutDialog(context),
+              ),
+            ],
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Welcome Card
+                Card(
+                  elevation: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundColor: Theme.of(context).primaryColor,
+                          child: Text(
+                            user?.username.substring(0, 1).toUpperCase() ?? 'م',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'مرحباً بك!',
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              user?.username ?? 'موظف',
-                              style: Theme.of(context).textTheme.bodyLarge
-                                  ?.copyWith(color: Colors.grey[600]),
-                            ),
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'مرحباً بك!',
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.bold),
                               ),
-                              decoration: BoxDecoration(
-                                color: Colors.green[100],
-                                borderRadius: BorderRadius.circular(12),
+                              const SizedBox(height: 4),
+                              Text(
+                                user?.username ?? 'موظف',
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(color: Colors.grey[600]),
                               ),
-                              child: Text(
-                                'موظف',
-                                style: TextStyle(
-                                  color: Colors.green[800],
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.secondary.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  'موظف',
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.secondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // Quick Actions
-              Text(
-                'الإجراءات السريعة',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                children: [
-                  _buildActionCard(
+                // Quick Actions
+                Text(
+                  'الإجراءات السريعة',
+                  style: Theme.of(
                     context,
-                    'التقرير اليومي',
-                    Icons.assessment,
-                    Colors.blue,
-                    () => context.go('/daily-report'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    'تسجيل طلب',
-                    Icons.add_shopping_cart,
-                    Colors.orange,
-                    () => context.go('/order-placement'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    'تحصيل الدفع',
-                    Icons.payment,
-                    Colors.green,
-                    () => context.go('/payment-collection'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    'مصروفات الطلب',
-                    Icons.money_off,
-                    Colors.brown,
-                    () => context.go('/expenses'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-            ],
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  children: [
+                    _buildActionCard(
+                      context,
+                      'التقرير اليومي',
+                      Icons.assessment,
+                      Theme.of(context).colorScheme.primary,
+                      () => context.go('/daily-report'),
+                    ),
+                    _buildActionCard(
+                      context,
+                      'تسجيل طلب',
+                      Icons.add_shopping_cart,
+                      Theme.of(context).colorScheme.secondary,
+                      () => context.go('/order-placement'),
+                    ),
+                    _buildActionCard(
+                      context,
+                      'تحصيل الدفع',
+                      Icons.payment,
+                      Theme.of(context).colorScheme.tertiary ??
+                          Theme.of(context).colorScheme.primary,
+                      () => context.go('/payment-collection'),
+                    ),
+                    _buildActionCard(
+                      context,
+                      'مصروفات الطلب',
+                      Icons.money_off,
+                      Theme.of(context).colorScheme.error,
+                      () => context.go('/expenses'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
@@ -150,7 +159,7 @@ class EmployeeDashboardView extends StatelessWidget {
     BuildContext context,
     String title,
     IconData icon,
-    Color color,
+    Color? color,
     VoidCallback onTap,
   ) {
     return Card(
@@ -163,14 +172,17 @@ class EmployeeDashboardView extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 48, color: color),
+              Icon(
+                icon,
+                size: 48,
+                color: color ?? Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(height: 12),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
             ],

@@ -88,7 +88,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              _getOrderStatusText(order['status']),
+                              _getOrderStatusArabic(order['status']),
                               style: TextStyle(
                                 color: _getOrderStatusColor(order['status']),
                                 fontWeight: FontWeight.bold,
@@ -106,12 +106,11 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      if (order['status'] != 'delivered')
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 20),
-                          onPressed: () => _showOrderStatusDialog(),
-                          tooltip: 'تحديث حالة الطلب',
-                        ),
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 20),
+                        onPressed: () => _showOrderStatusDialog(),
+                        tooltip: 'تحديث حالة الطلب',
+                      ),
                     ],
                   ),
                 ),
@@ -169,7 +168,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                       ),
                       const SizedBox(height: 16),
                       _buildDetailRow(
-                        'رقم الطلب',
+                        'معرّف الطلب',
                         order['_id']?.toString() ?? 'غير معروف',
                       ),
                       _buildDetailRow(
@@ -240,7 +239,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                         order['chickenType']?['name'] ?? 'غير معروف',
                       ),
                       _buildDetailRow(
-                        'السعر لكل وحدة',
+                        'السعر للوحدة',
                         'ج.م ${order['chickenType']?['price'] ?? 0}',
                       ),
                       _buildDetailRow(
@@ -471,7 +470,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
             children: [
               Expanded(
                 child: Text(
-                  expense['title'] ?? 'مصروف غير معروف',
+                  expense['title'] ?? 'Unknown Expense',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -479,7 +478,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                 ),
               ),
               Text(
-                'ج.م ${expense['amount']?.toString() ?? '0'}',
+                'EGP ${expense['amount']?.toString() ?? '0'}',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.red[700],
@@ -498,7 +497,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
           ],
           const SizedBox(height: 4),
           Text(
-            'تم الإضافة: ${_formatDate(expense['createdAt'])}',
+            'Added: ${_formatDate(expense['createdAt'])}',
             style: TextStyle(color: Colors.grey[500], fontSize: 12),
           ),
         ],
@@ -544,12 +543,12 @@ class _OrderDetailViewState extends State<OrderDetailView> {
   }
 
   String _formatDate(dynamic date) {
-    if (date == null) return 'غير معروف';
+    if (date == null) return 'Unknown';
     try {
       final DateTime dateTime = DateTime.parse(date.toString());
       return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
     } catch (e) {
-      return 'تاريخ غير صحيح';
+      return 'Invalid Date';
     }
   }
 
@@ -586,11 +585,9 @@ class _OrderDetailViewState extends State<OrderDetailView> {
       });
 
       _showSuccessDialog('تم تحديث حالة الطلب بنجاح');
-      // Return true to indicate status was updated
-      context.pop(true);
     } catch (e) {
       setState(() => isLoading = false);
-      _showErrorDialog('فشل في تحديث حالة الطلب: $e');
+      _showErrorDialog('فشل تحديث حالة الطلب: $e');
     }
   }
 
@@ -639,68 +636,52 @@ class _OrderDetailViewState extends State<OrderDetailView> {
   void _showOrderStatusDialog() {
     showDialog(
       context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('تحديث حالة الطلب'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('الحالة الحالية: ${_getOrderStatusText(order['status'])}'),
-              const SizedBox(height: 16),
-              const Text('اختر الحالة الجديدة:'),
-              const SizedBox(height: 8),
-              ...['pending', 'delivered', 'cancelled']
-                  .map(
-                    (status) => ListTile(
-                      leading: Radio<String>(
-                        value: status,
-                        groupValue: order['status'] ?? 'pending',
-                        onChanged: (value) {
-                          Navigator.of(context).pop();
-                          if (value != null && value != order['status']) {
-                            _updateOrderStatus(value);
-                          }
-                        },
-                      ),
-                      title: Text(_getOrderStatusText(status)),
-                      subtitle: Text(_getStatusDescription(status)),
-                      onTap: () {
+      builder: (context) => AlertDialog(
+        title: const Text('تحديث حالة الطلب'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('الحالة الحالية: ${_getOrderStatusArabic(order['status'])}'),
+            const SizedBox(height: 16),
+            const Text('اختر الحالة الجديدة:'),
+            const SizedBox(height: 8),
+            ...['pending', 'delivered', 'cancelled']
+                .map(
+                  (status) => ListTile(
+                    leading: Radio<String>(
+                      value: status,
+                      groupValue: order['status'] ?? 'pending',
+                      onChanged: (value) {
                         Navigator.of(context).pop();
-                        if (status != order['status']) {
-                          _updateOrderStatus(status);
+                        if (value != null && value != order['status']) {
+                          _updateOrderStatus(value);
                         }
                       },
                     ),
-                  )
-                  .toList(),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('إلغاء'),
-            ),
+                    title: Text(_getOrderStatusArabic(status)),
+                    subtitle: Text(_getStatusDescription(status)),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      if (status != order['status']) {
+                        _updateOrderStatus(status);
+                      }
+                    },
+                  ),
+                )
+                .toList(),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('إلغاء'),
+          ),
+        ],
       ),
     );
   }
 
-  String _getStatusDescription(String status) {
-    switch (status) {
-      case 'pending':
-        return 'الطلب في انتظار الموافقة';
-      case 'delivered':
-        return 'تم الموافقة على الطلب وتسليمه';
-      case 'cancelled':
-        return 'تم إلغاء الطلب';
-      default:
-        return '';
-    }
-  }
-
-  String _getOrderStatusText(String? status) {
+  String _getOrderStatusArabic(String? status) {
     switch (status) {
       case 'pending':
         return 'في الانتظار';
@@ -713,21 +694,31 @@ class _OrderDetailViewState extends State<OrderDetailView> {
     }
   }
 
+  String _getStatusDescription(String status) {
+    switch (status) {
+      case 'pending':
+        return 'الطلب في انتظار الموافقة';
+      case 'delivered':
+        return 'تمت الموافقة على الطلب وتسليمه';
+      case 'cancelled':
+        return 'تم إلغاء الطلب';
+      default:
+        return '';
+    }
+  }
+
   void _showSuccessDialog(String message) {
     showDialog(
       context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('نجح'),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('حسناً'),
-            ),
-          ],
-        ),
+      builder: (context) => AlertDialog(
+        title: const Text('نجح'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('موافق'),
+          ),
+        ],
       ),
     );
   }
@@ -735,18 +726,15 @@ class _OrderDetailViewState extends State<OrderDetailView> {
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('خطأ'),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('حسناً'),
-            ),
-          ],
-        ),
+      builder: (context) => AlertDialog(
+        title: const Text('خطأ'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('موافق'),
+          ),
+        ],
       ),
     );
   }

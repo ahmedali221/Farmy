@@ -4,6 +4,7 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/order_api_service.dart';
 import '../../../../core/services/payment_api_service.dart';
 import '../../../../core/services/expense_api_service.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class DailyReportScreen extends StatefulWidget {
   const DailyReportScreen({super.key});
@@ -99,143 +100,146 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        body: Stack(
-          children: [
-            // خلفية متدرّجة مع حافة سفلية دائرية
-            Container(
-              height: size.height * 0.34,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFFF6ECD8), // cream
-                    Color(0xFFFFFFFF),
-                  ],
-                ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(36),
-                  bottomRight: Radius.circular(36),
+    return Theme(
+      data: AppTheme.lightTheme,
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          body: Stack(
+            children: [
+              // خلفية متدرّجة مع حافة سفلية دائرية
+              Container(
+                height: size.height * 0.34,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Theme.of(context).colorScheme.surface,
+                      Theme.of(context).colorScheme.background,
+                    ],
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(36),
+                    bottomRight: Radius.circular(36),
+                  ),
                 ),
               ),
-            ),
 
-            // المحتوى
-            SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 36),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    _HeaderBar(),
-                    const SizedBox(height: 18),
+              // المحتوى
+              SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 36),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 8),
+                      _HeaderBar(),
+                      const SizedBox(height: 18),
 
-                    // Navigation Buttons
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => context.go('/order-placement'),
-                              icon: const Icon(Icons.add_shopping_cart),
-                              label: const Text('تسجيل طلب'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFF37B2A),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () =>
-                                  context.go('/payment-collection'),
-                              icon: const Icon(Icons.payment),
-                              label: const Text('تحصيل الدفع'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0EA57A),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                      // Navigation Buttons
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => context.go('/order-placement'),
+                                icon: const Icon(Icons.add_shopping_cart),
+                                label: const Text('تسجيل طلب'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFF37B2A),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // الكروت الملوّنة
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: const [
-                          // Values updated below in non-const section
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _StatCard(
-                              titleTop: 'الطلبات',
-                              value: _isLoading ? '—' : '$_ordersCount',
-                              color: const Color(0xFFF37B2A),
-                              icon: Icons.shopping_bag_rounded,
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () =>
+                                    context.go('/payment-collection'),
+                                icon: const Icon(Icons.payment),
+                                label: const Text('تحصيل الدفع'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0EA57A),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: _StatCard(
-                              titleTop: 'قيد التنفيذ',
-                              value: _isLoading ? '—' : '$_pendingCount',
-                              color: const Color(0xFF0EA57A),
-                              icon: Icons.timelapse_rounded,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // نظرة عامة (قابلة للتحديث من الباك)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _SectionCard(
-                        title: 'نظرة عامة',
-                        child: _OverviewGrid(
-                          delivered: _deliveredCount,
-                          receipts: _receiptsCount,
-                          collected: _totalCollected,
-                          expenses: _totalExpenses,
-                          finalBalance: _finalBalance,
+                          ],
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 14),
 
-                    const SizedBox(height: 16),
-                  ],
+                      // الكروت الملوّنة
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: const [
+                            // Values updated below in non-const section
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _StatCard(
+                                titleTop: 'الطلبات',
+                                value: _isLoading ? '—' : '$_ordersCount',
+                                color: const Color(0xFFF37B2A),
+                                icon: Icons.shopping_bag_rounded,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: _StatCard(
+                                titleTop: 'قيد التنفيذ',
+                                value: _isLoading ? '—' : '$_pendingCount',
+                                color: const Color(0xFF0EA57A),
+                                icon: Icons.timelapse_rounded,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // نظرة عامة (قابلة للتحديث من الباك)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: _SectionCard(
+                          title: 'نظرة عامة',
+                          child: _OverviewGrid(
+                            delivered: _deliveredCount,
+                            receipts: _receiptsCount,
+                            collected: _totalCollected,
+                            expenses: _totalExpenses,
+                            finalBalance: _finalBalance,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -334,8 +338,12 @@ class _RoundIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = filled ? const Color(0xFFF37B2A) : Colors.white;
-    final fg = filled ? Colors.white : Colors.black87;
+    final bg = filled
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.surface;
+    final fg = filled
+        ? Theme.of(context).colorScheme.onPrimary
+        : Theme.of(context).colorScheme.onSurface;
     return Material(
       color: bg,
       shape: const CircleBorder(),
@@ -372,11 +380,13 @@ class _SegmentChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? Colors.black : Colors.white,
+          color: selected
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: Theme.of(context).shadowColor.withOpacity(0.04),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -387,7 +397,9 @@ class _SegmentChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            color: selected ? Colors.white : Colors.black87,
+            color: selected
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ),
@@ -414,11 +426,11 @@ class _StatCard extends StatelessWidget {
     return Container(
       height: 116,
       decoration: BoxDecoration(
-        color: color,
+        color: Theme.of(context).colorScheme.primary,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: Theme.of(context).shadowColor.withOpacity(0.06),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -432,7 +444,7 @@ class _StatCard extends StatelessWidget {
             child: Icon(
               icon,
               size: 80,
-              color: Colors.black.withValues(alpha: 0.06),
+              color: Theme.of(context).shadowColor.withOpacity(0.06),
             ),
           ),
           Padding(
@@ -444,8 +456,8 @@ class _StatCard extends StatelessWidget {
                 const Spacer(),
                 Text(
                   titleTop,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimary,
                     fontWeight: FontWeight.w800,
                     fontSize: 16,
                   ),
@@ -453,8 +465,8 @@ class _StatCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   value,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
@@ -476,11 +488,15 @@ class _SmallBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.07),
+        color: Theme.of(context).shadowColor.withOpacity(0.07),
         borderRadius: BorderRadius.circular(10),
       ),
       padding: const EdgeInsets.all(6),
-      child: Icon(icon, size: 16, color: Colors.white),
+      child: Icon(
+        icon,
+        size: 16,
+        color: Theme.of(context).colorScheme.onPrimary,
+      ),
     );
   }
 }
@@ -496,11 +512,11 @@ class _SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: Theme.of(context).shadowColor.withOpacity(0.06),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -515,10 +531,9 @@ class _SectionCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
             ],
@@ -570,11 +585,11 @@ class _OverviewGrid extends StatelessWidget {
       itemBuilder: (context, i) {
         return Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: Theme.of(context).shadowColor.withOpacity(0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 6),
               ),
@@ -586,15 +601,16 @@ class _OverviewGrid extends StatelessWidget {
             children: [
               Text(
                 items[i][0],
-                style: const TextStyle(fontWeight: FontWeight.w700),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
               Text(
                 items[i][1],
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
             ],
           ),

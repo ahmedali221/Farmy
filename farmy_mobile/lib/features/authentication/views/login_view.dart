@@ -82,7 +82,6 @@ class _LoginViewState extends State<LoginView> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 48),
-
                     // Login Form
                     Card(
                       elevation: 4,
@@ -100,7 +99,6 @@ class _LoginViewState extends State<LoginView> {
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 24),
-
                               // Username Field
                               TextFormField(
                                 controller: _usernameController,
@@ -118,7 +116,6 @@ class _LoginViewState extends State<LoginView> {
                                 textInputAction: TextInputAction.next,
                               ),
                               const SizedBox(height: 16),
-
                               // Password Field
                               TextFormField(
                                 controller: _passwordController,
@@ -145,7 +142,7 @@ class _LoginViewState extends State<LoginView> {
                                     return 'يرجى إدخال كلمة المرور';
                                   }
                                   if (value.length < 6) {
-                                    return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+                                    return 'يجب أن تكون كلمة المرور 6 أحرف على الأقل';
                                   }
                                   return null;
                                 },
@@ -153,7 +150,6 @@ class _LoginViewState extends State<LoginView> {
                                 onFieldSubmitted: (_) => _handleLogin(),
                               ),
                               const SizedBox(height: 24),
-
                               // Login Button
                               BlocBuilder<AuthCubit, AuthState>(
                                 builder: (context, state) {
@@ -191,9 +187,7 @@ class _LoginViewState extends State<LoginView> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 24),
-
                     // Demo Credentials
                     Card(
                       color: Colors.blue[50],
@@ -203,14 +197,14 @@ class _LoginViewState extends State<LoginView> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'بيانات تجريبية:',
+                              'بيانات الدخول التجريبية:',
                               style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 8),
                             const Text('مدير: admin / admin123'),
                             const Text('موظف: employee1 / employee123'),
-                            const Text('مشرف: manager1 / manager123'),
+                            const Text('مدير عام: manager1 / manager123'),
                           ],
                         ),
                       ),

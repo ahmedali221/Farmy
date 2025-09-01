@@ -10,11 +10,12 @@ const paymentSchema = Joi.object({
   customer: Joi.string().required(),
   totalPrice: Joi.number().min(0).required(),
   paidAmount: Joi.number().min(0).required(),
+  remainingAmount: Joi.number().min(0).required(),
   discount: Joi.number().min(0).default(0),
   discountPercentage: Joi.number().min(0).max(100).default(0),
-  offer: Joi.string().allow('', null),
+  offer: Joi.string().allow('', null).default(''),
   paymentMethod: Joi.string().valid('cash').default('cash'),
-  notes: Joi.string().optional()
+  notes: Joi.string().allow('', null).default('')
 });
 
 exports.createPayment = async (req, res) => {

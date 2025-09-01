@@ -1167,3 +1167,279 @@
 {"level":"info","message":"User 68af30e0fc7a697cad375aa9 logged out","timestamp":"2025-09-01T14:16:11.275Z"}
 {"level":"info","message":"User emp1 logged in successfully","timestamp":"2025-09-01T14:16:39.188Z"}
 {"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T14:16:41.115Z"}
+{"level":"info","message":"User admin logged in successfully","timestamp":"2025-09-01T15:17:56.299Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:17:56.524Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:17:56.571Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:17:56.627Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:17:59.684Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:17:59.691Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:17:59.729Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:17:59.800Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:18:05.053Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:18:05.080Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:18:05.098Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:18:06.803Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:18:08.445Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:18:08.458Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:18:08.482Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:18:09.977Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:18:10.007Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:18:11.737Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:18:11.781Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:18:11.800Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:18:12.859Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:18:13.857Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:18:13.888Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:18:13.912Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:18:14.809Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:18:14.815Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:18:14.818Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:18:14.873Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:18:17.817Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:18:17.829Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:18:17.871Z"}
+{"level":"info","message":"User 68af30e0fc7a697cad375aa9 logged out","timestamp":"2025-09-01T15:19:19.198Z"}
+{"level":"info","message":"User emp1 logged in successfully","timestamp":"2025-09-01T15:19:24.990Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:19:26.219Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:19:28.304Z"}
+{"level":"info","message":"Payments fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:19:28.354Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:19:30.436Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:19:32.318Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:19:32.320Z"}
+{"level":"info","message":"Order created: 68b5b98df58327d91d481f8f by employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:19:41.470Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:19:41.555Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:19:41.558Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:19:47.910Z"}
+{"level":"info","message":"Payments fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:19:47.925Z"}
+{"level":"info","message":"Payments fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:19:47.981Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:19:51.675Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:19:56.962Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:19:56.966Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:19:58.869Z"}
+{"level":"info","message":"Payments fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:19:58.918Z"}
+{"level":"info","message":"Payments fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:19:58.974Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:20:01.260Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:20:03.377Z"}
+{"level":"info","message":"Payments fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:20:03.429Z"}
+{"level":"info","message":"Payments fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:20:03.471Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:20:04.097Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:20:04.105Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:20:11.458Z"}
+{"level":"info","message":"Payments fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:20:11.498Z"}
+{"level":"info","message":"Payments fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:20:11.587Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:20:15.181Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:20:15.186Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:20:29.852Z"}
+{"level":"info","message":"Payments fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:20:29.896Z"}
+{"level":"info","message":"Payments fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:20:29.954Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:20:30.628Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:20:45.001Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:20:45.006Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:20:59.001Z"}
+{"level":"info","message":"Payments fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:20:59.039Z"}
+{"level":"info","message":"Payments fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:20:59.070Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:21:00.749Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:21:00.754Z"}
+{"level":"info","message":"User 68b51c3bd50571ad177ef3b8 logged out","timestamp":"2025-09-01T15:32:01.176Z"}
+{"level":"info","message":"User admin logged in successfully","timestamp":"2025-09-01T15:34:47.599Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:34:47.794Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:34:47.842Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:34:47.867Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:34:50.004Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:34:50.011Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:34:50.014Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:34:50.093Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:34:50.096Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:36:12.160Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:36:12.209Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:36:12.232Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:36:16.096Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:36:19.250Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:36:19.293Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:36:19.315Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:36:20.737Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:36:20.743Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:36:20.745Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:36:20.822Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:36:20.828Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:36:46.054Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:36:46.121Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:36:46.151Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:36:49.734Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:36:49.775Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:36:49.819Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:36:55.656Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:36:55.724Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:36:55.879Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:36:56.265Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:36:56.312Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:36:56.369Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:36:57.449Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:36:57.456Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:36:57.458Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:36:57.525Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:36:57.528Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:37:10.838Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:37:10.885Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:37:10.923Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:37:12.146Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:37:12.151Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:37:12.153Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:37:12.270Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:37:12.274Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:37:36.656Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:37:36.689Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:37:36.716Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:37:37.772Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:37:37.778Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:37:37.781Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:37:37.884Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:37:37.892Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:37:45.550Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:37:45.581Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:37:45.609Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:37:48.478Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:37:48.482Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:37:48.485Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:37:48.586Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:37:48.588Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:38:50.885Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:38:50.922Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:38:50.958Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:38:53.267Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:38:53.318Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:38:53.352Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:39:16.425Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:39:16.453Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:39:16.478Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:39:20.839Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:39:20.879Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:39:20.930Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:39:23.447Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:39:23.488Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:39:23.546Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:39:23.742Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:39:23.785Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:39:25.012Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:39:25.043Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:39:25.066Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:39:26.202Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:39:26.205Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:39:26.207Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:39:26.265Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:39:26.273Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:39:45.639Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:39:45.682Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:39:45.735Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:39:48.810Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:39:48.816Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:39:48.818Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:39:48.883Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:39:48.887Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:39:56.309Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:39:56.339Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:39:56.364Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:41:58.398Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:41:58.422Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:41:58.503Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:41:59.781Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:41:59.786Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:41:59.788Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:41:59.854Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:41:59.856Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:42:02.095Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:42:02.135Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:42:02.168Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:42:16.105Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:42:16.130Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:42:16.154Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:42:18.095Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:42:18.100Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:42:18.102Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:42:18.171Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:42:18.172Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:42:35.213Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:42:35.242Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:42:35.352Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:42:37.380Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:42:37.403Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:42:37.427Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:42:38.380Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:42:38.385Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:42:38.387Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:42:38.460Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:42:38.463Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:42:48.709Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:42:48.738Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:42:48.762Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:42:49.886Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:42:49.891Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:42:49.893Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:42:49.965Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:42:49.968Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:43:34.786Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:43:34.808Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:43:34.825Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-09-01T15:43:35.759Z"}
+{"level":"info","message":"All orders fetched","timestamp":"2025-09-01T15:43:35.770Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:43:35.772Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:43:35.856Z"}
+{"level":"info","message":"Payment summary fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:43:35.859Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:43:37.147Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:43:37.178Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:43:37.204Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-01T15:44:15.290Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:44:15.334Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:44:15.378Z"}
+{"level":"info","message":"User 68af30e0fc7a697cad375aa9 logged out","timestamp":"2025-09-01T15:44:38.176Z"}
+{"level":"info","message":"User emp1 logged in successfully","timestamp":"2025-09-01T15:45:36.907Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:45:38.615Z"}
+{"level":"info","message":"Payments fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T15:45:38.681Z"}
+{"level":"info","message":"Payments fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T15:45:38.738Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:45:41.559Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:45:41.564Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:45:43.007Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:45:44.307Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T15:46:22.758Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T15:46:29.377Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T15:46:29.389Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T16:07:06.964Z"}
+{"level":"info","message":"Payments fetched for order: 68b5b98df58327d91d481f8f","timestamp":"2025-09-01T16:07:06.979Z"}
+{"level":"info","message":"Payments fetched for order: 68b54350f9ca1ff1739546d1","timestamp":"2025-09-01T16:07:07.043Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T16:07:10.211Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T16:07:10.214Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T16:07:12.674Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T16:07:28.338Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T16:07:30.936Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T16:07:30.940Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T16:12:11.737Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T16:12:11.739Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T16:18:06.176Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T16:18:06.179Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T16:20:47.709Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T16:20:47.712Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T16:20:55.184Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T16:20:55.187Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T16:24:12.349Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T16:24:12.352Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T16:28:04.386Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T16:28:04.408Z"}
+{"level":"info","message":"Order created: 68b5c9a580d5440ded159f9b by employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T16:28:21.403Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T16:28:21.459Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T16:28:21.464Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T16:37:06.283Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T16:37:06.288Z"}
+{"level":"info","message":"Order created: 68b5cbbf80d5440ded159faa by employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T16:37:19.127Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T16:37:19.227Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T16:37:19.236Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-01T16:40:35.130Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-01T16:40:35.146Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T16:40:37.579Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T16:43:48.077Z"}
+{"level":"error","message":"Error creating payment: Payment validation failed: remainingAmount: Path `remainingAmount` is required.","timestamp":"2025-09-01T16:44:01.932Z"}
+{"level":"info","message":"User emp1 logged in successfully","timestamp":"2025-09-01T16:47:21.918Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T16:47:23.221Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T16:48:25.764Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T16:48:29.022Z"}
+{"level":"info","message":"Payment created: 68b5ce656f52a62c3eb19481 for order: 68b5c9a580d5440ded159f9b","timestamp":"2025-09-01T16:48:37.861Z"}
+{"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T16:48:38.186Z"}

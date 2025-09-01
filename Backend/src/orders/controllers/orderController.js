@@ -9,6 +9,11 @@ const orderSchema = Joi.object({
   chickenType: Joi.string().required(),
   quantity: Joi.number().min(1).required(),
   customer: Joi.string().required(),
+  type: Joi.string().required(),
+  grossWeight: Joi.number().min(0).required(),
+  netWeight: Joi.number().min(0).required(),
+  todayAccount: Joi.number().min(0).required(),
+  totalPrice: Joi.number().min(0).required(),
   offer: Joi.string().allow('', null),
   orderDate: Joi.date().default(Date.now),
   status: Joi.string().valid('pending', 'delivered', 'cancelled').default('pending')

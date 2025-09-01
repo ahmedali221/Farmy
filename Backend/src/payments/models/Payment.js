@@ -49,6 +49,7 @@ const paymentSchema = new mongoose.Schema({
   },
   offer: {
     type: String,
+    default: '',
     description: 'Description of any special offer applied'
   },
   paymentMethod: {
@@ -63,6 +64,7 @@ const paymentSchema = new mongoose.Schema({
   },
   notes: {
     type: String,
+    default: '',
     description: 'Additional notes about the payment'
   }
 }, { timestamps: true });

@@ -93,6 +93,16 @@ class OrderApiService {
   }
 
   /// Create new order
+  ///
+  /// Required fields:
+  /// - chickenType: ID of the chicken type
+  /// - customer: ID of the customer
+  /// - quantity: Number of units
+  /// - type: Name of the chicken type
+  /// - grossWeight: Gross weight in kg
+  /// - netWeight: Net weight in kg (calculated as gross - (quantity * 8))
+  /// - todayAccount: Total price for today's account
+  /// - totalPrice: Total price for the order
   Future<Map<String, dynamic>> createOrder(
     Map<String, dynamic> orderData,
   ) async {

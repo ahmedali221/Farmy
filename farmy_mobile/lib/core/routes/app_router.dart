@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../../features/authentication/cubit/auth_cubit.dart';
 import '../../features/authentication/cubit/auth_state.dart';
 import '../../features/authentication/views/login_view.dart';
-import '../../features/authentication/views/splash_view.dart';
 import '../../features/dashboard/views/employee/employee_dashboard_view.dart';
 import '../../features/dashboard/views/admin/admin_dashboard_view.dart';
 import '../../features/dashboard/views/admin/Customers Section/customer_management_view.dart';
@@ -21,16 +20,10 @@ import '../../features/dashboard/views/employee/expense_management_view.dart';
 class AppRouter {
   static GoRouter createRouter(AuthCubit authCubit) {
     return GoRouter(
-      initialLocation: '/splash',
+      initialLocation: '/login',
       redirect: (context, state) {
         final authState = authCubit.state;
-        final isSplashRoute = state.matchedLocation == '/splash';
         final isLoginRoute = state.matchedLocation == '/login';
-
-        // If on splash screen, don't redirect (let splash handle auth check)
-        if (isSplashRoute) {
-          return null;
-        }
 
         // If user is not authenticated and not on login page, redirect to login
         if (authState is! AuthAuthenticated && !isLoginRoute) {
@@ -61,11 +54,6 @@ class AppRouter {
         return null; // No redirect needed
       },
       routes: [
-        GoRoute(
-          path: '/splash',
-          name: 'splash',
-          builder: (context, state) => const SplashView(),
-        ),
         GoRoute(
           path: '/login',
           name: 'login',
@@ -184,18 +172,18 @@ class AppRouter {
                 const Icon(Icons.error_outline, size: 64, color: Colors.red),
                 const SizedBox(height: 16),
                 Text(
-                  'الصفحة غير موجودة',
+                  'Page Not Found',
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'الصفحة التي تبحث عنها غير موجودة.',
+                  'The page you are looking for does not exist.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
-                  onPressed: () => context.go('/splash'),
-                  child: const Text('العودة للرئيسية'),
+                  onPressed: () => context.go('/login'),
+                  child: const Text('Go to Login'),
                 ),
               ],
             ),

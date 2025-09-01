@@ -72,14 +72,10 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
 
   Future<void> _loadOrders() async {
     try {
-      print('Loading orders...'); // Debug log
       final ordersList = await _orderService.getAllOrders();
       orders = ordersList;
-      print('Loaded ${orders.length} orders'); // Debug log
       // Debug: Print first order to see structure
-      if (orders.isNotEmpty) {
-        print('First order structure: ${orders[0]}'); // Debug log
-      }
+      if (orders.isNotEmpty) {}
     } catch (e) {
       print('Error loading orders: $e');
       orders = []; // Set empty list on error
@@ -192,49 +188,60 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('لوحة التحكم المالية'),
-        backgroundColor: Theme.of(context).primaryColor,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/admin-dashboard'),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _showCreateFinancialRecordDialog,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('لوحة المعلومات المالية'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.go('/admin-dashboard'),
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadFinancialData,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(text: 'التقارير اليومية', icon: Icon(Icons.today)),
-            Tab(text: 'الطلبات', icon: Icon(Icons.shopping_cart)),
-            Tab(text: 'تمويل الموظفين', icon: Icon(Icons.people)),
-          ],
-        ),
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildDailyReportsTab(),
-                _buildOrdersTab(),
-                _buildEmployeeFinanceTab(),
-              ],
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: _showCreateFinancialRecordDialog,
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showCreateFinancialRecordDialog,
-        child: const Icon(Icons.add),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadFinancialData,
+            ),
+          ],
+          bottom: TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(
+                text: 'التقارير اليومية',
+                icon: Icon(Icons.today),
+                // tooltip: 'تقارير يومية',
+              ),
+              Tab(
+                text: 'طلبات العملاء',
+                icon: Icon(Icons.shopping_cart),
+                // tooltip: 'طلبات العملاء',
+              ),
+              Tab(
+                text: 'مالية الموظفين',
+                icon: Icon(Icons.people),
+                // tooltip: 'مالية الموظفين',
+              ),
+            ],
+          ),
+        ),
+        body: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildDailyReportsTab(),
+                  _buildOrdersTab(),
+                  _buildEmployeeFinanceTab(),
+                ],
+              ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _showCreateFinancialRecordDialog,
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }
@@ -245,7 +252,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.bar_chart, size: 64, color: Colors.grey),
+            Icon(Icons.bar_chart, size: 64, color: Colors.white),
             SizedBox(height: 16),
             Text('لا توجد طلبات', style: TextStyle(fontSize: 18)),
           ],
@@ -298,7 +305,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
               Expanded(
                 child: _buildFinancialSummaryCard(
                   'إجمالي المال',
-                  'ج.م ${totalRevenue.toStringAsFixed(2)}',
+                  ' ${totalRevenue.toStringAsFixed(2)} ج.م',
                   Icons.attach_money,
                   Colors.green,
                 ),
@@ -321,11 +328,11 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                     child: Icon(Icons.today, color: Colors.white),
                   ),
                   title: Text(
-                    'التقرير اليومي - ${item['date']}',
+                    'تقرير يومي - ${item['date']}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Text(
-                    'الطلبات: ${item['orders']}  •  المال: ج.م ${(item['revenue'] as double).toStringAsFixed(2)}',
+                    'الطلبات: ${item['orders']}  •  المال: EGP ${(item['revenue'] as double).toStringAsFixed(2)}',
                   ),
                 ),
               );
@@ -447,7 +454,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                       ),
                       Text('الكمية: ${order['quantity'] ?? 0}'),
                       Text(
-                        'الحالة: ${_getOrderStatusText(order['status'])}',
+                        'الحالة: ${_getOrderStatusArabic(order['status'])}',
                         style: TextStyle(
                           color: _getOrderStatusColor(order['status']),
                           fontWeight: FontWeight.w500,
@@ -475,7 +482,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                               : [];
                           _navigateToOrderDetail(context, order, orderExpenses);
                         },
-                        tooltip: 'View order details',
+                        tooltip: 'عرض تفاصيل الطلب',
                       ),
                     ],
                   ),
@@ -497,7 +504,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
           children: [
             Icon(Icons.people_outline, size: 64, color: Colors.grey),
             SizedBox(height: 16),
-            Text('لا توجد بيانات موظفين', style: TextStyle(fontSize: 18)),
+            Text('لا توجد بيانات للموظفين', style: TextStyle(fontSize: 18)),
           ],
         ),
       );
@@ -589,15 +596,15 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
               ),
               _buildSummaryListTile(
                 'إجمالي المصروفات',
-                'ج.م ${totalEmployeeExpenses.toStringAsFixed(2)}',
+                'EGP ${totalEmployeeExpenses.toStringAsFixed(2)}',
                 Icons.money_off,
                 Colors.red,
               ),
               _buildSummaryListTile(
                 'المتوسط لكل طلب',
                 totalOrders > 0
-                    ? 'ج.م ${(totalEmployeeExpenses / totalOrders).toStringAsFixed(2)}'
-                    : 'ج.م 0.00',
+                    ? 'EGP ${(totalEmployeeExpenses / totalOrders).toStringAsFixed(2)}'
+                    : 'EGP 0.00',
                 Icons.calculate,
                 Colors.orange,
               ),
@@ -694,7 +701,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          '${employeeOrders.length} طلب • ج.م ${employeeExpenses.toStringAsFixed(2)} مصروفات',
+          '${employeeOrders.length} طلبات • EGP ${employeeExpenses.toStringAsFixed(2)} مصروفات',
         ),
         trailing: employeeOrders.isNotEmpty
             ? IconButton(
@@ -704,7 +711,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                   employee,
                   employeeOrders,
                 ),
-                tooltip: 'View all orders',
+                tooltip: 'عرض جميع الطلبات',
               )
             : null,
         children: [
@@ -722,13 +729,13 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                 ),
                 _buildEmployeeStatListTile(
                   'الإيرادات',
-                  'ج.م ${employeeRevenue.toStringAsFixed(2)}',
+                  'EGP ${employeeRevenue.toStringAsFixed(2)}',
                   Icons.attach_money,
                   Colors.green,
                 ),
                 _buildEmployeeStatListTile(
                   'المصروفات',
-                  'ج.م ${employeeExpenses.toStringAsFixed(2)}',
+                  'EGP ${employeeExpenses.toStringAsFixed(2)}',
                   Icons.money_off,
                   Colors.red,
                 ),
@@ -790,7 +797,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  'ج.م ${orderRevenue.toStringAsFixed(2)}',
+                  'EGP ${orderRevenue.toStringAsFixed(2)}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
@@ -798,7 +805,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                 ),
                 if (orderExpenseTotal > 0)
                   Text(
-                    'مصروفات: ج.م ${orderExpenseTotal.toStringAsFixed(2)}',
+                    'مصروفات: ${orderExpenseTotal.toStringAsFixed(2)} جنيه',
                     style: const TextStyle(color: Colors.red, fontSize: 10),
                   ),
               ],
@@ -808,17 +815,16 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
               icon: const Icon(Icons.visibility, size: 16),
               onPressed: () =>
                   _navigateToOrderDetail(context, order, orderExpenses),
-              tooltip: 'View order details',
+              tooltip: 'عرض تفاصيل الطلب',
             ),
-            if (order['status'] != 'delivered')
-              IconButton(
-                icon: const Icon(Icons.edit, size: 16),
-                onPressed: () => _showOrderStatusDialog(
-                  orderId!,
-                  order['status'] ?? 'pending',
-                ),
-                tooltip: 'Update order status',
+            IconButton(
+              icon: const Icon(Icons.edit, size: 16),
+              onPressed: () => _showOrderStatusDialog(
+                orderId!,
+                order['status'] ?? 'pending',
               ),
+              tooltip: 'تحديث حالة الطلب',
+            ),
           ],
         ),
         children: [
@@ -830,19 +836,19 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                 // Order details
                 _buildOrderDetailListTile(
                   'الإيرادات',
-                  'ج.م ${orderRevenue.toStringAsFixed(2)}',
+                  'EGP ${orderRevenue.toStringAsFixed(2)}',
                   Icons.attach_money,
                   Colors.green,
                 ),
                 _buildOrderDetailListTile(
                   'المصروفات',
-                  'ج.م ${orderExpenseTotal.toStringAsFixed(2)}',
+                  'EGP ${orderExpenseTotal.toStringAsFixed(2)}',
                   Icons.money_off,
                   Colors.red,
                 ),
                 _buildOrderDetailListTile(
-                  'صافي',
-                  'ج.م ${(orderRevenue - orderExpenseTotal).toStringAsFixed(2)}',
+                  'Net',
+                  'EGP ${(orderRevenue - orderExpenseTotal).toStringAsFixed(2)}',
                   Icons.account_balance,
                   Colors.blue,
                 ),
@@ -850,7 +856,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                 // Expenses list
                 if (orderExpenses.isNotEmpty) ...[
                   Text(
-                    'تفاصيل المصروفات',
+                    'Expense Details',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -875,7 +881,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'لا توجد مصروفات مسجلة لهذا الطلب',
+                          'No expenses recorded for this order',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 12,
@@ -942,7 +948,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  expense['title'] ?? 'مصروف غير معروف',
+                  expense['title'] ?? 'Unknown Expense',
                   style: const TextStyle(
                     fontWeight: FontWeight.w500,
                     fontSize: 12,
@@ -958,7 +964,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
             ),
           ),
           Text(
-            'ج.م ${expense['amount']?.toString() ?? '0'}',
+            'EGP ${expense['amount']?.toString() ?? '0'}',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.red[700],
@@ -1158,12 +1164,12 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Success'),
+        title: const Text('نجح'),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+            child: const Text('موافق'),
           ),
         ],
       ),
@@ -1174,12 +1180,12 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Error'),
+        title: const Text('خطأ'),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+            child: const Text('موافق'),
           ),
         ],
       ),
@@ -1205,8 +1211,8 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
     BuildContext context,
     Map<String, dynamic> order,
     List<dynamic> orderExpenses,
-  ) async {
-    final result = await context.push(
+  ) {
+    context.push(
       '/order-detail',
       extra: {
         'order': order,
@@ -1214,11 +1220,6 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
         'paymentSummary': paymentSummaryByOrder[order['_id']?.toString()],
       },
     );
-
-    // Reload data when returning from order detail to reflect any status changes
-    if (result == true) {
-      _loadFinancialData();
-    }
   }
 
   Future<void> _updateOrderStatus(String orderId, String newStatus) async {
@@ -1307,7 +1308,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('الحالة الحالية: ${_getOrderStatusText(currentStatus)}'),
+            Text('الحالة الحالية: ${_getOrderStatusArabic(currentStatus)}'),
             const SizedBox(height: 16),
             const Text('اختر الحالة الجديدة:'),
             const SizedBox(height: 8),
@@ -1324,7 +1325,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                         }
                       },
                     ),
-                    title: Text(_getOrderStatusText(status)),
+                    title: Text(_getOrderStatusArabic(status)),
                     subtitle: Text(_getStatusDescription(status)),
                     onTap: () {
                       Navigator.of(context).pop();
@@ -1347,20 +1348,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
     );
   }
 
-  String _getStatusDescription(String status) {
-    switch (status) {
-      case 'pending':
-        return 'الطلب في انتظار الموافقة';
-      case 'delivered':
-        return 'تم الموافقة على الطلب وتسليمه';
-      case 'cancelled':
-        return 'تم إلغاء الطلب';
-      default:
-        return '';
-    }
-  }
-
-  String _getOrderStatusText(String? status) {
+  String _getOrderStatusArabic(String? status) {
     switch (status) {
       case 'pending':
         return 'في الانتظار';
@@ -1370,6 +1358,19 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
         return 'ملغي';
       default:
         return 'غير معروف';
+    }
+  }
+
+  String _getStatusDescription(String status) {
+    switch (status) {
+      case 'pending':
+        return 'الطلب في انتظار الموافقة';
+      case 'delivered':
+        return 'تمت الموافقة على الطلب وتسليمه';
+      case 'cancelled':
+        return 'تم إلغاء الطلب';
+      default:
+        return '';
     }
   }
 }
@@ -1463,7 +1464,7 @@ class _FinancialRecordFormDialogState
                   ) {
                     return DropdownMenuItem<String>(
                       value: employee['_id'],
-                      child: Text(employee['username'] ?? 'غير معروف'),
+                      child: Text(employee['username'] ?? 'Unknown'),
                     );
                   }).toList(),
                   onChanged: (value) {
@@ -1476,7 +1477,7 @@ class _FinancialRecordFormDialogState
               TextFormField(
                 controller: _revenueController,
                 decoration: const InputDecoration(
-                  labelText: 'الإيرادات (ج.م)',
+                  labelText: 'الإيرادات (جنيه مصري)',
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
@@ -1495,7 +1496,7 @@ class _FinancialRecordFormDialogState
               TextFormField(
                 controller: _expensesController,
                 decoration: const InputDecoration(
-                  labelText: 'المصروفات (ج.م)',
+                  labelText: 'المصروفات (جنيه مصري)',
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
@@ -1514,7 +1515,7 @@ class _FinancialRecordFormDialogState
               TextFormField(
                 controller: _debtsController,
                 decoration: const InputDecoration(
-                  labelText: 'الديون المستحقة (ج.م)',
+                  labelText: 'الديون المستحقة (جنيه مصري)',
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,

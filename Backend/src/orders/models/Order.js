@@ -21,6 +21,31 @@ const orderSchema = new mongoose.Schema({
     ref: 'Customer',
     required: true
   },
+  // New fields from frontend
+  type: {
+    type: String,
+    required: true
+  },
+  grossWeight: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  netWeight: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  todayAccount: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  totalPrice: {
+    type: Number,
+    required: true,
+    min: 0
+  },
   offer: {
     type: String,
   },
