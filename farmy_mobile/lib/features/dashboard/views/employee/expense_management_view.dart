@@ -113,7 +113,10 @@ class _ExpenseManagementViewState extends State<ExpenseManagementView> {
                               decoration: const InputDecoration(
                                 labelText: 'البند',
                                 border: OutlineInputBorder(),
+                                alignLabelWithHint: true,
                               ),
+                              textDirection: TextDirection.rtl,
+                              textAlign: TextAlign.right,
                               validator: (v) =>
                                   (v == null || v.isEmpty) ? 'مطلوب' : null,
                             ),
@@ -123,7 +126,10 @@ class _ExpenseManagementViewState extends State<ExpenseManagementView> {
                               decoration: const InputDecoration(
                                 labelText: 'القيمة (ج.م)',
                                 border: OutlineInputBorder(),
+                                alignLabelWithHint: true,
                               ),
+                              textDirection: TextDirection.rtl,
+                              textAlign: TextAlign.right,
                               keyboardType: TextInputType.number,
                               validator: (v) {
                                 final n = double.tryParse(v ?? '');
@@ -137,7 +143,11 @@ class _ExpenseManagementViewState extends State<ExpenseManagementView> {
                               decoration: const InputDecoration(
                                 labelText: 'ملاحظة (اختياري)',
                                 border: OutlineInputBorder(),
+                                alignLabelWithHint: true,
                               ),
+                              textDirection: TextDirection.rtl,
+                              textAlign: TextAlign.right,
+                              maxLines: 3,
                             ),
                             const SizedBox(height: 8),
                             SizedBox(

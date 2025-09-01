@@ -6,8 +6,9 @@ import '../models/login_response.dart';
 import '../models/user.dart';
 
 class AuthService {
-  // Use 10.0.2.2 for Android emulator, 127.0.0.1 for other platforms
-  static const String baseUrl = 'http://10.0.2.2:3000/api';
+  // Use Vercel deployment URL
+  static const String baseUrl =
+      'https://farmy-3b980tcc5-ahmed-alis-projects-588ffe47.vercel.app/api';
 
   /// Login user with username and password
   Future<LoginResponse> login(LoginRequest request) async {

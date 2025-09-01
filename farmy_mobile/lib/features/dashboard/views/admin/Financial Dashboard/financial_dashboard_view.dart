@@ -23,7 +23,8 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
   Map<String, List<dynamic>> expensesByOrder = {};
   Map<String, dynamic> paymentSummaryByOrder = {};
   bool isLoading = true;
-  final String baseUrl = 'http://10.0.2.2:3000/api';
+  final String baseUrl =
+      'https://farmy-3b980tcc5-ahmed-alis-projects-588ffe47.vercel.app/api';
   late final ExpenseApiService _expenseService;
   late final OrderApiService _orderService;
   late final InventoryApiService _inventoryService;
@@ -193,6 +194,8 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
       child: Scaffold(
         appBar: AppBar(
           title: const Text('لوحة المعلومات المالية'),
+          backgroundColor: Theme.of(context).primaryColor,
+          foregroundColor: Colors.white,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/admin-dashboard'),
@@ -209,22 +212,12 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
           ],
           bottom: TabBar(
             controller: _tabController,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
             tabs: const [
-              Tab(
-                text: 'التقارير اليومية',
-                icon: Icon(Icons.today),
-                // tooltip: 'تقارير يومية',
-              ),
-              Tab(
-                text: 'طلبات العملاء',
-                icon: Icon(Icons.shopping_cart),
-                // tooltip: 'طلبات العملاء',
-              ),
-              Tab(
-                text: 'مالية الموظفين',
-                icon: Icon(Icons.people),
-                // tooltip: 'مالية الموظفين',
-              ),
+              Tab(text: 'التقارير اليومية', icon: Icon(Icons.today)),
+              Tab(text: 'طلبات العملاء', icon: Icon(Icons.shopping_cart)),
+              Tab(text: 'مالية الموظفين', icon: Icon(Icons.people)),
             ],
           ),
         ),
@@ -252,7 +245,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.bar_chart, size: 64, color: Colors.white),
+            Icon(Icons.bar_chart, size: 64, color: Colors.grey),
             SizedBox(height: 16),
             Text('لا توجد طلبات', style: TextStyle(fontSize: 18)),
           ],

@@ -175,7 +175,8 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
                       leading: CircleAvatar(
                         backgroundColor: Colors.green,
                         child: Text(
-                          customer['name']?.substring(0, 1).toUpperCase() ?? 'ع',
+                          customer['name']?.substring(0, 1).toUpperCase() ??
+                              'ع',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -196,9 +197,6 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
                             'العنوان: ${customer['contactInfo']?['address'] ?? 'غير متوفر'}',
                           ),
                           Text('الطلبات: ${customer['orders']?.length ?? 0}'),
-                          Text(
-                            'الديون المستحقة: ج.م ${customer['outstandingDebts'] ?? 0}',
-                          ),
                         ],
                       ),
                       trailing: Row(

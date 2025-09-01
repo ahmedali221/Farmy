@@ -204,7 +204,6 @@ class _LoginViewState extends State<LoginView> {
                             const SizedBox(height: 8),
                             const Text('مدير: admin / admin123'),
                             const Text('موظف: employee1 / employee123'),
-                            const Text('مدير عام: manager1 / manager123'),
                           ],
                         ),
                       ),

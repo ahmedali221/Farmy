@@ -10,6 +10,9 @@ import '../../../../core/services/order_api_service.dart';
 import '../../../../core/services/inventory_api_service.dart';
 import '../../../../core/services/customer_api_service.dart';
 import '../../../../core/theme/app_theme.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../authentication/cubit/auth_cubit.dart';
+import '../../../authentication/cubit/auth_state.dart';
 
 class OrderPlacementView extends StatefulWidget {
   const OrderPlacementView({super.key});
@@ -244,6 +247,25 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     );
   }
 
+  String _formatToday() {
+    final now = DateTime.now();
+    const months = [
+      'يناير',
+      'فبراير',
+      'مارس',
+      'أبريل',
+      'مايو',
+      'يونيو',
+      'يوليو',
+      'أغسطس',
+      'سبتمبر',
+      'أكتوبر',
+      'نوفمبر',
+      'ديسمبر',
+    ];
+    return '${now.day.toString().padLeft(2, '0')} ${months[now.month - 1]} ${now.year}';
+  }
+
   Future<void> _generateInvoice() async {
     try {
       // Check if required data is available
@@ -263,6 +285,18 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
       final quantity = double.tryParse(_quantityController.text) ?? 0;
       final totalPrice = quantity * chickenType['price'];
 
+      // Get current employee info from auth cubit
+      String employeeName = 'موظف النظام';
+      try {
+        // Get current user from auth cubit
+        final authState = context.read<AuthCubit>().state;
+        if (authState is AuthAuthenticated) {
+          employeeName = authState.user.username;
+        }
+      } catch (e) {
+        employeeName = 'موظف النظام';
+      }
+
       final pdf = pw.Document();
 
       pdf.addPage(
@@ -280,7 +314,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         pw.Text(
-                          'FARMY',
+                          'فارمي',
                           style: pw.TextStyle(
                             fontSize: 24,
                             fontWeight: pw.FontWeight.bold,
@@ -288,7 +322,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                           ),
                         ),
                         pw.Text(
-                          'Farm Management System',
+                          'نظام إدارة المزرعة',
                           style: pw.TextStyle(
                             fontSize: 12,
                             color: PdfColors.grey,
@@ -300,14 +334,14 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
                         pw.Text(
-                          'INVOICE',
+                          'فاتورة طلب',
                           style: pw.TextStyle(
                             fontSize: 20,
                             fontWeight: pw.FontWeight.bold,
                           ),
                         ),
                         pw.Text(
-                          'Date: ${DateTime.now().toString().split(' ')[0]}',
+                          'التاريخ: ${_formatToday()}',
                           style: pw.TextStyle(fontSize: 12),
                         ),
                       ],
@@ -329,20 +363,47 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text(
-                        'Customer Information:',
+                        'معلومات العميل:',
                         style: pw.TextStyle(
                           fontSize: 14,
                           fontWeight: pw.FontWeight.bold,
                         ),
                       ),
                       pw.SizedBox(height: 5),
-                      pw.Text('Name: ${customer['name']}'),
+                      pw.Text('الاسم: ${customer['name']}'),
                       pw.Text(
-                        'Phone: ${customer['contactInfo']?['phone'] ?? 'N/A'}',
+                        'الهاتف: ${customer['contactInfo']?['phone'] ?? 'غير متوفر'}',
                       ),
                       pw.Text(
-                        'Address: ${customer['contactInfo']?['address'] ?? 'N/A'}',
+                        'العنوان: ${customer['contactInfo']?['address'] ?? 'غير متوفر'}',
                       ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+
+                // Employee Information
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey),
+                    borderRadius: const pw.BorderRadius.all(
+                      pw.Radius.circular(5),
+                    ),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'معلومات الموظف:',
+                        style: pw.TextStyle(
+                          fontSize: 14,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 5),
+                      pw.Text('الموظف: $employeeName'),
+                      pw.Text('التاريخ: ${_formatToday()}'),
                     ],
                   ),
                 ),
@@ -361,18 +422,18 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text(
-                        'Order Details:',
+                        'تفاصيل الطلب:',
                         style: pw.TextStyle(
                           fontSize: 14,
                           fontWeight: pw.FontWeight.bold,
                         ),
                       ),
                       pw.SizedBox(height: 5),
-                      pw.Text('Chicken Type: ${chickenType['name']}'),
-                      pw.Text('Quantity: ${quantity.toStringAsFixed(2)} kg'),
-                      pw.Text('Price per kg: EGP ${chickenType['price']}'),
+                      pw.Text('نوع الدجاج: ${chickenType['name']}'),
+                      pw.Text('الكمية: ${quantity.toStringAsFixed(2)} كيلو'),
+                      pw.Text('السعر لكل كيلو: ${chickenType['price']} ج.م'),
                       pw.Text(
-                        'Total Price: EGP ${totalPrice.toStringAsFixed(2)}',
+                        'السعر الإجمالي: ${totalPrice.toStringAsFixed(2)} ج.م',
                       ),
                     ],
                   ),
@@ -392,19 +453,56 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text(
-                        'TOTAL AMOUNT:',
+                        'إجمالي المبلغ:',
                         style: pw.TextStyle(
                           fontSize: 16,
                           fontWeight: pw.FontWeight.bold,
                         ),
                       ),
                       pw.Text(
-                        'EGP ${totalPrice.toStringAsFixed(2)}',
+                        '${totalPrice.toStringAsFixed(2)} ج.م',
                         style: pw.TextStyle(
                           fontSize: 18,
                           fontWeight: pw.FontWeight.bold,
                           color: PdfColors.blue,
                         ),
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+
+                // Footer
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey),
+                    borderRadius: const pw.BorderRadius.all(
+                      pw.Radius.circular(5),
+                    ),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'ملاحظات:',
+                        style: pw.TextStyle(
+                          fontSize: 12,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 5),
+                      pw.Text(
+                        '• هذا الطلب صالح لمدة 7 أيام من تاريخ الإصدار',
+                        style: pw.TextStyle(fontSize: 10),
+                      ),
+                      pw.Text(
+                        '• في حالة وجود أي استفسار، يرجى التواصل مع إدارة المزرعة',
+                        style: pw.TextStyle(fontSize: 10),
+                      ),
+                      pw.Text(
+                        '• شكراً لثقتكم في منتجاتنا',
+                        style: pw.TextStyle(fontSize: 10),
                       ),
                     ],
                   ),
@@ -923,6 +1021,7 @@ class _NumField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       enabled: enabled,
+      textDirection: TextDirection.rtl,
       textAlign: TextAlign.right,
       keyboardType: TextInputType.number,
       onChanged: onChanged,
@@ -936,6 +1035,7 @@ class _NumField extends StatelessWidget {
           vertical: 12,
         ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        alignLabelWithHint: true,
       ),
     );
   }
@@ -972,7 +1072,10 @@ class _DropdownField extends StatelessWidget {
           vertical: 12,
         ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        alignLabelWithHint: true,
       ),
+      dropdownColor: Colors.white,
+      icon: const Icon(Icons.arrow_drop_down),
     );
   }
 }
