@@ -6,6 +6,7 @@ import '../../../../../core/di/service_locator.dart';
 import '../../../../../core/services/expense_api_service.dart';
 import '../../../../../core/services/order_api_service.dart';
 import '../../../../../core/services/inventory_api_service.dart';
+import '../../../../../core/services/payment_api_service.dart';
 
 class FinancialDashboardView extends StatefulWidget {
   const FinancialDashboardView({super.key});
@@ -22,12 +23,15 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
   List<dynamic> employees = [];
   Map<String, List<dynamic>> expensesByOrder = {};
   Map<String, dynamic> paymentSummaryByOrder = {};
+  Map<String, List<dynamic>> paymentsByOrder = {};
   bool isLoading = true;
+  List<Map<String, dynamic>> otherExpenses = [];
   final String baseUrl =
       'https://farmy-3b980tcc5-ahmed-alis-projects-588ffe47.vercel.app/api';
   late final ExpenseApiService _expenseService;
   late final OrderApiService _orderService;
   late final InventoryApiService _inventoryService;
+  late final PaymentApiService _paymentService;
 
   @override
   void initState() {
@@ -36,6 +40,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
     _expenseService = serviceLocator<ExpenseApiService>();
     _orderService = serviceLocator<OrderApiService>();
     _inventoryService = serviceLocator<InventoryApiService>();
+    _paymentService = serviceLocator<PaymentApiService>();
     _loadFinancialData();
   }
 
@@ -115,10 +120,14 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
         if (id == null) continue;
         futures.add(_fetchExpensesForOrder(id));
         futures.add(_fetchPaymentSummaryForOrder(id));
+        futures.add(_fetchPaymentsForOrder(id));
       }
       await Future.wait(futures);
       print(
         'Loaded expenses for ${expensesByOrder.length} orders',
+      ); // Debug log
+      print(
+        'Loaded payments for ${paymentsByOrder.length} orders',
       ); // Debug log
       print('Expenses by order: $expensesByOrder'); // Debug log
     } catch (e) {
@@ -152,6 +161,21 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
       }
     } catch (e) {
       print('Error loading payment summary for order $orderId: $e');
+    }
+  }
+
+  Future<void> _fetchPaymentsForOrder(String orderId) async {
+    try {
+      print('Fetching payments for order: $orderId'); // Debug log
+      final payments = await _paymentService.getPaymentsByOrder(orderId);
+      print(
+        'Found ${payments.length} payments for order $orderId',
+      ); // Debug log
+      paymentsByOrder[orderId] = payments;
+    } catch (e) {
+      print('Error loading payments for order $orderId: $e');
+      // Set empty list to avoid null issues
+      paymentsByOrder[orderId] = [];
     }
   }
 
@@ -222,7 +246,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
               unselectedLabelColor: Colors.white70,
               tabs: const [
                 Tab(text: 'التقارير اليومية', icon: Icon(Icons.today)),
-                Tab(text: 'طلبات العملاء', icon: Icon(Icons.shopping_cart)),
+                Tab(text: 'الخزنة', icon: Icon(Icons.account_balance)),
                 Tab(text: 'مالية الموظفين', icon: Icon(Icons.people)),
               ],
             ),
@@ -233,7 +257,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                   controller: _tabController,
                   children: [
                     _buildDailyReportsTab(),
-                    _buildOrdersTab(),
+                    _buildTreasuryTab(),
                     _buildEmployeeFinanceTab(),
                   ],
                 ),
@@ -248,15 +272,10 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
 
   Widget _buildDailyReportsTab() {
     if (orders.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.bar_chart, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('لا توجد طلبات', style: TextStyle(fontSize: 18)),
-          ],
-        ),
+      return _buildEmptyState(
+        Icons.bar_chart,
+        'لا توجد طلبات',
+        'لم يتم العثور على أي طلبات لعرض التقارير',
       );
     }
 
@@ -286,245 +305,410 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
         return db.compareTo(da);
       });
 
-    return Column(
-      children: [
-        // Summary Cards
-        Container(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: _buildFinancialSummaryCard(
-                  'إجمالي الطلبات',
-                  totalOrders.toString(),
-                  Icons.shopping_cart,
-                  Colors.blue,
-                ),
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Header Section
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.indigo, Colors.indigo.withOpacity(0.8)],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildFinancialSummaryCard(
-                  'إجمالي المال',
-                  ' ${totalRevenue.toStringAsFixed(2)} ج.م',
-                  Icons.attach_money,
-                  Colors.green,
-                ),
-              ),
-            ],
-          ),
-        ),
-        // Daily breakdown
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: dailyList.length,
-            itemBuilder: (context, index) {
-              final item = dailyList[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Colors.indigo,
-                    child: Icon(Icons.today, color: Colors.white),
-                  ),
-                  title: Text(
-                    'تقرير يومي - ${item['date']}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    'الطلبات: ${item['orders']}  •  المال: EGP ${(item['revenue'] as double).toStringAsFixed(2)}',
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.today, size: 48, color: Colors.white),
+                const SizedBox(height: 12),
+                const Text(
+                  'التقارير اليومية',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
-              );
-            },
+                const SizedBox(height: 8),
+                Text(
+                  'ملخص الطلبات والإيرادات حسب التاريخ',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white.withOpacity(0.9),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+
+          // Summary Cards
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'ملخص عام',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildEnhancedTreasuryCard(
+                        'إجمالي الطلبات',
+                        totalOrders.toString(),
+                        Icons.shopping_cart,
+                        Colors.blue,
+                        'عدد الطلبات الإجمالي',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildEnhancedTreasuryCard(
+                        'إجمالي الإيرادات',
+                        'EGP ${totalRevenue.toStringAsFixed(2)}',
+                        Icons.attach_money,
+                        Colors.green,
+                        'إجمالي المبالغ المحصلة',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Daily Reports Section
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.calendar_today,
+                        color: Colors.indigo,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'التقارير اليومية',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ...dailyList
+                    .map((item) => _buildDailyReportCard(item))
+                    .toList(),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+        ],
+      ),
     );
   }
 
-  Widget _buildOrdersTab() {
-    if (orders.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('لا توجد طلبات', style: TextStyle(fontSize: 18)),
-          ],
-        ),
-      );
+  Widget _buildTreasuryTab() {
+    // Calculate total money collected by all employees based on paid amounts
+    double totalMoneyCollected = 0.0;
+    Map<String, double> employeeMoney = {};
+
+    for (final employee in employees) {
+      final String employeeId = employee['_id'] ?? '';
+      double employeeTotal = 0.0;
+
+      // Find orders for this employee by checking payments
+      for (final order in orders) {
+        final String? orderId = order['_id']?.toString();
+        if (orderId != null) {
+          final List<dynamic> orderPayments = paymentsByOrder[orderId] ?? [];
+          // Check if any payment for this order belongs to this employee
+          final bool hasEmployeePayment = orderPayments.any(
+            (payment) => payment['employee']?['_id'] == employeeId,
+          );
+          if (hasEmployeePayment) {
+            // Sum up all paid amounts for this employee in this order
+            final double orderPaidAmount = orderPayments
+                .where((payment) => payment['employee']?['_id'] == employeeId)
+                .fold(
+                  0.0,
+                  (sum, payment) =>
+                      sum + ((payment['paidAmount'] ?? 0) as num).toDouble(),
+                );
+            employeeTotal += orderPaidAmount;
+          }
+        }
+      }
+
+      employeeMoney[employeeId] = employeeTotal;
+      totalMoneyCollected += employeeTotal;
     }
 
-    // Calculate order statistics
-    int totalOrders = orders.length;
-    int pendingOrders = orders
-        .where((order) => order['status'] == 'pending')
-        .length;
-    int deliveredOrders = orders
-        .where((order) => order['status'] == 'delivered')
-        .length;
-    int cancelledOrders = orders
-        .where((order) => order['status'] == 'cancelled')
-        .length;
+    // Calculate total other expenses
+    double totalOtherExpenses = otherExpenses.fold(0.0, (sum, expense) {
+      return sum + (expense['value'] ?? 0.0);
+    });
 
-    return Column(
-      children: [
-        // Order Statistics
-        Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildOrderStatCard(
-                      'إجمالي الطلبات',
-                      totalOrders.toString(),
-                      Icons.shopping_cart,
-                      Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildOrderStatCard(
-                      'في الانتظار',
-                      pendingOrders.toString(),
-                      Icons.pending,
-                      Colors.orange,
-                    ),
-                  ),
+    // Calculate treasury total
+    double treasuryTotal = totalMoneyCollected - totalOtherExpenses;
+
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Header Section
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Theme.of(context).primaryColor,
+                  Theme.of(context).primaryColor.withOpacity(0.8),
                 ],
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildOrderStatCard(
-                      'تم التسليم',
-                      deliveredOrders.toString(),
-                      Icons.check_circle,
-                      Colors.green,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildOrderStatCard(
-                      'ملغي',
-                      cancelledOrders.toString(),
-                      Icons.cancel,
-                      Colors.red,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        // Orders List
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: orders.length,
-            itemBuilder: (context, index) {
-              final order = orders[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: _getOrderStatusColor(order['status']),
-                    child: Icon(
-                      _getOrderStatusIcon(order['status']),
-                      color: Colors.white,
-                    ),
-                  ),
-                  title: Text(
-                    'طلب رقم #${order['_id']?.substring(0, 8) ?? 'غير معروف'}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'العميل: ${order['customer']?['name'] ?? 'غير معروف'}',
-                      ),
-                      Text(
-                        'نوع الدجاج: ${order['chickenType']?['name'] ?? 'غير معروف'}',
-                      ),
-                      Text('الكمية: ${order['quantity'] ?? 0}'),
-                      Text(
-                        'الحالة: ${_getOrderStatusArabic(order['status'])}',
-                        style: TextStyle(
-                          color: _getOrderStatusColor(order['status']),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _formatDate(order['orderDate']),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.visibility, size: 16),
-                        onPressed: () {
-                          final String? orderId = order['_id']?.toString();
-                          final List<dynamic> orderExpenses = orderId != null
-                              ? (expensesByOrder[orderId] ?? [])
-                              : [];
-                          _navigateToOrderDetail(context, order, orderExpenses);
-                        },
-                        tooltip: 'عرض تفاصيل الطلب',
-                      ),
-                    ],
-                  ),
-                  isThreeLine: true,
+            ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.account_balance,
+                  size: 48,
+                  color: Colors.white,
                 ),
-              );
-            },
+                const SizedBox(height: 12),
+                const Text(
+                  'الخزنة المالية',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'إجمالي الأموال المحصلة والمصاريف',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white.withOpacity(0.9),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+
+          // Summary Cards Section
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'ملخص مالي',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildEnhancedTreasuryCard(
+                        'إجمالي التحصيل',
+                        'EGP ${totalMoneyCollected.toStringAsFixed(2)}',
+                        Icons.trending_up,
+                        Colors.green,
+                        'المبلغ الإجمالي المحصل من جميع الموظفين',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildEnhancedTreasuryCard(
+                        'المصاريف الأخرى',
+                        'EGP ${totalOtherExpenses.toStringAsFixed(2)}',
+                        Icons.trending_down,
+                        Colors.red,
+                        'المصاريف الإضافية المضافة يدوياً',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildEnhancedTreasuryCard(
+                  'إجمالي الخزنة',
+                  'EGP ${treasuryTotal.toStringAsFixed(2)}',
+                  Icons.account_balance_wallet,
+                  Colors.blue,
+                  'الرصيد النهائي بعد خصم المصاريف',
+                  isMain: true,
+                ),
+              ],
+            ),
+          ),
+
+          // Employee Collection Section
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.people,
+                        color: Colors.blue,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'تحصيل الموظفين',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (employees.isEmpty)
+                  _buildEmptyState(
+                    Icons.people_outline,
+                    'لا يوجد موظفين',
+                    'لم يتم العثور على أي موظفين في النظام',
+                  )
+                else
+                  ...employees.map((employee) {
+                    final String employeeId = employee['_id'] ?? '';
+                    final double employeeTotal =
+                        employeeMoney[employeeId] ?? 0.0;
+                    return _buildEmployeeCollectionCard(
+                      employee,
+                      employeeTotal,
+                    );
+                  }).toList(),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Other Expenses Section
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.money_off,
+                        color: Colors.red,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'مصاريف أخرى',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const Spacer(),
+                    ElevatedButton.icon(
+                      onPressed: _addOtherExpense,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('إضافة مصروف'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (otherExpenses.isEmpty)
+                  _buildEmptyState(
+                    Icons.money_off_outlined,
+                    'لا توجد مصاريف أخرى',
+                    'اضغط على "إضافة مصروف" لإضافة مصاريف جديدة',
+                  )
+                else
+                  ...otherExpenses.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final expense = entry.value;
+                    return _buildOtherExpenseCard(expense, index);
+                  }).toList(),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+        ],
+      ),
     );
   }
 
   Widget _buildEmployeeFinanceTab() {
     if (employees.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.people_outline, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('لا توجد بيانات للموظفين', style: TextStyle(fontSize: 18)),
-          ],
-        ),
+      return _buildEmptyState(
+        Icons.people_outline,
+        'لا توجد بيانات للموظفين',
+        'لم يتم العثور على أي موظفين في النظام',
       );
     }
 
     if (orders.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('لا توجد طلبات', style: TextStyle(fontSize: 18)),
-            SizedBox(height: 8),
-            Text(
-              'الطلبات مطلوبة لعرض مصروفات الموظفين',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-          ],
-        ),
+      return _buildEmptyState(
+        Icons.shopping_cart_outlined,
+        'لا توجد طلبات',
+        'الطلبات مطلوبة لعرض مصروفات الموظفين',
       );
     }
 
@@ -541,17 +725,17 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
         'Processing employee: ${employee['username']} (ID: $employeeId)',
       ); // Debug log
 
-      // Find orders for this employee by checking expenses
+      // Find orders for this employee by checking payments
       final List<dynamic> employeeOrders = [];
       for (final order in orders) {
         final String? orderId = order['_id']?.toString();
         if (orderId != null) {
-          final List<dynamic> orderExpenses = expensesByOrder[orderId] ?? [];
-          // Check if any expense for this order belongs to this employee
-          final bool hasEmployeeExpense = orderExpenses.any(
-            (expense) => expense['employee']?['_id'] == employeeId,
+          final List<dynamic> orderPayments = paymentsByOrder[orderId] ?? [];
+          // Check if any payment for this order belongs to this employee
+          final bool hasEmployeePayment = orderPayments.any(
+            (payment) => payment['employee']?['_id'] == employeeId,
           );
-          if (hasEmployeeExpense) {
+          if (hasEmployeePayment) {
             employeeOrders.add(order);
           }
         }
@@ -655,27 +839,39 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
   Widget _buildEmployeeCard(dynamic employee) {
     final String employeeId = employee['_id'] ?? '';
 
-    // Find orders for this employee by checking expenses
+    // Find orders for this employee by checking payments
     final List<dynamic> employeeOrders = [];
     for (final order in orders) {
       final String? orderId = order['_id']?.toString();
       if (orderId != null) {
-        final List<dynamic> orderExpenses = expensesByOrder[orderId] ?? [];
-        // Check if any expense for this order belongs to this employee
-        final bool hasEmployeeExpense = orderExpenses.any(
-          (expense) => expense['employee']?['_id'] == employeeId,
+        final List<dynamic> orderPayments = paymentsByOrder[orderId] ?? [];
+        // Check if any payment for this order belongs to this employee
+        final bool hasEmployeePayment = orderPayments.any(
+          (payment) => payment['employee']?['_id'] == employeeId,
         );
-        if (hasEmployeeExpense) {
+        if (hasEmployeePayment) {
           employeeOrders.add(order);
         }
       }
     }
 
-    // Calculate employee totals
-    final double employeeRevenue = employeeOrders.fold(
-      0.0,
-      (sum, o) => sum + _orderTotalPrice(o),
-    );
+    // Calculate employee totals based on paid amounts
+    final double employeeRevenue = employeeOrders.fold(0.0, (sum, o) {
+      final String? orderId = o['_id']?.toString();
+      if (orderId != null) {
+        final List<dynamic> orderPayments = paymentsByOrder[orderId] ?? [];
+        return sum +
+            orderPayments
+                .where((payment) => payment['employee']?['_id'] == employeeId)
+                .fold(
+                  0.0,
+                  (paymentSum, payment) =>
+                      paymentSum +
+                      ((payment['paidAmount'] ?? 0) as num).toDouble(),
+                );
+      }
+      return sum;
+    });
     final double employeeExpenses = employeeOrders.fold(0.0, (sum, o) {
       final String? id = o['_id']?.toString();
       final List<dynamic> list = id != null ? (expensesByOrder[id] ?? []) : [];
@@ -764,7 +960,13 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
     final List<dynamic> orderExpenses = orderId != null
         ? (expensesByOrder[orderId] ?? [])
         : [];
-    final double orderRevenue = _orderTotalPrice(order);
+    final List<dynamic> orderPayments = orderId != null
+        ? (paymentsByOrder[orderId] ?? [])
+        : [];
+    final double orderRevenue = orderPayments.fold(
+      0.0,
+      (sum, payment) => sum + ((payment['paidAmount'] ?? 0) as num).toDouble(),
+    );
     final double orderExpenseTotal = orderExpenses.fold(
       0.0,
       (sum, e) => sum + ((e['amount'] ?? 0) as num).toDouble(),
@@ -976,65 +1178,298 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
     );
   }
 
-  Widget _buildFinancialSummaryCard(
+  Widget _buildEnhancedTreasuryCard(
     String title,
     String value,
     IconData icon,
     Color color,
-  ) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: color,
+    String description, {
+    bool isMain = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isMain ? color.withOpacity(0.1) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isMain ? color : color.withOpacity(0.3),
+          width: isMain ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 24),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: isMain ? 18 : 16,
+                    fontWeight: FontWeight.bold,
+                    color: isMain ? color : Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: isMain ? 24 : 20,
+              fontWeight: FontWeight.bold,
+              color: color,
             ),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-              textAlign: TextAlign.center,
-            ),
-          ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            description,
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmployeeCollectionCard(dynamic employee, double total) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Theme.of(context).primaryColor,
+                      Theme.of(context).primaryColor.withOpacity(0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: Center(
+                  child: Text(
+                    employee['username']?.substring(0, 1).toUpperCase() ?? 'E',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      employee['username'] ?? 'موظف غير معروف',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'إجمالي التحصيل',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'EGP ${total.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildOrderStatCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: color,
+  Widget _buildOtherExpenseCard(Map<String, dynamic> expense, int index) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Card(
+        elevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        child: ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.money_off, color: Colors.red, size: 20),
+          ),
+          title: Text(
+            expense['name'] ?? 'مصروف غير معروف',
+            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'EGP ${(expense['value'] ?? 0.0).toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                    fontSize: 12,
+                  ),
+                ),
               ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18),
+                onPressed: () => _removeOtherExpense(index),
+                tooltip: 'حذف المصروف',
+                color: Colors.red[400],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(IconData icon, String title, String subtitle) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Icon(icon, size: 64, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[600],
             ),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-              textAlign: TextAlign.center,
-            ),
-          ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyReportCard(Map<String, dynamic> item) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Colors.indigo, Colors.indigo.withOpacity(0.8)],
+                  ),
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: const Icon(Icons.today, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'تقرير يومي - ${item['date']}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'الطلبات: ${item['orders']}',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'EGP ${(item['revenue'] as double).toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1147,16 +1582,6 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
         return Icons.cancel;
       default:
         return Icons.help;
-    }
-  }
-
-  String _formatDate(dynamic date) {
-    if (date == null) return 'Unknown';
-    try {
-      final DateTime dateTime = DateTime.parse(date.toString());
-      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
-    } catch (e) {
-      return 'Invalid Date';
     }
   }
 
@@ -1373,6 +1798,25 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
         return '';
     }
   }
+
+  void _addOtherExpense() {
+    showDialog(
+      context: context,
+      builder: (context) => _OtherExpenseDialog(
+        onSave: (expense) {
+          setState(() {
+            otherExpenses.add(expense);
+          });
+        },
+      ),
+    );
+  }
+
+  void _removeOtherExpense(int index) {
+    setState(() {
+      otherExpenses.removeAt(index);
+    });
+  }
 }
 
 class _FinancialRecordFormDialog extends StatefulWidget {
@@ -1539,6 +1983,93 @@ class _FinancialRecordFormDialogState
           child: const Text('إلغاء'),
         ),
         ElevatedButton(onPressed: _save, child: const Text('إنشاء')),
+      ],
+    );
+  }
+}
+
+class _OtherExpenseDialog extends StatefulWidget {
+  final Function(Map<String, dynamic>) onSave;
+
+  const _OtherExpenseDialog({required this.onSave});
+
+  @override
+  State<_OtherExpenseDialog> createState() => _OtherExpenseDialogState();
+}
+
+class _OtherExpenseDialogState extends State<_OtherExpenseDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _valueController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _valueController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (_formKey.currentState!.validate()) {
+      final expense = {
+        'name': _nameController.text.trim(),
+        'value': double.tryParse(_valueController.text) ?? 0.0,
+      };
+      widget.onSave(expense);
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('إضافة مصروف آخر'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'اسم المصروف',
+                border: OutlineInputBorder(),
+                hintText: 'مثال: البنزين، الكهرباء، إلخ',
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'اسم المصروف مطلوب';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _valueController,
+              decoration: const InputDecoration(
+                labelText: 'قيمة المصروف (جنيه مصري)',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'قيمة المصروف مطلوبة';
+                }
+                if (double.tryParse(value) == null || double.parse(value) < 0) {
+                  return 'يرجى إدخال قيمة صحيحة';
+                }
+                return null;
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(onPressed: _save, child: const Text('إضافة')),
       ],
     );
   }

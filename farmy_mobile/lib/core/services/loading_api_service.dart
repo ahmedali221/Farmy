@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../features/authentication/services/token_service.dart';
+import '../constants/api_constants.dart';
 import 'api_exception.dart';
 
 class LoadingApiService {
-  static const String baseUrl = 'http://192.168.1.2:3000/api';
+  static const String baseUrl = ApiConstants.baseUrl;
   final TokenService _tokenService;
 
   LoadingApiService({required TokenService tokenService})

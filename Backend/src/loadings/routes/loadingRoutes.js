@@ -27,3 +27,4 @@ router.put('/:id', loadingController.updateLoading);
 router.delete('/:id', loadingController.deleteLoading);
 
 module.exports = router;
+

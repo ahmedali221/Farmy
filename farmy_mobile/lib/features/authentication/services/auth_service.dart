@@ -1,14 +1,13 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import '../../../core/constants/api_constants.dart';
 import '../models/login_request.dart';
 import '../models/login_response.dart';
 import '../models/user.dart';
 
 class AuthService {
-  // Use Vercel deployment URL
-  static const String baseUrl =
-      'https://farmy-3b980tcc5-ahmed-alis-projects-588ffe47.vercel.app/api';
+  // Use API constants for base URL
+  static const String baseUrl = ApiConstants.baseUrl;
 
   /// Login user with username and password
   Future<LoginResponse> login(LoginRequest request) async {

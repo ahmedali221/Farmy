@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../features/authentication/services/token_service.dart';
+import '../constants/api_constants.dart';
 import 'api_exception.dart';
 
 class CustomerApiService {
-  static const String baseUrl =
-      'https://farmy-3b980tcc5-ahmed-alis-projects-588ffe47.vercel.app/api';
+  static const String baseUrl = ApiConstants.baseUrl;
   final TokenService _tokenService;
 
   CustomerApiService({required TokenService tokenService})
