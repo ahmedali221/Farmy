@@ -1443,3 +1443,5 @@
 {"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T16:48:29.022Z"}
 {"level":"info","message":"Payment created: 68b5ce656f52a62c3eb19481 for order: 68b5c9a580d5440ded159f9b","timestamp":"2025-09-01T16:48:37.861Z"}
 {"level":"info","message":"Orders fetched for employee: 68b51c3bd50571ad177ef3b8","timestamp":"2025-09-01T16:48:38.186Z"}
+{"level":"info","message":"User employee1Test logged in successfully","timestamp":"2025-09-07T06:55:25.175Z"}
+{"level":"info","message":"Loading created: 68bd306763a11c3f4bdd1ca3 by employee: 68b5f366138a3a4cc983a063","timestamp":"2025-09-07T07:12:40.270Z"}

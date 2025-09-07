@@ -189,51 +189,58 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('لوحة المعلومات المالية'),
-          backgroundColor: Theme.of(context).primaryColor,
-          foregroundColor: Colors.white,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/admin-dashboard'),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: _showCreateFinancialRecordDialog,
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        context.go('/admin-dashboard');
+      },
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('لوحة المعلومات المالية'),
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.go('/admin-dashboard'),
             ),
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _loadFinancialData,
-            ),
-          ],
-          bottom: TabBar(
-            controller: _tabController,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: const [
-              Tab(text: 'التقارير اليومية', icon: Icon(Icons.today)),
-              Tab(text: 'طلبات العملاء', icon: Icon(Icons.shopping_cart)),
-              Tab(text: 'مالية الموظفين', icon: Icon(Icons.people)),
-            ],
-          ),
-        ),
-        body: isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildDailyReportsTab(),
-                  _buildOrdersTab(),
-                  _buildEmployeeFinanceTab(),
-                ],
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: _showCreateFinancialRecordDialog,
               ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: _showCreateFinancialRecordDialog,
-          child: const Icon(Icons.add),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadFinancialData,
+              ),
+            ],
+            bottom: TabBar(
+              controller: _tabController,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              tabs: const [
+                Tab(text: 'التقارير اليومية', icon: Icon(Icons.today)),
+                Tab(text: 'طلبات العملاء', icon: Icon(Icons.shopping_cart)),
+                Tab(text: 'مالية الموظفين', icon: Icon(Icons.people)),
+              ],
+            ),
+          ),
+          body: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildDailyReportsTab(),
+                    _buildOrdersTab(),
+                    _buildEmployeeFinanceTab(),
+                  ],
+                ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: _showCreateFinancialRecordDialog,
+            child: const Icon(Icons.add),
+          ),
         ),
       ),
     );

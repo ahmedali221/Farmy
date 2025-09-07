@@ -96,9 +96,16 @@ class _EmployeeManagementViewState extends State<EmployeeManagementView> {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          context.go('/admin-dashboard');
+        }
+      },
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
         appBar: AppBar(
           title: const Text('إدارة الموظفين'),
           backgroundColor: Theme.of(context).primaryColor,
@@ -125,6 +132,7 @@ class _EmployeeManagementViewState extends State<EmployeeManagementView> {
           onPressed: _showAddEmployeeUserDialog,
           child: const Icon(Icons.add),
         ),
+      ),
       ),
     );
   }

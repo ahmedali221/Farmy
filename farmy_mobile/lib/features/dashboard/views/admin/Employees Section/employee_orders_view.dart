@@ -28,190 +28,204 @@ class EmployeeOrdersView extends StatelessWidget {
     });
     final double netProfit = totalRevenue - totalExpenses;
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text('${employee['username']} - الطلبات'),
-          backgroundColor: Theme.of(context).primaryColor,
-          foregroundColor: Colors.white,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          context.pop();
+        }
+      },
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text('${employee['username']} - الطلبات'),
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.pop(),
+            ),
           ),
-        ),
-        body: CustomScrollView(
-          slivers: [
-            // Employee Summary - Sticky Header
-            SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.all(16),
-                child: Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        // Employee Info Header
-                        ListTile(
-                          leading: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).primaryColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: CircleAvatar(
-                              radius: 24,
-                              backgroundColor: Theme.of(context).primaryColor,
-                              child: Text(
-                                employee['username']
-                                        ?.substring(0, 1)
-                                        .toUpperCase() ??
-                                    'م',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 20,
+          body: CustomScrollView(
+            slivers: [
+              // Employee Summary - Sticky Header
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.all(16),
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          // Employee Info Header
+                          ListTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).primaryColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Theme.of(context).primaryColor,
+                                child: Text(
+                                  employee['username']
+                                          ?.substring(0, 1)
+                                          .toUpperCase() ??
+                                      'م',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 20,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          title: Text(
-                            employee['username'] ?? 'موظف غير معروف',
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 22,
-                                ),
-                          ),
-                          subtitle: Container(
-                            margin: const EdgeInsets.only(top: 8),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).primaryColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              'الدور: ${employee['role'] ?? 'غير معروف'}',
-                              style: Theme.of(context).textTheme.bodyMedium
+                            title: Text(
+                              employee['username'] ?? 'موظف غير معروف',
+                              style: Theme.of(context).textTheme.titleLarge
                                   ?.copyWith(
-                                    color: Theme.of(context).primaryColor,
-                                    fontWeight: FontWeight.w500,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 22,
                                   ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Summary List
-                        Column(
-                          children: [
-                            _buildSummaryListTile(
-                              'إجمالي الطلبات',
-                              orders.length.toString(),
-                              Icons.shopping_cart,
-                              Colors.blue,
-                            ),
-                            _buildSummaryListTile(
-                              'إجمالي الإيرادات',
-                              'ج.م ${totalRevenue.toStringAsFixed(2)}',
-                              Icons.attach_money,
-                              Colors.green,
-                            ),
-                            _buildSummaryListTile(
-                              'إجمالي المصروفات',
-                              'ج.م ${totalExpenses.toStringAsFixed(2)}',
-                              Icons.money_off,
-                              Colors.red,
-                            ),
-                            _buildSummaryListTile(
-                              'صافي الربح',
-                              'ج.م ${netProfit.toStringAsFixed(2)}',
-                              Icons.account_balance,
-                              netProfit >= 0 ? Colors.blue : Colors.orange,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // Orders List Header
-            SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    Icons.list_alt,
-                    color: Theme.of(context).primaryColor,
-                    size: 20,
-                  ),
-                  title: Text(
-                    'قائمة الطلبات (${orders.length})',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).primaryColor,
-                    ),
-                  ),
-                  dense: true,
-                ),
-              ),
-            ),
-
-            // Orders List
-            orders.isEmpty
-                ? const SliverFillRemaining(
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.shopping_cart_outlined,
-                            size: 80,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'لا توجد طلبات',
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: Colors.grey,
-                              fontWeight: FontWeight.w500,
+                            subtitle: Container(
+                              margin: const EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).primaryColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                'الدور: ${employee['role'] ?? 'غير معروف'}',
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: Theme.of(context).primaryColor,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                              ),
                             ),
                           ),
-                          SizedBox(height: 8),
-                          Text(
-                            'لم يتم تسجيل أي طلبات لهذا الموظف بعد',
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                          const SizedBox(height: 24),
+
+                          // Summary List
+                          Column(
+                            children: [
+                              _buildSummaryListTile(
+                                'إجمالي الطلبات',
+                                orders.length.toString(),
+                                Icons.shopping_cart,
+                                Colors.blue,
+                              ),
+                              _buildSummaryListTile(
+                                'إجمالي الإيرادات',
+                                'ج.م ${totalRevenue.toStringAsFixed(2)}',
+                                Icons.attach_money,
+                                Colors.green,
+                              ),
+                              _buildSummaryListTile(
+                                'إجمالي المصروفات',
+                                'ج.م ${totalExpenses.toStringAsFixed(2)}',
+                                Icons.money_off,
+                                Colors.red,
+                              ),
+                              _buildSummaryListTile(
+                                'صافي الربح',
+                                'ج.م ${netProfit.toStringAsFixed(2)}',
+                                Icons.account_balance,
+                                netProfit >= 0 ? Colors.blue : Colors.orange,
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                  )
-                : SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        final order = orders[index];
-                        return _buildOrderCard(context, order);
-                      }, childCount: orders.length),
-                    ),
                   ),
-          ],
+                ),
+              ),
+
+              // Orders List Header
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      Icons.list_alt,
+                      color: Theme.of(context).primaryColor,
+                      size: 20,
+                    ),
+                    title: Text(
+                      'قائمة الطلبات (${orders.length})',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                    dense: true,
+                  ),
+                ),
+              ),
+
+              // Orders List
+              orders.isEmpty
+                  ? const SliverFillRemaining(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.shopping_cart_outlined,
+                              size: 80,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'لا توجد طلبات',
+                              style: TextStyle(
+                                fontSize: 20,
+                                color: Colors.grey,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'لم يتم تسجيل أي طلبات لهذا الموظف بعد',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final order = orders[index];
+                          return _buildOrderCard(context, order);
+                        }, childCount: orders.length),
+                      ),
+                    ),
+            ],
+          ),
         ),
       ),
     );

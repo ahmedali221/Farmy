@@ -124,8 +124,15 @@ class EmployeeDashboardView extends StatelessWidget {
                     ),
                     _buildActionCard(
                       context,
-                      'تسجيل طلب',
+                      'التحميل',
                       Icons.add_shopping_cart,
+                      Theme.of(context).colorScheme.secondary,
+                      () => context.go('/order-placement'),
+                    ),
+                    _buildActionCard(
+                      context,
+                      'التوزيع',
+                      Icons.horizontal_distribute,
                       Theme.of(context).colorScheme.secondary,
                       () => context.go('/order-placement'),
                     ),

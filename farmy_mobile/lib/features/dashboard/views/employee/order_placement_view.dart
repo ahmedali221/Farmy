@@ -6,7 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import '../../../../core/di/service_locator.dart';
-import '../../../../core/services/order_api_service.dart';
+import '../../../../core/services/loading_api_service.dart';
 import '../../../../core/services/inventory_api_service.dart';
 import '../../../../core/services/customer_api_service.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -34,17 +34,19 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
   String? selectedCustomerId;
   final _quantityController = TextEditingController();
   final _totalPriceController = TextEditingController();
-  // Additional controllers
+  // التحميل controllers
   final _grossWeightController = TextEditingController();
   final _netWeightController = TextEditingController();
+  final _loadingPriceController = TextEditingController();
+  final _totalLoadingController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadData();
-    _grossWeightController.addListener(_calculateNetWeight);
-    _quantityController.addListener(_calculateNetWeight);
-    _netWeightController.addListener(_calculateTotalPrice);
+    _grossWeightController.addListener(_calculateLoadingValues);
+    _quantityController.addListener(_calculateLoadingValues);
+    _loadingPriceController.addListener(_calculateLoadingValues);
   }
 
   @override
@@ -53,23 +55,33 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     _totalPriceController.dispose();
     _grossWeightController.dispose();
     _netWeightController.dispose();
+    _loadingPriceController.dispose();
+    _totalLoadingController.dispose();
     super.dispose();
   }
 
-  void _calculateNetWeight() {
+  void _calculateLoadingValues() {
     final gross = double.tryParse(_grossWeightController.text);
     final count = double.tryParse(_quantityController.text);
+    final loadingPrice = double.tryParse(_loadingPriceController.text);
 
-    // Only calculate if both values are provided
-    if (gross != null && count != null) {
-      final net = gross - (count * 8);
-      _netWeightController.text = net.toStringAsFixed(2);
-      // Recalculate total price when net weight changes
-      _calculateTotalPrice();
+    // Only calculate if all required values are provided
+    if (gross != null && count != null && loadingPrice != null) {
+      // الوزن الصافي = الوزن القائم - (العدد × 8)
+      final netWeight = gross - (count * 8);
+      _netWeightController.text = netWeight.toStringAsFixed(2);
+
+      // إجمالي التحميل = الوزن الصافي × سعر التحميل
+      final totalLoading = netWeight * loadingPrice;
+      _totalLoadingController.text = totalLoading.toStringAsFixed(2);
+
+      // Update legacy fields for backward compatibility
+      _totalPriceController.text = totalLoading.toStringAsFixed(2);
     } else {
-      // Clear the field if either value is missing
+      // Clear calculated fields if any required value is missing
       _netWeightController.clear();
-      _calculateTotalPrice();
+      _totalLoadingController.clear();
+      _totalPriceController.clear();
     }
   }
 
@@ -100,26 +112,6 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     }
   }
 
-  void _calculateTotalPrice() {
-    if (selectedChickenTypeId != null) {
-      final chickenType = chickenTypes.firstWhere(
-        (type) => type['_id'] == selectedChickenTypeId,
-      );
-      final netWeight = double.tryParse(_netWeightController.text);
-      final dynamic priceRaw = chickenType['price'];
-      final double price = (priceRaw is int)
-          ? priceRaw.toDouble()
-          : (priceRaw as double);
-
-      if (netWeight != null && netWeight > 0) {
-        final totalPrice = netWeight * price;
-        _totalPriceController.text = totalPrice.toStringAsFixed(2);
-      } else {
-        _totalPriceController.clear();
-      }
-    }
-  }
-
   int _getAvailableStock() {
     try {
       final type = chickenTypes.firstWhere(
@@ -137,24 +129,18 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     setState(() => isSubmitting = true);
 
     try {
-      final orderService = serviceLocator<OrderApiService>();
+      final loadingService = serviceLocator<LoadingApiService>();
 
-      final orderData = {
+      final loadingData = {
         'chickenType': selectedChickenTypeId,
         'customer': selectedCustomerId,
         'quantity': double.parse(_quantityController.text),
-        'type': selectedChickenTypeId != null
-            ? chickenTypes.firstWhere(
-                (type) => type['_id'] == selectedChickenTypeId,
-              )['name']
-            : '',
         'grossWeight': double.tryParse(_grossWeightController.text) ?? 0,
-        'netWeight': double.tryParse(_netWeightController.text) ?? 0,
-        'todayAccount': double.tryParse(_totalPriceController.text) ?? 0,
-        'totalPrice': double.tryParse(_totalPriceController.text) ?? 0,
+        'loadingPrice': double.tryParse(_loadingPriceController.text) ?? 0,
+        'notes': null, // Default to null as per requirements
       };
 
-      await orderService.createOrder(orderData);
+      await loadingService.createLoading(loadingData);
 
       if (mounted) {
         setState(() {
@@ -166,7 +152,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
       }
     } catch (e) {
       if (mounted) {
-        _showErrorDialog('فشل في إنشاء الطلب: $e');
+        _showErrorDialog('فشل في إنشاء التحميل: $e');
       }
     } finally {
       if (mounted) {
@@ -175,25 +161,12 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     }
   }
 
-  void _resetForm() {
-    _formKey.currentState?.reset();
-    selectedChickenTypeId = null;
-    selectedCustomerId = null;
-    _quantityController.clear();
-    _totalPriceController.clear();
-    _grossWeightController.clear();
-    _netWeightController.clear();
-    setState(() {
-      isOrderSubmitted = false;
-    });
-  }
-
   void _showSuccessDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('نجح'),
-        content: const Text('تم إنشاء الطلب بنجاح'),
+        content: const Text('تم إنشاء التحميل بنجاح'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -283,7 +256,10 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
         (t) => t['_id'] == selectedChickenTypeId,
       );
       final quantity = double.tryParse(_quantityController.text) ?? 0;
-      final totalPrice = quantity * chickenType['price'];
+      final grossWeight = double.tryParse(_grossWeightController.text) ?? 0;
+      final loadingPrice = double.tryParse(_loadingPriceController.text) ?? 0;
+      final netWeight = grossWeight - (quantity * 8);
+      final totalLoading = netWeight * loadingPrice;
 
       // Get current employee info from auth cubit
       String employeeName = 'موظف النظام';
@@ -334,7 +310,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
                         pw.Text(
-                          'فاتورة طلب',
+                          'فاتورة التحميل',
                           style: pw.TextStyle(
                             fontSize: 20,
                             fontWeight: pw.FontWeight.bold,
@@ -422,7 +398,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text(
-                        'تفاصيل الطلب:',
+                        'تفاصيل التحميل:',
                         style: pw.TextStyle(
                           fontSize: 14,
                           fontWeight: pw.FontWeight.bold,
@@ -430,10 +406,18 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                       ),
                       pw.SizedBox(height: 5),
                       pw.Text('نوع الدجاج: ${chickenType['name']}'),
-                      pw.Text('الكمية: ${quantity.toStringAsFixed(2)} كيلو'),
-                      pw.Text('السعر لكل كيلو: ${chickenType['price']} ج.م'),
+                      pw.Text('العدد: ${quantity.toStringAsFixed(0)}'),
                       pw.Text(
-                        'السعر الإجمالي: ${totalPrice.toStringAsFixed(2)} ج.م',
+                        'الوزن القائم: ${grossWeight.toStringAsFixed(2)} كيلو',
+                      ),
+                      pw.Text(
+                        'الوزن الصافي: ${netWeight.toStringAsFixed(2)} كيلو',
+                      ),
+                      pw.Text(
+                        'سعر التحميل: ${loadingPrice.toStringAsFixed(2)} ج.م/كيلو',
+                      ),
+                      pw.Text(
+                        'إجمالي التحميل: ${totalLoading.toStringAsFixed(2)} ج.م',
                       ),
                     ],
                   ),
@@ -453,14 +437,14 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text(
-                        'إجمالي المبلغ:',
+                        'إجمالي التحميل:',
                         style: pw.TextStyle(
                           fontSize: 16,
                           fontWeight: pw.FontWeight.bold,
                         ),
                       ),
                       pw.Text(
-                        '${totalPrice.toStringAsFixed(2)} ج.م',
+                        '${totalLoading.toStringAsFixed(2)} ج.م',
                         style: pw.TextStyle(
                           fontSize: 18,
                           fontWeight: pw.FontWeight.bold,
@@ -493,7 +477,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                       ),
                       pw.SizedBox(height: 5),
                       pw.Text(
-                        '• هذا الطلب صالح لمدة 7 أيام من تاريخ الإصدار',
+                        '• هذا التحميل صالح لمدة 7 أيام من تاريخ الإصدار',
                         style: pw.TextStyle(fontSize: 10),
                       ),
                       pw.Text(
@@ -519,7 +503,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
           .replaceAll(RegExp(r'[^\w\s-]'), '')
           .replaceAll(' ', '_');
       final file = File(
-        '${documentsDir.path}/order_invoice_${customerName}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+        '${documentsDir.path}/loading_invoice_${customerName}_${DateTime.now().millisecondsSinceEpoch}.pdf',
       );
       await file.writeAsBytes(await pdf.save());
 
@@ -529,7 +513,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
       } catch (openError) {
         // If opening fails, show success with file path info
         _showSuccessDialogWithPath(
-          'تم إنشاء الفاتورة بنجاح',
+          'تم إنشاء فاتورة التحميل بنجاح',
           'تم حفظ الملف في مجلد المستندات: ${file.path}',
         );
         return;
@@ -537,7 +521,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
 
       _showSuccessDialog();
     } catch (e) {
-      _showErrorDialog('فشل في إنشاء الفاتورة: $e');
+      _showErrorDialog('فشل في إنشاء فاتورة التحميل: $e');
     }
   }
 
@@ -545,324 +529,374 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
 
-    return Theme(
-      data: AppTheme.lightTheme,
-      child: Directionality(
-        textDirection: TextDirection.rtl,
-        child: Scaffold(
-          body: Stack(
-            children: [
-              // خلفية متدرّجة مع حافة سفلية دائرية
-              Container(
-                height: size.height * 0.34,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Theme.of(context).colorScheme.surface,
-                      Theme.of(context).colorScheme.background,
-                    ],
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(36),
-                    bottomRight: Radius.circular(36),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          context.go('/employee-dashboard');
+        }
+      },
+      child: Theme(
+        data: AppTheme.lightTheme,
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: Stack(
+              children: [
+                // خلفية متدرّجة مع حافة سفلية دائرية
+                Container(
+                  height: size.height * 0.34,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Theme.of(context).colorScheme.surface,
+                        Theme.of(context).colorScheme.background,
+                      ],
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(36),
+                      bottomRight: Radius.circular(36),
+                    ),
                   ),
                 ),
-              ),
 
-              // المحتوى
-              SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 36),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 8),
-                      _HeaderBar(onRefresh: _loadData),
-                      const SizedBox(height: 18),
+                // المحتوى
+                SafeArea(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(bottom: 36),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 8),
+                        _HeaderBar(onRefresh: _loadData),
+                        const SizedBox(height: 18),
 
-                      if (isLoading)
-                        const Center(child: CircularProgressIndicator())
-                      else
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              children: [
-                                // Customer Selection
-                                _SectionCard(
-                                  title: 'اختيار العميل',
-                                  child: _DropdownField(
-                                    label: 'العميل',
-                                    value: selectedCustomerId,
-                                    items: customers
-                                        .map(
-                                          (customer) =>
-                                              DropdownMenuItem<String>(
-                                                value: customer['_id'],
-                                                child: Text(customer['name']),
-                                              ),
-                                        )
-                                        .toList(),
-                                    onChanged: (value) {
-                                      setState(() {
-                                        selectedCustomerId = value;
-                                      });
-                                    },
-                                    validator: (value) {
-                                      if (value == null) {
-                                        return 'يرجى اختيار العميل';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-
-                                // Chicken Type Selection
-                                _SectionCard(
-                                  title: 'نوع الدجاج',
-                                  child: _DropdownField(
-                                    label: 'نوع الدجاج',
-                                    value: selectedChickenTypeId,
-                                    items: chickenTypes
-                                        .map(
-                                          (
-                                            chickenType,
-                                          ) => DropdownMenuItem<String>(
-                                            value: chickenType['_id'],
-                                            child: Row(
-                                              children: [
-                                                Text(chickenType['name']),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  '(${chickenType['price']} EGP/kg)',
-                                                  style: TextStyle(
-                                                    color: Colors.grey[600],
-                                                    fontSize: 12,
+                        if (isLoading)
+                          const Center(child: CircularProgressIndicator())
+                        else
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                children: [
+                                  // Customer Selection
+                                  _SectionCard(
+                                    title: 'اختيار العميل (المكان)',
+                                    child: _DropdownField(
+                                      label: 'العميل',
+                                      value: selectedCustomerId,
+                                      items: customers
+                                          .map(
+                                            (customer) =>
+                                                DropdownMenuItem<String>(
+                                                  value: customer['_id'],
+                                                  child: Text(
+                                                    customer['name'],
+                                                    style: const TextStyle(
+                                                      color: Colors.black,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
                                                   ),
                                                 ),
-                                                const SizedBox(width: 10),
+                                          )
+                                          .toList(),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          selectedCustomerId = value;
+                                        });
+                                      },
+                                      validator: (value) {
+                                        if (value == null) {
+                                          return 'يرجى اختيار العميل';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // Chicken Type Selection
+                                  _SectionCard(
+                                    title: 'نوع الدجاج (النوع)',
+                                    child: _DropdownField(
+                                      label: 'نوع الدجاج',
+                                      value: selectedChickenTypeId,
+                                      items: chickenTypes
+                                          .map(
+                                            (
+                                              chickenType,
+                                            ) => DropdownMenuItem<String>(
+                                              value: chickenType['_id'],
+                                              child: Row(
+                                                children: [
+                                                  Text(
+                                                    chickenType['name'],
+                                                    style: const TextStyle(
+                                                      color: Colors.black,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  Text(
+                                                    'متاح: ${chickenType['stock']}',
+                                                    style: TextStyle(
+                                                      color: Colors.grey[600],
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          selectedChickenTypeId = value;
+                                        });
+                                      },
+                                      validator: (value) {
+                                        if (value == null) {
+                                          return 'يرجى اختيار نوع الدجاج';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // التحميل - Input Fields
+                                  _SectionCard(
+                                    title: 'بيانات التحميل',
+                                    child: Column(
+                                      children: [
+                                        if (selectedChickenTypeId != null)
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue[50],
+                                              border: Border.all(
+                                                color: Colors.blue[200]!,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.info_outline,
+                                                  color: Colors.blue[700],
+                                                  size: 20,
+                                                ),
+                                                const SizedBox(width: 8),
                                                 Text(
-                                                  'متاح: ${chickenType['stock']}',
+                                                  'النوع المحدد: ',
                                                   style: TextStyle(
-                                                    color: Colors.grey[600],
-                                                    fontSize: 12,
+                                                    color: Colors.blue[700],
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  chickenTypes.firstWhere(
+                                                    (type) =>
+                                                        type['_id'] ==
+                                                        selectedChickenTypeId,
+                                                  )['name'],
+                                                  style: TextStyle(
+                                                    color: Colors.blue[700],
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const Spacer(),
+                                                Text(
+                                                  'المتاح: ${_getAvailableStock()}',
+                                                  style: TextStyle(
+                                                    color: Colors.blue[600],
+                                                    fontWeight: FontWeight.w600,
                                                   ),
                                                 ),
                                               ],
                                             ),
                                           ),
-                                        )
-                                        .toList(),
-                                    onChanged: (value) {
-                                      setState(() {
-                                        selectedChickenTypeId = value;
-                                      });
-                                      _calculateTotalPrice();
-                                    },
-                                    validator: (value) {
-                                      if (value == null) {
-                                        return 'يرجى اختيار نوع الدجاج';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
+                                        const SizedBox(height: 16),
 
-                                // Quantity and Price
-                                _SectionCard(
-                                  title: 'الكمية والسعر',
-                                  child: Column(
-                                    children: [
-                                      if (selectedChickenTypeId != null)
-                                        Align(
-                                          alignment: Alignment.centerRight,
-                                          child: Padding(
-                                            padding: const EdgeInsets.only(
-                                              bottom: 8.0,
-                                            ),
-                                            child: Text(
-                                              'المتاح: ${_getAvailableStock()} ',
-                                              style: TextStyle(
-                                                color: Colors.grey[700],
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
+                                        // Input Fields - Vertical Layout
+                                        _NumField(
+                                          label: 'العدد',
+                                          controller: _quantityController,
+                                          validator: (value) {
+                                            if (value == null ||
+                                                value.isEmpty) {
+                                              return 'يرجى إدخال العدد';
+                                            }
+                                            final quantity = double.tryParse(
+                                              value,
+                                            );
+                                            if (quantity == null ||
+                                                quantity <= 0) {
+                                              return 'يرجى إدخال عدد صحيح';
+                                            }
+                                            final available =
+                                                _getAvailableStock().toDouble();
+                                            if (selectedChickenTypeId != null &&
+                                                quantity > available) {
+                                              return 'العدد يتجاوز المتاح: ${_getAvailableStock()}';
+                                            }
+                                            return null;
+                                          },
                                         ),
-                                      _NumField(
-                                        label: 'الكمية ',
-                                        controller: _quantityController,
-                                        onChanged: (value) =>
-                                            _calculateTotalPrice(),
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return 'يرجى إدخال الكمية';
-                                          }
-                                          final quantity = double.tryParse(
-                                            value,
-                                          );
-                                          if (quantity == null ||
-                                              quantity <= 0) {
-                                            return 'يرجى إدخال كمية صحيحة';
-                                          }
-                                          final available = _getAvailableStock()
-                                              .toDouble();
-                                          if (selectedChickenTypeId != null &&
-                                              quantity > available) {
-                                            return 'الكمية تتجاوز المتاح: ${_getAvailableStock()}';
-                                          }
-                                          return null;
-                                        },
-                                      ),
-                                      const SizedBox(height: 10),
-                                      _NumField(
-                                        label: 'السعر الإجمالي (EGP)',
-                                        controller: _totalPriceController,
-                                        enabled: false,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                // Additional Data Section
-                                _SectionCard(
-                                  title: 'بيانات إضافية',
-                                  child: Column(
-                                    children: [
-                                      if (selectedChickenTypeId != null)
-                                        Container(
-                                          padding: const EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            border: Border.all(
-                                              color: Colors.grey,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              const Text('نوع: '),
-                                              Text(
-                                                chickenTypes.firstWhere(
-                                                  (type) =>
-                                                      type['_id'] ==
-                                                      selectedChickenTypeId,
-                                                )['name'],
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      const SizedBox(height: 10),
-                                      _NumField(
-                                        label: 'وزن القايم',
-                                        controller: _grossWeightController,
-                                      ),
-                                      const SizedBox(height: 10),
-                                      _NumField(
-                                        label: 'وزن الصافي (يحسب تلقائياً)',
-                                        controller: _netWeightController,
-                                        enabled: false,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
+                                        const SizedBox(height: 12),
 
-                                // Submit Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: isSubmitting
-                                        ? null
-                                        : _submitOrder,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 14,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
+                                        _NumField(
+                                          label: 'الوزن القائم (كيلو)',
+                                          controller: _grossWeightController,
+                                          validator: (value) {
+                                            if (value == null ||
+                                                value.isEmpty) {
+                                              return 'يرجى إدخال الوزن القائم';
+                                            }
+                                            final weight = double.tryParse(
+                                              value,
+                                            );
+                                            if (weight == null || weight <= 0) {
+                                              return 'يرجى إدخال وزن صحيح';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                        const SizedBox(height: 12),
+
+                                        _NumField(
+                                          label: 'سعر التحميل (EGP/كيلو)',
+                                          controller: _loadingPriceController,
+                                          validator: (value) {
+                                            if (value == null ||
+                                                value.isEmpty) {
+                                              return 'يرجى إدخال سعر التحميل';
+                                            }
+                                            final price = double.tryParse(
+                                              value,
+                                            );
+                                            if (price == null || price <= 0) {
+                                              return 'يرجى إدخال سعر صحيح';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                        const SizedBox(height: 12),
+
+                                        _NumField(
+                                          label: 'الوزن الصافي (يحسب تلقائياً)',
+                                          controller: _netWeightController,
+                                          enabled: false,
+                                        ),
+                                        const SizedBox(height: 12),
+
+                                        _NumField(
+                                          label: 'إجمالي التحميل (EGP)',
+                                          controller: _totalLoadingController,
+                                          enabled: false,
+                                        ),
+                                      ],
                                     ),
-                                    child: isSubmitting
-                                        ? const CircularProgressIndicator(
-                                            color: Colors.white,
-                                          )
-                                        : const Text(
-                                            'تسجيل الطلب',
-                                            style: TextStyle(
-                                              fontSize: 16,
+                                  ),
+                                  const SizedBox(height: 24),
+
+                                  // Submit Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: isSubmitting
+                                          ? null
+                                          : _submitOrder,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      child: isSubmitting
+                                          ? const CircularProgressIndicator(
                                               color: Colors.white,
-                                              fontWeight: FontWeight.w700,
+                                            )
+                                          : const Text(
+                                              'تسجيل التحميل',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w700,
+                                              ),
                                             ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 16),
+
+                                  // Generate Invoice Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      onPressed: isOrderSubmitted
+                                          ? _generateInvoice
+                                          : null,
+                                      icon: Icon(
+                                        Icons.receipt,
+                                        color: isOrderSubmitted
+                                            ? Theme.of(
+                                                context,
+                                              ).colorScheme.primary
+                                            : Colors.grey,
+                                      ),
+                                      label: Text(
+                                        'إنشاء فاتورة التحميل',
+                                        style: TextStyle(
+                                          color: isOrderSubmitted
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.primary
+                                              : Colors.grey,
+                                        ),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
                                           ),
-                                  ),
-                                ),
-
-                                const SizedBox(height: 16),
-
-                                // Generate Invoice Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    onPressed: isOrderSubmitted
-                                        ? _generateInvoice
-                                        : null,
-                                    icon: Icon(
-                                      Icons.receipt,
-                                      color: isOrderSubmitted
-                                          ? Theme.of(
-                                              context,
-                                            ).colorScheme.primary
-                                          : Colors.grey,
-                                    ),
-                                    label: Text(
-                                      'إنشاء الفاتورة',
-                                      style: TextStyle(
-                                        color: isOrderSubmitted
-                                            ? Theme.of(
-                                                context,
-                                              ).colorScheme.primary
-                                            : Colors.grey,
-                                      ),
-                                    ),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 14,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      side: BorderSide(
-                                        color: isOrderSubmitted
-                                            ? Theme.of(
-                                                context,
-                                              ).colorScheme.primary
-                                            : Colors.grey,
+                                        ),
+                                        side: BorderSide(
+                                          color: isOrderSubmitted
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.primary
+                                              : Colors.grey,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -899,7 +933,7 @@ class _HeaderBar extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'تسجيل طلب جديد',
+                'تسجيل التحميل',
                 style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700),
               ),
               Text(
@@ -1005,14 +1039,12 @@ class _NumField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final bool enabled;
-  final ValueChanged<String>? onChanged;
   final String? Function(String?)? validator;
 
   const _NumField({
     required this.label,
     required this.controller,
     this.enabled = true,
-    this.onChanged,
     this.validator,
   });
 
@@ -1024,7 +1056,6 @@ class _NumField extends StatelessWidget {
       textDirection: TextDirection.rtl,
       textAlign: TextAlign.right,
       keyboardType: TextInputType.number,
-      onChanged: onChanged,
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
@@ -1037,6 +1068,12 @@ class _NumField extends StatelessWidget {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         alignLabelWithHint: true,
       ),
+      style: const TextStyle(
+        overflow: TextOverflow.ellipsis,
+        color: Colors.black,
+        fontWeight: FontWeight.w500,
+      ),
+      maxLines: 1,
     );
   }
 }
@@ -1060,9 +1097,22 @@ class _DropdownField extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
       value: value,
-      items: items,
+      items: items.map((item) {
+        return DropdownMenuItem<String>(
+          value: item.value,
+          child: DefaultTextStyle(
+            style: const TextStyle(
+              overflow: TextOverflow.ellipsis,
+              color: Colors.black,
+            ),
+            maxLines: 1,
+            child: item.child,
+          ),
+        );
+      }).toList(),
       onChanged: onChanged,
       validator: validator,
+      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         labelText: label,
         filled: true,
@@ -1075,7 +1125,7 @@ class _DropdownField extends StatelessWidget {
         alignLabelWithHint: true,
       ),
       dropdownColor: Colors.white,
-      icon: const Icon(Icons.arrow_drop_down),
+      icon: const Icon(Icons.arrow_drop_down, color: Colors.black),
     );
   }
 }

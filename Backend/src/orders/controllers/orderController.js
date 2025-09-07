@@ -1,4 +1,3 @@
-const Order = require('../models/Order');
 const ChickenType = require('../../managers/models/ChickenType');
 const Customer = require('../../customers/models/Customer');
 const Joi = require('joi');
@@ -11,21 +10,45 @@ const orderSchema = Joi.object({
   customer: Joi.string().required(),
   type: Joi.string().required(),
   grossWeight: Joi.number().min(0).required(),
-  netWeight: Joi.number().min(0).required(),
-  todayAccount: Joi.number().min(0).required(),
-  totalPrice: Joi.number().min(0).required(),
+  loadingPrice: Joi.number().min(0).required(),
+  // Auto calculated fields - will be calculated in controller
+  netWeight: Joi.number().min(0),
+  totalLoading: Joi.number().min(0),
+  // Legacy fields for backward compatibility
+  todayAccount: Joi.number().min(0),
+  totalPrice: Joi.number().min(0),
   offer: Joi.string().allow('', null),
   orderDate: Joi.date().default(Date.now),
   status: Joi.string().valid('pending', 'delivered', 'cancelled').default('pending')
 });
+
+// Helper function to calculate loading values
+const calculateLoadingValues = (orderData) => {
+  const { grossWeight, quantity, loadingPrice } = orderData;
+  
+  // الوزن الصافي = الوزن القائم - (العدد × 8)
+  const netWeight = grossWeight - (quantity * 8);
+  
+  // إجمالي التحميل = الوزن الصافي × سعر التحميل
+  const totalLoading = netWeight * loadingPrice;
+  
+  return {
+    netWeight: Math.max(0, netWeight), // Ensure non-negative
+    totalLoading: Math.max(0, totalLoading) // Ensure non-negative
+  };
+};
 
 exports.createOrder = async (req, res) => {
   const { error } = orderSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
 
   try {
+    // Calculate auto-calculated fields
+    const calculatedValues = calculateLoadingValues(req.body);
+    
     const orderData = {
       ...req.body,
+      ...calculatedValues, // Add calculated netWeight and totalLoading
       employee: req.user.id // Current logged-in employee
     };
 

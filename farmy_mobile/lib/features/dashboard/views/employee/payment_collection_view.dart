@@ -589,11 +589,18 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
 
-    return Theme(
-      data: AppTheme.lightTheme,
-      child: Directionality(
-        textDirection: TextDirection.rtl,
-        child: Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          context.go('/employee-dashboard');
+        }
+      },
+      child: Theme(
+        data: AppTheme.lightTheme,
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
           body: Stack(
             children: [
               // خلفية متدرّجة مع حافة سفلية دائرية
@@ -860,6 +867,7 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
               ),
             ],
           ),
+          ),
         ),
       ),
     );
@@ -1034,6 +1042,8 @@ class _NumField extends StatelessWidget {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         alignLabelWithHint: true,
       ),
+      style: const TextStyle(overflow: TextOverflow.ellipsis),
+      maxLines: 1,
     );
   }
 }
@@ -1057,7 +1067,16 @@ class _DropdownField extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
       value: value,
-      items: items,
+      items: items.map((item) {
+        return DropdownMenuItem<String>(
+          value: item.value,
+          child: DefaultTextStyle(
+            style: const TextStyle(overflow: TextOverflow.ellipsis),
+            maxLines: 1,
+            child: item.child,
+          ),
+        );
+      }).toList(),
       onChanged: onChanged,
       validator: validator,
       decoration: InputDecoration(

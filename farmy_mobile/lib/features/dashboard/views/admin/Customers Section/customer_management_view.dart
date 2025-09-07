@@ -129,9 +129,16 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          context.go('/admin-dashboard');
+        }
+      },
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
         appBar: AppBar(
           title: const Text('إدارة العملاء'),
           backgroundColor: Theme.of(context).primaryColor,
@@ -261,6 +268,7 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
           onPressed: _showAddCustomerDialog,
           child: const Icon(Icons.add),
         ),
+      ),
       ),
     );
   }

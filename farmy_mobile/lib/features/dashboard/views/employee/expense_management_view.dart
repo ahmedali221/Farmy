@@ -65,230 +65,241 @@ class _ExpenseManagementViewState extends State<ExpenseManagementView> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.lightTheme,
-      child: Directionality(
-        textDirection: TextDirection.rtl,
-        child: Scaffold(
-          appBar: AppBar(
-            title: const Text('مصروفات الطلب'),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.go('/employee-dashboard'),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          context.go('/employee-dashboard');
+        }
+      },
+      child: Theme(
+        data: AppTheme.lightTheme,
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('مصروفات الطلب'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go('/employee-dashboard'),
+              ),
             ),
-          ),
-          body: loading
-              ? const Center(child: CircularProgressIndicator())
-              : Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      DropdownButtonFormField<String>(
-                        value: selectedOrderId,
-                        decoration: const InputDecoration(
-                          labelText: 'اختر الطلب',
-                          border: OutlineInputBorder(),
+            body: loading
+                ? const Center(child: CircularProgressIndicator())
+                : Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        DropdownButtonFormField<String>(
+                          value: selectedOrderId,
+                          decoration: const InputDecoration(
+                            labelText: 'اختر الطلب',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: orders.map<DropdownMenuItem<String>>((o) {
+                            final c = o['customer'];
+                            final t = o['chickenType'];
+                            final q = o['quantity'];
+                            return DropdownMenuItem<String>(
+                              value: o['_id']?.toString(),
+                              child: Text('${c['name']} - ${t['name']} - $q ك'),
+                            );
+                          }).toList(),
+                          onChanged: (String? v) async {
+                            setState(() => selectedOrderId = v);
+                            await _loadExpenses();
+                          },
                         ),
-                        items: orders.map<DropdownMenuItem<String>>((o) {
-                          final c = o['customer'];
-                          final t = o['chickenType'];
-                          final q = o['quantity'];
-                          return DropdownMenuItem<String>(
-                            value: o['_id']?.toString(),
-                            child: Text('${c['name']} - ${t['name']} - $q ك'),
-                          );
-                        }).toList(),
-                        onChanged: (String? v) async {
-                          setState(() => selectedOrderId = v);
-                          await _loadExpenses();
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      Form(
-                        key: _formKey,
-                        child: Column(
-                          children: [
-                            TextFormField(
-                              controller: _titleCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'البند',
-                                border: OutlineInputBorder(),
-                                alignLabelWithHint: true,
-                              ),
-                              textDirection: TextDirection.rtl,
-                              textAlign: TextAlign.right,
-                              validator: (v) =>
-                                  (v == null || v.isEmpty) ? 'مطلوب' : null,
-                            ),
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              controller: _amountCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'القيمة (ج.م)',
-                                border: OutlineInputBorder(),
-                                alignLabelWithHint: true,
-                              ),
-                              textDirection: TextDirection.rtl,
-                              textAlign: TextAlign.right,
-                              keyboardType: TextInputType.number,
-                              validator: (v) {
-                                final n = double.tryParse(v ?? '');
-                                if (n == null || n < 0) return 'قيمة غير صالحة';
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              controller: _noteCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'ملاحظة (اختياري)',
-                                border: OutlineInputBorder(),
-                                alignLabelWithHint: true,
-                              ),
-                              textDirection: TextDirection.rtl,
-                              textAlign: TextAlign.right,
-                              maxLines: 3,
-                            ),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: _addExpense,
-                                child: const Text('إضافة مصروف'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: expenses.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.receipt_long,
-                                      size: 64,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface.withOpacity(0.7),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'No expenses recorded yet',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.copyWith(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withOpacity(0.7),
-                                          ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Add expenses for the selected order above',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withOpacity(0.5),
-                                          ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
+                        const SizedBox(height: 12),
+                        Form(
+                          key: _formKey,
+                          child: Column(
+                            children: [
+                              TextFormField(
+                                controller: _titleCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'البند',
+                                  border: OutlineInputBorder(),
+                                  alignLabelWithHint: true,
                                 ),
-                              )
-                            : ListView.builder(
-                                itemCount: expenses.length,
-                                itemBuilder: (context, i) {
-                                  final e = expenses[i];
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    elevation: 2,
-                                    child: ListTile(
-                                      leading: CircleAvatar(
-                                        backgroundColor: Theme.of(
-                                          context,
-                                        ).colorScheme.error.withOpacity(0.15),
-                                        child: Icon(
-                                          Icons.money_off,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.error,
-                                          size: 20,
-                                        ),
+                                textDirection: TextDirection.rtl,
+                                textAlign: TextAlign.right,
+                                validator: (v) =>
+                                    (v == null || v.isEmpty) ? 'مطلوب' : null,
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _amountCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'القيمة (ج.م)',
+                                  border: OutlineInputBorder(),
+                                  alignLabelWithHint: true,
+                                ),
+                                textDirection: TextDirection.rtl,
+                                textAlign: TextAlign.right,
+                                keyboardType: TextInputType.number,
+                                validator: (v) {
+                                  final n = double.tryParse(v ?? '');
+                                  if (n == null || n < 0)
+                                    return 'قيمة غير صالحة';
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _noteCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'ملاحظة (اختياري)',
+                                  border: OutlineInputBorder(),
+                                  alignLabelWithHint: true,
+                                ),
+                                textDirection: TextDirection.rtl,
+                                textAlign: TextAlign.right,
+                                maxLines: 3,
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _addExpense,
+                                  child: const Text('إضافة مصروف'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: expenses.isEmpty
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.receipt_long,
+                                        size: 64,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withOpacity(0.7),
                                       ),
-                                      title: Text(
-                                        e['title'] ?? 'Unknown Expense',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16,
-                                        ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'No expenses recorded yet',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyLarge
+                                            ?.copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withOpacity(0.7),
+                                            ),
                                       ),
-                                      subtitle:
-                                          e['note'] != null &&
-                                              e['note'].toString().isNotEmpty
-                                          ? Text(
-                                              e['note'],
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurface
-                                                        .withOpacity(0.7),
-                                                    fontSize: 14,
-                                                  ),
-                                            )
-                                          : null,
-                                      trailing: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Add expenses for the selected order above',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withOpacity(0.5),
+                                            ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ListView.builder(
+                                  itemCount: expenses.length,
+                                  itemBuilder: (context, i) {
+                                    final e = expenses[i];
+                                    return Card(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      elevation: 2,
+                                      child: ListTile(
+                                        leading: CircleAvatar(
+                                          backgroundColor: Theme.of(
                                             context,
-                                          ).colorScheme.error.withOpacity(0.07),
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                          border: Border.all(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .error
-                                                .withOpacity(0.3),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          'EGP ${e['amount']?.toString() ?? '0'}',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
+                                          ).colorScheme.error.withOpacity(0.15),
+                                          child: Icon(
+                                            Icons.money_off,
                                             color: Theme.of(
                                               context,
                                             ).colorScheme.error,
-                                            fontSize: 14,
+                                            size: 20,
                                           ),
                                         ),
+                                        title: Text(
+                                          e['title'] ?? 'Unknown Expense',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        subtitle:
+                                            e['note'] != null &&
+                                                e['note'].toString().isNotEmpty
+                                            ? Text(
+                                                e['note'],
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.copyWith(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurface
+                                                          .withOpacity(0.7),
+                                                      fontSize: 14,
+                                                    ),
+                                              )
+                                            : null,
+                                        trailing: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .error
+                                                .withOpacity(0.07),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .error
+                                                  .withOpacity(0.3),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'EGP ${e['amount']?.toString() ?? '0'}',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.error,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                        isThreeLine:
+                                            e['note'] != null &&
+                                            e['note'].toString().isNotEmpty,
                                       ),
-                                      isThreeLine:
-                                          e['note'] != null &&
-                                          e['note'].toString().isNotEmpty,
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+          ),
         ),
       ),
     );

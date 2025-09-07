@@ -21,7 +21,7 @@ const orderSchema = new mongoose.Schema({
     ref: 'Customer',
     required: true
   },
-  // New fields from frontend
+  // التحميل fields
   type: {
     type: String,
     required: true
@@ -31,11 +31,23 @@ const orderSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  loadingPrice: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  // Auto calculated fields
   netWeight: {
     type: Number,
     required: true,
     min: 0
   },
+  totalLoading: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  // Legacy fields for backward compatibility
   todayAccount: {
     type: Number,
     required: true,

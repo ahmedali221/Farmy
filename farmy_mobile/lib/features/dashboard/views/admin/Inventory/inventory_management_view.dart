@@ -241,226 +241,233 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('إدارة المخزون (ج.م)'),
-          backgroundColor: Theme.of(context).primaryColor,
-          foregroundColor: Colors.white,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/admin-dashboard'),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        context.go('/admin-dashboard');
+      },
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('إدارة المخزون (ج.م)'),
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.go('/admin-dashboard'),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: _showAddChickenTypeDialog,
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadChickenTypes,
+              ),
+            ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: _showAddChickenTypeDialog,
-            ),
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _loadChickenTypes,
-            ),
-          ],
-        ),
-        body: isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : chickenTypes.isEmpty
-            ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          body: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : chickenTypes.isEmpty
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.inventory_2_outlined,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'لا توجد عناصر في المخزون',
+                        style: TextStyle(fontSize: 18),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'أضف أنواع الدجاج مع الأسعار بالجنية المصري لكل كيلو',
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                )
+              : Column(
                   children: [
-                    Icon(
-                      Icons.inventory_2_outlined,
-                      size: 64,
-                      color: Colors.grey,
+                    // Summary Cards
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildSummaryCard(
+                                  'إجمالي العناصر',
+                                  chickenTypes.length.toString(),
+                                  Icons.inventory,
+                                  Colors.blue,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildSummaryCard(
+                                  'إجمالي المخزون',
+                                  chickenTypes
+                                      .fold<int>(
+                                        0,
+                                        (sum, item) =>
+                                            sum + (item['stock'] as int),
+                                      )
+                                      .toString(),
+                                  Icons.storage,
+                                  Colors.green,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildSummaryCard(
+                                  'مخزون منخفض',
+                                  chickenTypes
+                                      .where((item) => item['stock'] < 10)
+                                      .length
+                                      .toString(),
+                                  Icons.warning,
+                                  Colors.orange,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildSummaryCard(
+                                  'القيمة الإجمالية',
+                                  '${_calculateTotalValue().toStringAsFixed(0)} ج.م',
+                                  Icons.attach_money,
+                                  Colors.purple,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    SizedBox(height: 16),
-                    Text(
-                      'لا توجد عناصر في المخزون',
-                      style: TextStyle(fontSize: 18),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'أضف أنواع الدجاج مع الأسعار بالجنية المصري لكل كيلو',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    // Inventory List
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: chickenTypes.length,
+                        itemBuilder: (context, index) {
+                          final chickenType = chickenTypes[index];
+                          final stock = chickenType['stock'] as int;
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            child: ListTile(
+                              leading: Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: _getStockStatusColor(
+                                    stock,
+                                  ).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.egg_outlined,
+                                  color: _getStockStatusColor(stock),
+                                  size: 30,
+                                ),
+                              ),
+                              title: Text(
+                                chickenType['name'] ?? 'غير معروف',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'السعر: ${_formatPrice(chickenType['price'])} ج.م/كجم',
+                                  ),
+                                  Text(
+                                    'المخزون: $stock - ${_getStockStatusText(stock)}',
+                                    style: TextStyle(
+                                      color: _getStockStatusColor(stock),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              trailing: PopupMenuButton(
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'update_stock',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.edit, size: 20),
+                                        SizedBox(width: 8),
+                                        Text('تحديث المخزون'),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.settings, size: 20),
+                                        SizedBox(width: 8),
+                                        Text('تعديل التفاصيل'),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.delete,
+                                          size: 20,
+                                          color: Colors.red,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'حذف',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                onSelected: (value) {
+                                  if (value == 'update_stock') {
+                                    _showStockUpdateDialog(chickenType);
+                                  } else if (value == 'edit') {
+                                    _showEditChickenTypeDialog(chickenType);
+                                  } else if (value == 'delete') {
+                                    _deleteChickenType(
+                                      chickenType['_id'],
+                                      chickenType['name'],
+                                    );
+                                  }
+                                },
+                              ),
+                              isThreeLine: true,
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ),
-              )
-            : Column(
-                children: [
-                  // Summary Cards
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildSummaryCard(
-                                'إجمالي العناصر',
-                                chickenTypes.length.toString(),
-                                Icons.inventory,
-                                Colors.blue,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildSummaryCard(
-                                'إجمالي المخزون',
-                                chickenTypes
-                                    .fold<int>(
-                                      0,
-                                      (sum, item) =>
-                                          sum + (item['stock'] as int),
-                                    )
-                                    .toString(),
-                                Icons.storage,
-                                Colors.green,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildSummaryCard(
-                                'مخزون منخفض',
-                                chickenTypes
-                                    .where((item) => item['stock'] < 10)
-                                    .length
-                                    .toString(),
-                                Icons.warning,
-                                Colors.orange,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildSummaryCard(
-                                'القيمة الإجمالية',
-                                '${_calculateTotalValue().toStringAsFixed(0)} ج.م',
-                                Icons.attach_money,
-                                Colors.purple,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Inventory List
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: chickenTypes.length,
-                      itemBuilder: (context, index) {
-                        final chickenType = chickenTypes[index];
-                        final stock = chickenType['stock'] as int;
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            leading: Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: _getStockStatusColor(
-                                  stock,
-                                ).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                Icons.egg_outlined,
-                                color: _getStockStatusColor(stock),
-                                size: 30,
-                              ),
-                            ),
-                            title: Text(
-                              chickenType['name'] ?? 'غير معروف',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'السعر: ${_formatPrice(chickenType['price'])} ج.م/كجم',
-                                ),
-                                Text(
-                                  'المخزون: $stock - ${_getStockStatusText(stock)}',
-                                  style: TextStyle(
-                                    color: _getStockStatusColor(stock),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            trailing: PopupMenuButton(
-                              itemBuilder: (context) => [
-                                const PopupMenuItem(
-                                  value: 'update_stock',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.edit, size: 20),
-                                      SizedBox(width: 8),
-                                      Text('تحديث المخزون'),
-                                    ],
-                                  ),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.settings, size: 20),
-                                      SizedBox(width: 8),
-                                      Text('تعديل التفاصيل'),
-                                    ],
-                                  ),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.delete,
-                                        size: 20,
-                                        color: Colors.red,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'حذف',
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                              onSelected: (value) {
-                                if (value == 'update_stock') {
-                                  _showStockUpdateDialog(chickenType);
-                                } else if (value == 'edit') {
-                                  _showEditChickenTypeDialog(chickenType);
-                                } else if (value == 'delete') {
-                                  _deleteChickenType(
-                                    chickenType['_id'],
-                                    chickenType['name'],
-                                  );
-                                }
-                              },
-                            ),
-                            isThreeLine: true,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: _showAddChickenTypeDialog,
-          child: const Icon(Icons.add),
+          floatingActionButton: FloatingActionButton(
+            onPressed: _showAddChickenTypeDialog,
+            child: const Icon(Icons.add),
+          ),
         ),
       ),
     );

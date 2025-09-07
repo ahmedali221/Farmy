@@ -100,11 +100,18 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
 
-    return Theme(
-      data: AppTheme.lightTheme,
-      child: Directionality(
-        textDirection: TextDirection.rtl,
-        child: Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          context.go('/employee-dashboard');
+        }
+      },
+      child: Theme(
+        data: AppTheme.lightTheme,
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
           body: Stack(
             children: [
               // خلفية متدرّجة مع حافة سفلية دائرية
@@ -239,6 +246,7 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
                 ),
               ),
             ],
+          ),
           ),
         ),
       ),

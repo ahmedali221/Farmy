@@ -32,6 +32,7 @@ const customerRoutes = require('./src/customers/routes/customerRoutes');
 const financeRoutes = require('./src/finances/routes/financeRoutes');
 const paymentRoutes = require('./src/payments/routes/paymentRoutes');
 const expenseRoutes = require('./src/expenses/routes/expenseRoutes');
+const loadingRoutes = require('./src/loadings/routes/loadingRoutes');
 
 // Public routes
 app.post('/api/login', authController.login);
@@ -53,10 +54,13 @@ app.use('/api/customers', auth(['manager', 'employee']), customerRoutes);
 app.use('/api/finances', auth(['manager']), financeRoutes);
 app.use('/api/payments', auth(['manager', 'employee']), paymentRoutes);
 app.use('/api/expenses', auth(['manager', 'employee']), expenseRoutes);
+app.use('/api/loadings', auth(['manager', 'employee']), loadingRoutes);
 
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
+  console.log(`Accessible from: http://127.0.0.1:${PORT} (localhost)`);
+  console.log(`Accessible from: http://[YOUR_IP]:${PORT} (network)`);
 });

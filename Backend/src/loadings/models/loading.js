@@ -1,0 +1,149 @@
+const mongoose = require('mongoose');
+
+const loadingSchema = new mongoose.Schema({
+  // معرفات أساسية
+  employee: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee',
+    required: true
+  },
+  customer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Customer',
+    required: true
+  },
+  chickenType: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ChickenType',
+    required: true
+  },
+  
+  // بيانات الإدخال اليدوي
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1
+  },
+  grossWeight: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  loadingPrice: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  
+  // الحقول المحسوبة تلقائياً
+  netWeight: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  totalLoading: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  
+  // بيانات إضافية
+  loadingDate: {
+    type: Date,
+    default: Date.now
+  },
+  notes: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  
+  // بيانات التتبع (اختيارية)
+  batchNumber: {
+    type: String,
+    trim: true
+  },
+  supplier: {
+    type: String,
+    trim: true
+  },
+  
+  // بيانات الجودة (اختيارية)
+  qualityGrade: {
+    type: String,
+    enum: ['A', 'B', 'C'],
+    default: 'A'
+  },
+  temperature: {
+    type: Number,
+    min: -50,
+    max: 50
+  },
+  
+  // بيانات النقل (اختيارية)
+  vehicleNumber: {
+    type: String,
+    trim: true
+  },
+  driverName: {
+    type: String,
+    trim: true
+  },
+  
+  // بيانات المالية (اختيارية)
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'partial'],
+    default: 'pending'
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['cash', 'bank', 'credit'],
+    default: 'cash'
+  },
+  
+  // بيانات المراجعة (اختيارية)
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee'
+  },
+  reviewedAt: {
+    type: Date
+  },
+  reviewNotes: {
+    type: String,
+    trim: true
+  }
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
+
+// Virtual fields for calculations
+loadingSchema.virtual('packagingWeight').get(function() {
+  return this.quantity * 8;
+});
+
+loadingSchema.virtual('pricePerKg').get(function() {
+  return this.netWeight > 0 ? this.totalLoading / this.netWeight : 0;
+});
+
+// Pre-save middleware to calculate fields
+loadingSchema.pre('save', function(next) {
+  // حساب الوزن الصافي
+  this.netWeight = Math.max(0, this.grossWeight - (this.quantity * 8));
+  
+  // حساب إجمالي التحميل
+  this.totalLoading = this.netWeight * this.loadingPrice;
+  
+  next();
+});
+
+// Indexes for better performance
+loadingSchema.index({ employee: 1, loadingDate: -1 });
+loadingSchema.index({ customer: 1, loadingDate: -1 });
+loadingSchema.index({ chickenType: 1, loadingDate: -1 });
+loadingSchema.index({ loadingDate: -1 });
+
+module.exports = mongoose.model('Loading', loadingSchema);

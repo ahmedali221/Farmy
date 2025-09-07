@@ -4,10 +4,10 @@ import '../../features/authentication/services/token_service.dart';
 import 'api_exception.dart';
 
 class OrderApiService {
-  static const String baseUrl =
-      'https://farmy-3b980tcc5-ahmed-alis-projects-588ffe47.vercel.app/api';
+  static const String baseUrl = 'http://192.168.1.2:3000/api';
   final TokenService _tokenService;
-
+  //  static const String baseUrl =
+  //       'https://farmy-3b980tcc5-ahmed-alis-projects-588ffe47.vercel.app/api';
   OrderApiService({required TokenService tokenService})
     : _tokenService = tokenService;
 
@@ -93,17 +93,21 @@ class OrderApiService {
     }
   }
 
-  /// Create new order
+  /// Create new order (التحميل)
   ///
   /// Required fields:
   /// - chickenType: ID of the chicken type
-  /// - customer: ID of the customer
-  /// - quantity: Number of units
-  /// - type: Name of the chicken type
-  /// - grossWeight: Gross weight in kg
-  /// - netWeight: Net weight in kg (calculated as gross - (quantity * 8))
-  /// - todayAccount: Total price for today's account
-  /// - totalPrice: Total price for the order
+  /// - customer: ID of the customer (المكان)
+  /// - quantity: Number of units (العدد)
+  /// - type: Name of the chicken type (النوع)
+  /// - grossWeight: Gross weight in kg (الوزن القائم)
+  /// - loadingPrice: Price per kg entered by user (سعر التحميل)
+  /// - todayAccount: Total price for today's account (legacy)
+  /// - totalPrice: Total price for the order (legacy)
+  ///
+  /// Auto calculated fields:
+  /// - netWeight: Net weight = grossWeight - (quantity * 8)
+  /// - totalLoading: Total loading = netWeight * loadingPrice
   Future<Map<String, dynamic>> createOrder(
     Map<String, dynamic> orderData,
   ) async {

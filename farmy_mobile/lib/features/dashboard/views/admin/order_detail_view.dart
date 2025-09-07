@@ -45,9 +45,15 @@ class _OrderDetailViewState extends State<OrderDetailView> {
     );
     final double netProfit = orderRevenue - totalExpenses;
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        context.pop();
+      },
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
         appBar: AppBar(
           title: Text(
             'طلب رقم #${order['_id']?.substring(0, 8) ?? 'غير معروف'}',
@@ -360,6 +366,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

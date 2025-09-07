@@ -1,0 +1,238 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../../features/authentication/services/token_service.dart';
+import 'api_exception.dart';
+
+class LoadingApiService {
+  static const String baseUrl = 'http://192.168.1.2:3000/api';
+  final TokenService _tokenService;
+
+  LoadingApiService({required TokenService tokenService})
+    : _tokenService = tokenService;
+
+  /// Get authorization headers with token
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final token = await _tokenService.getToken();
+    return {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+    };
+  }
+
+  /// Create new loading (التحميل)
+  ///
+  /// Required fields:
+  /// - chickenType: ID of the chicken type (النوع)
+  /// - customer: ID of the customer (المكان)
+  /// - quantity: Number of units (العدد)
+  /// - grossWeight: Gross weight in kg (الوزن القائم)
+  /// - loadingPrice: Price per kg entered by user (سعر التحميل)
+  /// - notes: Optional notes (ملاحظات)
+  ///
+  /// Auto calculated fields:
+  /// - netWeight: Net weight = grossWeight - (quantity * 8)
+  /// - totalLoading: Total loading = netWeight * loadingPrice
+  Future<Map<String, dynamic>> createLoading(
+    Map<String, dynamic> loadingData,
+  ) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$baseUrl/loadings'),
+        headers: headers,
+        body: json.encode(loadingData),
+      );
+
+      if (response.statusCode == 201) {
+        return json.decode(response.body);
+      } else {
+        final errorData = json.decode(response.body);
+        throw ApiException(
+          message: errorData['message'] ?? 'Failed to create loading',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get all loadings
+  Future<List<Map<String, dynamic>>> getAllLoadings() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/loadings'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load loadings',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get loadings by current employee
+  Future<List<Map<String, dynamic>>> getLoadingsByEmployee() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/loadings/employee'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load employee loadings',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get loadings by specific customer
+  Future<List<Map<String, dynamic>>> getLoadingsByCustomer(
+    String customerId,
+  ) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/loadings/customer/$customerId'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load customer loadings',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get loading by ID
+  Future<Map<String, dynamic>?> getLoadingById(String id) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/loadings/$id'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else if (response.statusCode == 404) {
+        return null;
+      } else {
+        throw ApiException(
+          message: 'Failed to load loading',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Update loading
+  Future<Map<String, dynamic>> updateLoading(
+    String id,
+    Map<String, dynamic> loadingData,
+  ) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.put(
+        Uri.parse('$baseUrl/loadings/$id'),
+        headers: headers,
+        body: json.encode(loadingData),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final errorData = json.decode(response.body);
+        throw ApiException(
+          message: errorData['message'] ?? 'Failed to update loading',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Delete loading
+  Future<void> deleteLoading(String id) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.delete(
+        Uri.parse('$baseUrl/loadings/$id'),
+        headers: headers,
+      );
+
+      if (response.statusCode != 200) {
+        final errorData = json.decode(response.body);
+        throw ApiException(
+          message: errorData['message'] ?? 'Failed to delete loading',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get loading statistics
+  Future<Map<String, dynamic>> getLoadingStats({
+    String? startDate,
+    String? endDate,
+  }) async {
+    try {
+      final headers = await _getAuthHeaders();
+      String url = '$baseUrl/loadings/stats';
+
+      if (startDate != null && endDate != null) {
+        url += '?startDate=$startDate&endDate=$endDate';
+      }
+
+      final response = await http.get(Uri.parse(url), headers: headers);
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw ApiException(
+          message: 'Failed to load loading statistics',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+}
