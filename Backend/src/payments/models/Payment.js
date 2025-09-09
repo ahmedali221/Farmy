@@ -1,11 +1,6 @@
 const mongoose = require('mongoose');
 
 const paymentSchema = new mongoose.Schema({
-  order: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Order',
-    required: true
-  },
   customer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Customer',
@@ -28,29 +23,17 @@ const paymentSchema = new mongoose.Schema({
     min: 0,
     description: 'Amount paid by customer in EGP'
   },
+  discount: {
+    type: Number,
+    min: 0,
+    default: 0,
+    description: 'Discount amount in EGP (from notes)'
+  },
   remainingAmount: {
     type: Number,
     required: true,
     min: 0,
     description: 'Remaining amount to be paid in EGP'
-  },
-  discount: {
-    type: Number,
-    default: 0,
-    min: 0,
-    description: 'Discount amount in EGP'
-  },
-  discountPercentage: {
-    type: Number,
-    default: 0,
-    min: 0,
-    max: 100,
-    description: 'Discount percentage'
-  },
-  offer: {
-    type: String,
-    default: '',
-    description: 'Description of any special offer applied'
   },
   paymentMethod: {
     type: String,
@@ -61,17 +44,15 @@ const paymentSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'completed', 'partial'],
     default: 'pending'
-  },
-  notes: {
-    type: String,
-    default: '',
-    description: 'Additional notes about the payment'
   }
 }, { timestamps: true });
 
 // Calculate remaining amount and set status before saving
 paymentSchema.pre('save', function(next) {
-  const remaining = (this.totalPrice || 0) - (this.paidAmount || 0);
+  const total = this.totalPrice || 0;
+  const paid = this.paidAmount || 0;
+  const discount = this.discount || 0;
+  const remaining = total - paid - discount;
   this.remainingAmount = Math.max(0, remaining);
   this.status = this.remainingAmount === 0 ? 'completed' : 'partial';
   next();

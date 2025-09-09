@@ -8,5 +8,6 @@ router.get('/:id', customerController.getCustomerById);
 router.put('/:id', customerController.updateCustomer);
 router.delete('/:id', customerController.deleteCustomer);
 router.post('/:id/payments', customerController.addPayment);
+router.post('/:id/outstanding/increment', customerController.incrementOutstanding);
 
 module.exports = router;

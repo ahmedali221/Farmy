@@ -16,6 +16,7 @@ import '../../features/dashboard/views/employee/daily_report_screen.dart';
 import '../../features/dashboard/views/employee/order_placement_view.dart';
 import '../../features/dashboard/views/employee/payment_collection_view.dart';
 import '../../features/dashboard/views/employee/expense_management_view.dart';
+import '../../features/dashboard/views/employee/distribution_view.dart';
 
 class AppRouter {
   static GoRouter createRouter(AuthCubit authCubit) {
@@ -156,6 +157,11 @@ class AppRouter {
           path: '/payment-collection',
           name: 'payment-collection',
           builder: (context, state) => const PaymentCollectionView(),
+        ),
+        GoRoute(
+          path: '/distribution',
+          name: 'distribution',
+          builder: (context, state) => const DistributionView(),
         ),
         GoRoute(
           path: '/expenses',

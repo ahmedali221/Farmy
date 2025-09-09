@@ -1,21 +1,15 @@
 const Payment = require('../models/Payment');
-const Order = require('../../orders/models/Order');
 const Customer = require('../../customers/models/Customer');
 const Joi = require('joi');
 const logger = require('../../utils/logger');
 
 // Validation schemas
 const paymentSchema = Joi.object({
-  order: Joi.string().required(),
   customer: Joi.string().required(),
   totalPrice: Joi.number().min(0).required(),
   paidAmount: Joi.number().min(0).required(),
-  remainingAmount: Joi.number().min(0).required(),
   discount: Joi.number().min(0).default(0),
-  discountPercentage: Joi.number().min(0).max(100).default(0),
-  offer: Joi.string().allow('', null).default(''),
-  paymentMethod: Joi.string().valid('cash').default('cash'),
-  notes: Joi.string().allow('', null).default('')
+  paymentMethod: Joi.string().valid('cash').default('cash')
 });
 
 exports.createPayment = async (req, res) => {
@@ -23,28 +17,26 @@ exports.createPayment = async (req, res) => {
   if (error) return res.status(400).json({ message: error.details[0].message });
 
   try {
+    const total = req.body.totalPrice || 0;
+    const paid = req.body.paidAmount || 0;
+    const discount = req.body.discount || 0;
+    const remaining = Math.max(0, total - paid - discount);
+    const status = remaining === 0 ? 'completed' : 'partial';
+
     const paymentData = {
       ...req.body,
-      employee: req.user.id // Current logged-in employee
+      employee: req.user.id, // Current logged-in employee
+      remainingAmount: remaining,
+      status
     };
 
     const payment = new Payment(paymentData);
     await payment.save();
 
-    // If offer provided, persist it on the related order as last applied offer
-    if (payment.offer) {
-      await Order.findByIdAndUpdate(payment.order, { offer: payment.offer });
-    }
-
-    // Update order status to delivered if payment is completed
-    if (payment.status === 'completed') {
-      await Order.findByIdAndUpdate(payment.order, { status: 'delivered' });
-    }
-
-    // Update customer outstanding debt
+    // Update customer outstanding debt: set to new unpaid remaining amount
     const customer = await Customer.findById(payment.customer);
     if (customer) {
-      customer.outstandingDebts = Math.max(0, customer.outstandingDebts - payment.paidAmount);
+      customer.outstandingDebts = remaining;
       await customer.save();
     }
 
@@ -95,24 +87,27 @@ exports.updatePayment = async (req, res) => {
   if (error) return res.status(400).json({ message: error.details[0].message });
 
   try {
+    const previousPayment = await Payment.findById(req.params.id);
+    if (!previousPayment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+
     const payment = await Payment.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true }
-    ).populate('order customer employee');
+    ).populate('customer employee');
 
     if (!payment) {
       return res.status(404).json({ message: 'Payment not found' });
     }
 
-    // Update order status if payment is completed
-    if (payment.status === 'completed') {
-      await Order.findByIdAndUpdate(payment.order, { status: 'delivered' });
-    }
-
-    // Sync offer to order if present
-    if (payment.offer) {
-      await Order.findByIdAndUpdate(payment.order, { offer: payment.offer });
+    // Recalculate customer's outstanding as the new remaining amount
+    const customer = await Customer.findById(payment.customer);
+    if (customer) {
+      const newRemaining = Math.max(0, (payment.totalPrice || 0) - (payment.paidAmount || 0) - (payment.discount || 0));
+      customer.outstandingDebts = newRemaining;
+      await customer.save();
     }
 
     logger.info(`Payment updated: ${req.params.id}`);

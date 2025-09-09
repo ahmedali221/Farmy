@@ -582,6 +582,7 @@ class _ChickenTypeFormDialogState extends State<_ChickenTypeFormDialog> {
     'أحمر',
     'ساسو',
     'بط',
+    'فراخ بيضاء',
   ];
 
   @override

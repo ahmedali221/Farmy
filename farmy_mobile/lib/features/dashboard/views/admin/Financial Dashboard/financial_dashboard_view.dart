@@ -7,6 +7,7 @@ import '../../../../../core/services/expense_api_service.dart';
 import '../../../../../core/services/order_api_service.dart';
 import '../../../../../core/services/inventory_api_service.dart';
 import '../../../../../core/services/payment_api_service.dart';
+import '../../../../../core/services/loading_api_service.dart';
 
 class FinancialDashboardView extends StatefulWidget {
   const FinancialDashboardView({super.key});
@@ -21,17 +22,20 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
   List<dynamic> dailyReports = [];
   List<dynamic> orders = [];
   List<dynamic> employees = [];
+  List<Map<String, dynamic>> loadings = [];
   Map<String, List<dynamic>> expensesByOrder = {};
   Map<String, dynamic> paymentSummaryByOrder = {};
   Map<String, List<dynamic>> paymentsByOrder = {};
   bool isLoading = true;
   List<Map<String, dynamic>> otherExpenses = [];
+  int selectedDaysFilter = 7; // 7, 30, 90, 0 (for all)
   final String baseUrl =
       'https://farmy-3b980tcc5-ahmed-alis-projects-588ffe47.vercel.app/api';
   late final ExpenseApiService _expenseService;
   late final OrderApiService _orderService;
   late final InventoryApiService _inventoryService;
   late final PaymentApiService _paymentService;
+  late final LoadingApiService _loadingService;
 
   @override
   void initState() {
@@ -41,6 +45,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
     _orderService = serviceLocator<OrderApiService>();
     _inventoryService = serviceLocator<InventoryApiService>();
     _paymentService = serviceLocator<PaymentApiService>();
+    _loadingService = serviceLocator<LoadingApiService>();
     _loadFinancialData();
   }
 
@@ -53,7 +58,12 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
   Future<void> _loadFinancialData() async {
     setState(() => isLoading = true);
     try {
-      await Future.wait([_loadDailyReports(), _loadOrders(), _loadEmployees()]);
+      await Future.wait([
+        _loadDailyReports(),
+        _loadOrders(),
+        _loadEmployees(),
+        _loadLoadings(),
+      ]);
       await _loadOrderDetails();
       setState(() => isLoading = false);
     } catch (e) {
@@ -132,6 +142,16 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
       print('Expenses by order: $expensesByOrder'); // Debug log
     } catch (e) {
       print('Error loading order details: $e');
+    }
+  }
+
+  Future<void> _loadLoadings() async {
+    try {
+      final list = await _loadingService.getAllLoadings();
+      loadings = list;
+    } catch (e) {
+      print('Error loading loadings: $e');
+      loadings = [];
     }
   }
 
@@ -256,7 +276,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
               : TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildDailyReportsTab(),
+                    _buildDailyProfitTab(),
                     _buildTreasuryTab(),
                     _buildEmployeeFinanceTab(),
                   ],
@@ -270,40 +290,93 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
     );
   }
 
-  Widget _buildDailyReportsTab() {
+  Widget _buildDailyProfitTab() {
     if (orders.isEmpty) {
       return _buildEmptyState(
         Icons.bar_chart,
         'لا توجد طلبات',
-        'لم يتم العثور على أي طلبات لعرض التقارير',
+        'لم يتم العثور على أي طلبات لعرض الأرباح',
       );
     }
 
-    // Aggregate from orders
-    final int totalOrders = orders.length;
-    final double totalRevenue = orders.fold(
-      0.0,
-      (sum, o) => sum + _orderTotalPrice(o),
-    );
+    // Aggregate per day: compute profit = meals - loading - expenses - discounts
+    final Map<String, Map<String, dynamic>> byDay = {};
 
-    final Map<String, Map<String, dynamic>> daily = {};
-    for (final o in orders) {
-      final String key = _dateKey(o['orderDate']);
-      final double revenue = _orderTotalPrice(o);
-      if (!daily.containsKey(key)) {
-        daily[key] = {'date': key, 'orders': 0, 'revenue': 0.0};
-      }
-      daily[key]!['orders'] = (daily[key]!['orders'] as int) + 1;
-      daily[key]!['revenue'] = (daily[key]!['revenue'] as double) + revenue;
+    // Helper to ensure entry
+    Map<String, dynamic> _ensureDay(String key) {
+      return byDay.putIfAbsent(
+        key,
+        () => {
+          'date': key,
+          'orders': 0,
+          'meals': 0.0,
+          'loadingAmount': 0.0,
+          'expenses': 0.0,
+          'discounts': 0.0,
+        },
+      );
     }
 
-    final List<Map<String, dynamic>> dailyList = daily.values.toList()
-      ..sort((a, b) {
-        // sort by date desc
-        DateTime da = _parseDateKey(a['date']);
-        DateTime db = _parseDateKey(b['date']);
-        return db.compareTo(da);
-      });
+    // Orders: meals and discounts, expenses
+    for (final o in orders) {
+      final DateTime dt = _safeParseDate(o['orderDate']);
+      if (!_isWithinSelectedDays(dt)) continue;
+      final String key = _dateKey(dt);
+      final entry = _ensureDay(key);
+      entry['orders'] = (entry['orders'] as int) + 1;
+      entry['meals'] = (entry['meals'] as double) + _orderTotalPrice(o);
+
+      final String? id = o['_id']?.toString();
+      // Expenses
+      final List<dynamic> list = id != null ? (expensesByOrder[id] ?? []) : [];
+      final double exp = list.fold(
+        0.0,
+        (s, e) => s + ((e['amount'] ?? 0) as num).toDouble(),
+      );
+      entry['expenses'] = (entry['expenses'] as double) + exp;
+
+      // Discounts from payment summary if available
+      final dynamic summary = id != null ? paymentSummaryByOrder[id] : null;
+      if (summary != null && summary is Map<String, dynamic>) {
+        final num? disc = summary['totalDiscount'] as num?;
+        if (disc != null) {
+          entry['discounts'] = (entry['discounts'] as double) + disc.toDouble();
+        }
+      }
+    }
+
+    // Loadings: totalLoading per day
+    for (final l in loadings) {
+      final DateTime dt = _safeParseDate(l['loadingDate']);
+      if (!_isWithinSelectedDays(dt)) continue;
+      final String key = _dateKey(dt);
+      final entry = _ensureDay(key);
+      final double amt = ((l['totalLoading'] ?? 0) as num).toDouble();
+      entry['loadingAmount'] = (entry['loadingAmount'] as double) + amt;
+    }
+
+    // Build list and compute profit
+    final List<Map<String, dynamic>> dailyList =
+        byDay.values.map((m) {
+          final double meals = (m['meals'] as double);
+          final double loadingAmount = (m['loadingAmount'] as double);
+          final double expenses = (m['expenses'] as double);
+          final double discounts = (m['discounts'] as double);
+          final double profit = meals - loadingAmount - expenses - discounts;
+          return {...m, 'profit': profit};
+        }).toList()..sort((a, b) {
+          DateTime da = _parseDateKey(a['date']);
+          DateTime db = _parseDateKey(b['date']);
+          return db.compareTo(da);
+        });
+
+    final double totalProfit = dailyList.fold(
+      0.0,
+      (s, d) => s + ((d['profit'] as double)),
+    );
+    final int totalOrders = orders
+        .where((o) => _isWithinSelectedDays(_safeParseDate(o['orderDate'])))
+        .length;
 
     return SingleChildScrollView(
       child: Column(
@@ -321,10 +394,10 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
             ),
             child: Column(
               children: [
-                const Icon(Icons.today, size: 48, color: Colors.white),
+                const Icon(Icons.attach_money, size: 48, color: Colors.white),
                 const SizedBox(height: 12),
                 const Text(
-                  'التقارير اليومية',
+                  'الربح اليومي',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -333,7 +406,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'ملخص الطلبات والإيرادات حسب التاريخ',
+                  'الربح = الوجبات - التحميل - مصروفات التحميل - الخصومات',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.white.withOpacity(0.9),
@@ -366,26 +439,28 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                         totalOrders.toString(),
                         Icons.shopping_cart,
                         Colors.blue,
-                        'عدد الطلبات الإجمالي',
+                        'عدد الطلبات في الفترة',
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _buildEnhancedTreasuryCard(
-                        'إجمالي الإيرادات',
-                        'EGP ${totalRevenue.toStringAsFixed(2)}',
-                        Icons.attach_money,
+                        'إجمالي الربح',
+                        'EGP ${totalProfit.toStringAsFixed(2)}',
+                        Icons.trending_up,
                         Colors.green,
-                        'إجمالي المبالغ المحصلة',
+                        'صافي الربح في الفترة المحددة',
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
+                _buildDaysFilter(),
               ],
             ),
           ),
 
-          // Daily Reports Section
+          // Daily Profit Section
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
@@ -407,7 +482,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                     ),
                     const SizedBox(width: 12),
                     const Text(
-                      'التقارير اليومية',
+                      'الربح اليومي',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -418,7 +493,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                 ),
                 const SizedBox(height: 16),
                 ...dailyList
-                    .map((item) => _buildDailyReportCard(item))
+                    .map((item) => _buildDailyProfitCard(item))
                     .toList(),
               ],
             ),
@@ -428,6 +503,48 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
         ],
       ),
     );
+  }
+
+  Widget _buildDaysFilter() {
+    return Row(
+      children: [
+        _buildFilterChip('7 أيام', 7),
+        const SizedBox(width: 8),
+        _buildFilterChip('30 يوم', 30),
+        const SizedBox(width: 8),
+        _buildFilterChip('90 يوم', 90),
+        const SizedBox(width: 8),
+        _buildFilterChip('الكل', 0),
+      ],
+    );
+  }
+
+  Widget _buildFilterChip(String label, int days) {
+    final bool selected = selectedDaysFilter == days;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) {
+        setState(() {
+          selectedDaysFilter = days;
+        });
+      },
+    );
+  }
+
+  bool _isWithinSelectedDays(DateTime date) {
+    if (selectedDaysFilter == 0) return true;
+    final DateTime now = DateTime.now();
+    final DateTime start = now.subtract(Duration(days: selectedDaysFilter));
+    final DateTime normalizedDate = DateTime(date.year, date.month, date.day);
+    final DateTime normalizedStart = DateTime(
+      start.year,
+      start.month,
+      start.day,
+    );
+    final DateTime normalizedNow = DateTime(now.year, now.month, now.day);
+    return !normalizedDate.isBefore(normalizedStart) &&
+        !normalizedDate.isAfter(normalizedNow);
   }
 
   Widget _buildTreasuryTab() {
@@ -1406,7 +1523,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
     );
   }
 
-  Widget _buildDailyReportCard(Map<String, dynamic> item) {
+  Widget _buildDailyProfitCard(Map<String, dynamic> item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Card(
@@ -1427,7 +1544,11 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                   ),
                   borderRadius: BorderRadius.circular(25),
                 ),
-                child: const Icon(Icons.today, color: Colors.white, size: 24),
+                child: const Icon(
+                  Icons.trending_up,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -1435,7 +1556,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'تقرير يومي - ${item['date']}',
+                      'الربح - ${item['date']}',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -1443,9 +1564,28 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      'الطلبات: ${item['orders']}',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        _miniPill('طلبات: ${item['orders']}', Colors.blue),
+                        _miniPill(
+                          'وجبات: EGP ${(item['meals'] as double).toStringAsFixed(0)}',
+                          Colors.green,
+                        ),
+                        _miniPill(
+                          'تحميل: EGP ${(item['loadingAmount'] as double).toStringAsFixed(0)}',
+                          Colors.orange,
+                        ),
+                        _miniPill(
+                          'مصروفات: EGP ${(item['expenses'] as double).toStringAsFixed(0)}',
+                          Colors.red,
+                        ),
+                        _miniPill(
+                          'خصومات: EGP ${(item['discounts'] as double).toStringAsFixed(0)}',
+                          Colors.purple,
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1460,7 +1600,7 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'EGP ${(item['revenue'] as double).toStringAsFixed(2)}',
+                  'EGP ${(item['profit'] as double).toStringAsFixed(2)}',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -1472,6 +1612,18 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _miniPill(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Text(text, style: TextStyle(fontSize: 11, color: color)),
     );
   }
 

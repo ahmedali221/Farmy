@@ -20,6 +20,10 @@ const paymentSchema = Joi.object({
   date: Joi.date()
 });
 
+const outstandingIncrementSchema = Joi.object({
+  amount: Joi.number().min(0).required()
+});
+
 exports.createCustomer = async (req, res) => {
   const { error } = customerSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
@@ -53,6 +57,24 @@ exports.updateCustomer = async (req, res) => {
   try {
     const customer = await Customer.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    res.json(customer);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Increment only outstandingDebts by a positive amount
+exports.incrementOutstanding = async (req, res) => {
+  const { error } = outstandingIncrementSchema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+
+  try {
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    const increment = req.body.amount || 0;
+    customer.outstandingDebts = Math.max(0, (customer.outstandingDebts || 0) + increment);
+    await customer.save();
     res.json(customer);
   } catch (err) {
     logger.error(err);

@@ -134,7 +134,7 @@ class EmployeeDashboardView extends StatelessWidget {
                       'التوزيع',
                       Icons.horizontal_distribute,
                       Theme.of(context).colorScheme.secondary,
-                      () => context.go('/order-placement'),
+                      () => context.go('/distribution'),
                     ),
                     _buildActionCard(
                       context,

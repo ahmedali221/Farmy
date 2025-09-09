@@ -8,3 +8,11 @@
 {"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-07T21:15:11.255Z"}
 {"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-07T21:15:24.348Z"}
 {"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-07T21:16:25.255Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T09:18:26.228Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T09:18:57.346Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T09:19:19.445Z"}
+{"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-09T09:20:08.300Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T09:24:21.888Z"}
+{"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-09T09:46:46.530Z"}
+{"level":"error","message":"Error creating payment: Payment validation failed: remainingAmount: Path `remainingAmount` is required.","timestamp":"2025-09-09T10:27:17.417Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T10:53:07.166Z"}

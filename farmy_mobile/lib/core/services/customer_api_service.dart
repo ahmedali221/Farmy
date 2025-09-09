@@ -173,4 +173,32 @@ class CustomerApiService {
       throw ApiException(message: 'Network error: $e', statusCode: 0);
     }
   }
+
+  /// Increment customer's outstanding debts by amount
+  Future<Map<String, dynamic>> incrementOutstanding(
+    String customerId,
+    double amount,
+  ) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$baseUrl/customers/$customerId/outstanding/increment'),
+        headers: headers,
+        body: json.encode({'amount': amount}),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final errorData = json.decode(response.body);
+        throw ApiException(
+          message: errorData['message'] ?? 'Failed to increment outstanding',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
 }

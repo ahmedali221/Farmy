@@ -7,7 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/payment_api_service.dart';
-import '../../../../core/services/order_api_service.dart';
+import '../../../../core/services/customer_api_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../authentication/cubit/auth_cubit.dart';
@@ -21,112 +21,93 @@ class PaymentCollectionView extends StatefulWidget {
 }
 
 class _PaymentCollectionViewState extends State<PaymentCollectionView> {
-  List<Map<String, dynamic>> orders = [];
+  List<Map<String, dynamic>> customers = [];
   bool isLoading = true;
   bool isSubmitting = false;
   bool isPaymentSubmitted = false;
 
   // Form controllers
   final _formKey = GlobalKey<FormState>();
-  String? selectedOrderId;
-  final _totalPriceController = TextEditingController();
+  String? selectedCustomerId;
+  final _totalOutstandingController = TextEditingController();
   final _paidAmountController = TextEditingController();
   final _discountController = TextEditingController();
-  final _discountPercentageController = TextEditingController();
-  final _offerController = TextEditingController();
-  final _notesController = TextEditingController();
   final _remainingController = TextEditingController();
   String _selectedPaymentMethod = 'cash';
 
   @override
   void initState() {
     super.initState();
-    _loadOrders();
+    _loadCustomers();
+    // Auto-calc remaining when discount or paid change
+    _paidAmountController.addListener(_calculateRemaining);
+    _discountController.addListener(_calculateRemaining);
   }
 
   @override
   void dispose() {
-    _totalPriceController.dispose();
+    _totalOutstandingController.dispose();
     _paidAmountController.dispose();
     _discountController.dispose();
-    _discountPercentageController.dispose();
-    _offerController.dispose();
-    _notesController.dispose();
     _remainingController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadOrders() async {
+  Future<void> _loadCustomers() async {
     setState(() => isLoading = true);
 
     try {
-      final orderService = serviceLocator<OrderApiService>();
-      final orders = await orderService.getOrdersByEmployee();
-
-      // Filter only pending orders
-      final pendingOrders = orders
-          .where((order) => order['status'] == 'pending')
-          .toList();
-
+      final customerService = serviceLocator<CustomerApiService>();
+      final result = await customerService.getAllCustomers();
       if (mounted) {
         setState(() {
-          this.orders = pendingOrders;
+          customers = result;
           isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => isLoading = false);
-        _showErrorDialog('فشل في تحميل الطلبات: $e');
+        _showErrorDialog('فشل في تحميل العملاء: $e');
       }
     }
   }
 
-  void _onOrderSelected(String? orderId) {
+  void _onCustomerSelected(String? id) {
     setState(() {
-      selectedOrderId = orderId;
+      selectedCustomerId = id;
     });
-
-    if (orderId != null) {
-      final order = orders.firstWhere((order) => order['_id'] == orderId);
-      final chickenType = order['chickenType'];
-      final quantity = order['quantity'];
-      final totalPrice = quantity * chickenType['price'];
-
-      _totalPriceController.text = totalPrice.toString();
-      _paidAmountController.text = totalPrice.toString();
-      _remainingController.text = '0.00';
+    if (id != null) {
+      final customer = customers.firstWhere((c) => c['_id'] == id);
+      final outstanding = (customer['outstandingDebts'] as num? ?? 0)
+          .toDouble();
+      _totalOutstandingController.text = outstanding.toStringAsFixed(2);
+      _paidAmountController.text = '';
       _discountController.text = '0';
-      _discountPercentageController.text = '0';
-    }
-  }
-
-  void _calculateDiscount() {
-    final totalPrice = double.tryParse(_totalPriceController.text) ?? 0;
-    final discountPercentage =
-        double.tryParse(_discountPercentageController.text) ?? 0;
-
-    if (totalPrice > 0 && discountPercentage > 0) {
-      final discount = (totalPrice * discountPercentage) / 100;
-      _discountController.text = discount.toStringAsFixed(2);
-
-      final newTotalPrice = totalPrice - discount;
-      _totalPriceController.text = newTotalPrice.toStringAsFixed(2);
-      _paidAmountController.text = newTotalPrice.toStringAsFixed(2);
+      _remainingController.text = outstanding.toStringAsFixed(2);
     }
   }
 
   void _calculateRemaining() {
-    final totalPrice = double.tryParse(_totalPriceController.text) ?? 0;
+    final totalPrice = double.tryParse(_totalOutstandingController.text) ?? 0;
     final paidAmount = double.tryParse(_paidAmountController.text) ?? 0;
-    final remaining = totalPrice - paidAmount;
+    final discount = double.tryParse(_discountController.text) ?? 0;
+    // Clamp values to valid ranges
+    final effectiveDiscount = discount.clamp(0, totalPrice);
+    final maxPayable = (totalPrice - effectiveDiscount).clamp(0, totalPrice);
+    final effectivePaid = paidAmount.clamp(0, maxPayable);
+    final remaining = (totalPrice - effectiveDiscount - effectivePaid).clamp(
+      0,
+      double.infinity,
+    );
 
-    if (remaining < 0) {
-      _paidAmountController.text = totalPrice.toString();
-      _remainingController.text = '0.00';
-    } else {
-      _remainingController.text = remaining.toStringAsFixed(2);
+    if (effectiveDiscount != discount) {
+      _discountController.text = effectiveDiscount.toStringAsFixed(2);
     }
+    if (effectivePaid != paidAmount) {
+      _paidAmountController.text = effectivePaid.toStringAsFixed(2);
+    }
+    _remainingController.text = (remaining as double).toStringAsFixed(2);
   }
 
   Future<void> _submitPayment() async {
@@ -136,27 +117,18 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
 
     try {
       final paymentService = serviceLocator<PaymentApiService>();
-      final order = orders.firstWhere(
-        (order) => order['_id'] == selectedOrderId,
-      );
-
-      final totalPrice = double.parse(_totalPriceController.text);
+      final totalPrice = double.parse(_totalOutstandingController.text);
       final paidAmount = double.parse(_paidAmountController.text);
       final discount = double.tryParse(_discountController.text) ?? 0;
-      final remainingAmount = totalPrice - paidAmount - discount;
+      final remainingAmount =
+          totalPrice - paidAmount - discount; // for display only
 
       final paymentData = {
-        'order': selectedOrderId,
-        'customer': order['customer']['_id'],
+        'customer': selectedCustomerId,
         'totalPrice': totalPrice,
         'paidAmount': paidAmount,
-        'remainingAmount': remainingAmount,
         'discount': discount,
-        'discountPercentage':
-            double.tryParse(_discountPercentageController.text) ?? 0,
-        'offer': _offerController.text.isNotEmpty ? _offerController.text : '',
         'paymentMethod': _selectedPaymentMethod,
-        'notes': _notesController.text.isNotEmpty ? _notesController.text : '',
       };
 
       await paymentService.createPayment(paymentData);
@@ -166,7 +138,11 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
           isPaymentSubmitted = true;
         });
         _showSuccessDialog();
-        _loadOrders(); // Reload orders to update status
+        await _loadCustomers(); // Reload customers to update outstanding
+        // Re-apply selection to refresh the displayed totals/remaining
+        if (selectedCustomerId != null) {
+          _onCustomerSelected(selectedCustomerId);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -181,13 +157,10 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
 
   void _resetForm() {
     _formKey.currentState?.reset();
-    selectedOrderId = null;
-    _totalPriceController.clear();
+    selectedCustomerId = null;
+    _totalOutstandingController.clear();
     _paidAmountController.clear();
     _discountController.clear();
-    _discountPercentageController.clear();
-    _offerController.clear();
-    _notesController.clear();
     _selectedPaymentMethod = 'cash';
     setState(() {
       isPaymentSubmitted = false;
@@ -275,39 +248,23 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
   Future<void> _generateReceipt() async {
     try {
       // Check if required data is available
-      if (selectedOrderId == null) {
-        _showErrorDialog('يرجى اختيار الطلب أولاً');
+      if (selectedCustomerId == null) {
+        _showErrorDialog('يرجى اختيار العميل أولاً');
         return;
       }
-
-      final order = orders.firstWhere(
-        (order) => order['_id'] == selectedOrderId,
+      final customer = customers.firstWhere(
+        (c) => c['_id'] == selectedCustomerId,
       );
-      final customer = order['customer'];
-      final chickenType = order['chickenType'];
-      final quantity = order['quantity'];
-      final totalPrice = quantity * chickenType['price'];
-      final paidAmount =
-          double.tryParse(_paidAmountController.text) ?? totalPrice;
+      final totalPrice = double.tryParse(_totalOutstandingController.text) ?? 0;
+      final paidAmount = double.tryParse(_paidAmountController.text) ?? 0;
       final discount = double.tryParse(_discountController.text) ?? 0;
       final remaining = totalPrice - paidAmount - discount;
 
       // Get current employee info from auth cubit
       String employeeName = 'موظف النظام';
-      try {
-        // Try to get employee info from the order or current user
-        if (order['employee'] != null) {
-          employeeName = order['employee']['username'] ?? 'موظف النظام';
-        } else {
-          // Get current user from auth cubit
-          final authState = context.read<AuthCubit>().state;
-          if (authState is AuthAuthenticated) {
-            employeeName = authState.user.username;
-          }
-        }
-      } catch (e) {
-        // Fallback to default name
-        employeeName = 'موظف النظام';
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthAuthenticated) {
+        employeeName = authState.user.username;
       }
 
       final pdf = pw.Document();
@@ -422,7 +379,7 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
                 ),
                 pw.SizedBox(height: 20),
 
-                // Order Details
+                // Balance Details
                 pw.Container(
                   padding: const pw.EdgeInsets.all(10),
                   decoration: pw.BoxDecoration(
@@ -435,18 +392,15 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text(
-                        'تفاصيل الطلب:',
+                        'تفاصيل الرصيد:',
                         style: pw.TextStyle(
                           fontSize: 14,
                           fontWeight: pw.FontWeight.bold,
                         ),
                       ),
                       pw.SizedBox(height: 5),
-                      pw.Text('نوع الدجاج: ${chickenType['name']}'),
-                      pw.Text('الكمية: ${quantity.toStringAsFixed(2)} كيلو'),
-                      pw.Text('السعر لكل كيلو: ${chickenType['price']} ج.م'),
                       pw.Text(
-                        'السعر الإجمالي: ${totalPrice.toStringAsFixed(2)} ج.م',
+                        'إجمالي الحساب: ${totalPrice.toStringAsFixed(2)} ج.م',
                       ),
                     ],
                   ),
@@ -601,272 +555,318 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
         child: Directionality(
           textDirection: TextDirection.rtl,
           child: Scaffold(
-          body: Stack(
-            children: [
-              // خلفية متدرّجة مع حافة سفلية دائرية
-              Container(
-                height: size.height * 0.34,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Theme.of(context).colorScheme.surface,
-                      Theme.of(context).colorScheme.background,
-                    ],
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(36),
-                    bottomRight: Radius.circular(36),
+            body: Stack(
+              children: [
+                // خلفية متدرّجة مع حافة سفلية دائرية
+                Container(
+                  height: size.height * 0.34,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Theme.of(context).colorScheme.surface,
+                        Theme.of(context).colorScheme.background,
+                      ],
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(36),
+                      bottomRight: Radius.circular(36),
+                    ),
                   ),
                 ),
-              ),
 
-              // المحتوى
-              SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 36),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 8),
-                      _HeaderBar(onRefresh: _loadOrders),
-                      const SizedBox(height: 18),
+                // المحتوى
+                SafeArea(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(bottom: 36),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 8),
+                        _HeaderBar(onRefresh: _loadCustomers),
+                        const SizedBox(height: 18),
 
-                      if (isLoading)
-                        const Center(child: CircularProgressIndicator())
-                      else if (orders.isEmpty)
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(32.0),
-                            child: Text(
-                              'لا توجد طلبات معلقة للتحصيل',
-                              style: TextStyle(fontSize: 18),
+                        if (isLoading)
+                          const Center(child: CircularProgressIndicator())
+                        else if (customers.isEmpty)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(32.0),
+                              child: Text(
+                                'لا يوجد عملاء متاحون',
+                                style: TextStyle(fontSize: 18),
+                              ),
                             ),
-                          ),
-                        )
-                      else
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              children: [
-                                // Order Selection
-                                _SectionCard(
-                                  title: 'اختيار الطلب',
-                                  child: _DropdownField(
-                                    label: 'الطلب',
-                                    value: selectedOrderId,
-                                    items: orders.map((order) {
-                                      final customer = order['customer'];
-                                      final chickenType = order['chickenType'];
-                                      final quantity = order['quantity'];
-                                      final totalPrice =
-                                          quantity * chickenType['price'];
-
-                                      return DropdownMenuItem<String>(
-                                        value: order['_id'],
-                                        child: Text(
-                                          '${customer['name']} - ${chickenType['name']} - $quantity كيلو - ${totalPrice.toStringAsFixed(0)} EGP',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      );
-                                    }).toList(),
-                                    onChanged: _onOrderSelected,
-                                    validator: (value) {
-                                      if (value == null) {
-                                        return 'يرجى اختيار الطلب';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-
-                                // Payment Details
-                                _SectionCard(
-                                  title: 'تفاصيل الدفع',
-                                  child: Column(
-                                    children: [
-                                      _NumField(
-                                        label: 'السعر الإجمالي (EGP)',
-                                        controller: _totalPriceController,
-                                        enabled: false,
-                                      ),
-                                      const SizedBox(height: 10),
-
-                                      // Discount Percentage
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: _NumField(
-                                              label: 'نسبة الخصم (%)',
-                                              controller:
-                                                  _discountPercentageController,
-                                              onChanged: (value) =>
-                                                  _calculateDiscount(),
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                children: [
+                                  // Customer Selection
+                                  _SectionCard(
+                                    title: 'اختيار العميل',
+                                    child: _DropdownField(
+                                      label: 'العميل',
+                                      value: selectedCustomerId,
+                                      items: customers.map((c) {
+                                        return DropdownMenuItem<String>(
+                                          value: c['_id'],
+                                          child: Text(
+                                            c['name'] ?? '',
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Colors.black,
                                             ),
                                           ),
-                                          const SizedBox(width: 16),
-                                          Expanded(
-                                            child: _NumField(
-                                              label: 'قيمة الخصم (EGP)',
-                                              controller: _discountController,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-
-                                      _NumField(
-                                        label: 'المبلغ المدفوع (EGP)',
-                                        controller: _paidAmountController,
-                                        onChanged: (value) =>
-                                            _calculateRemaining(),
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return 'يرجى إدخال المبلغ المدفوع';
-                                          }
-                                          final amount = double.tryParse(value);
-                                          if (amount == null || amount < 0) {
-                                            return 'يرجى إدخال مبلغ صحيح';
-                                          }
-                                          return null;
-                                        },
-                                      ),
-                                      const SizedBox(height: 10),
-
-                                      // Remaining amount (read-only)
-                                      _NumField(
-                                        label: 'المتبقي (EGP)',
-                                        controller: _remainingController,
-                                        enabled: false,
-                                      ),
-                                      const SizedBox(height: 10),
-
-                                      // Payment Method (cash only)
-                                      Align(
-                                        alignment: Alignment.centerRight,
-                                        child: Text(
-                                          'طريقة الدفع: نقداً',
-                                          style: TextStyle(
-                                            color: Theme.of(
-                                              context,
-                                            ).textTheme.bodyMedium?.color,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      const SizedBox(height: 10),
-
-                                      // Offer
-                                      _NumField(
-                                        label: 'العرض (اختياري)',
-                                        controller: _offerController,
-                                        enabled: true,
-                                      ),
-                                      const SizedBox(height: 10),
-
-                                      // Notes
-                                      _NumField(
-                                        label: 'ملاحظات (اختياري)',
-                                        controller: _notesController,
-                                        enabled: true,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-
-                                // Submit Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: isSubmitting
-                                        ? null
-                                        : _submitPayment,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 14,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
+                                        );
+                                      }).toList(),
+                                      onChanged: _onCustomerSelected,
+                                      validator: (value) {
+                                        if (value == null) {
+                                          return 'يرجى اختيار العميل';
+                                        }
+                                        return null;
+                                      },
                                     ),
-                                    child: isSubmitting
-                                        ? const CircularProgressIndicator(
-                                            color: Colors.white,
-                                          )
-                                        : const Text(
-                                            'تسجيل الدفع',
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // Payment Details
+                                  _SectionCard(
+                                    title: 'تفاصيل الدفع',
+                                    child: Column(
+                                      children: [
+                                        if (selectedCustomerId != null)
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue[50],
+                                              border: Border.all(
+                                                color: Colors.blue[200]!,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.info_outline,
+                                                  color: Colors.blue[700],
+                                                  size: 20,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'العميل المحدد: ',
+                                                  style: TextStyle(
+                                                    color: Colors.blue[700],
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                Expanded(
+                                                  child: Text(
+                                                    customers.firstWhere(
+                                                          (c) =>
+                                                              c['_id'] ==
+                                                              selectedCustomerId,
+                                                        )['name'] ??
+                                                        '',
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color: Colors.blue[700],
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Text(
+                                                  'المستحق: ${_totalOutstandingController.text}',
+                                                  style: TextStyle(
+                                                    color: Colors.blue[600],
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        if (selectedCustomerId != null)
+                                          const SizedBox(height: 12),
+                                        _NumField(
+                                          label: 'إجمالي الحساب (EGP)',
+                                          controller:
+                                              _totalOutstandingController,
+                                          enabled: false,
+                                        ),
+                                        const SizedBox(height: 10),
+                                        _NumField(
+                                          label: 'قيمة الخصم (EGP)',
+                                          controller: _discountController,
+                                          onChanged: (v) =>
+                                              _calculateRemaining(),
+                                        ),
+                                        const SizedBox(height: 10),
+
+                                        _NumField(
+                                          label: 'المبلغ المدفوع (EGP)',
+                                          controller: _paidAmountController,
+                                          onChanged: (value) =>
+                                              _calculateRemaining(),
+                                          validator: (value) {
+                                            if (value == null ||
+                                                value.isEmpty) {
+                                              return 'يرجى إدخال المبلغ المدفوع';
+                                            }
+                                            final amount = double.tryParse(
+                                              value,
+                                            );
+                                            if (amount == null || amount < 0) {
+                                              return 'يرجى إدخال مبلغ صحيح';
+                                            }
+                                            final total =
+                                                double.tryParse(
+                                                  _totalOutstandingController
+                                                      .text,
+                                                ) ??
+                                                0;
+                                            final discount =
+                                                double.tryParse(
+                                                  _discountController.text,
+                                                ) ??
+                                                0;
+                                            final maxPay = (total - discount)
+                                                .clamp(0, total);
+                                            if (amount > maxPay) {
+                                              return 'الحد الأقصى للدفع: ${maxPay.toStringAsFixed(2)}';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                        const SizedBox(height: 10),
+
+                                        // Remaining amount (read-only)
+                                        _NumField(
+                                          label: 'المتبقي (EGP)',
+                                          controller: _remainingController,
+                                          enabled: false,
+                                        ),
+                                        const SizedBox(height: 10),
+
+                                        // Payment Method (cash only)
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: Text(
+                                            'طريقة الدفع: نقداً',
                                             style: TextStyle(
-                                              fontSize: 16,
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w700,
+                                              color: Theme.of(
+                                                context,
+                                              ).textTheme.bodyMedium?.color,
+                                              fontWeight: FontWeight.w600,
                                             ),
                                           ),
-                                  ),
-                                ),
-
-                                const SizedBox(height: 16),
-
-                                // Generate Receipt Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    onPressed: isPaymentSubmitted
-                                        ? _generateReceipt
-                                        : null,
-                                    icon: Icon(
-                                      Icons.receipt,
-                                      color: isPaymentSubmitted
-                                          ? Theme.of(
-                                              context,
-                                            ).colorScheme.primary
-                                          : Colors.grey,
+                                        ),
+                                        const SizedBox(height: 10),
+                                        const SizedBox(height: 10),
+                                      ],
                                     ),
-                                    label: Text(
-                                      'إنشاء الإيصال',
-                                      style: TextStyle(
+                                  ),
+                                  const SizedBox(height: 24),
+
+                                  // Submit Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: isSubmitting
+                                          ? null
+                                          : _submitPayment,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      child: isSubmitting
+                                          ? const CircularProgressIndicator(
+                                              color: Colors.white,
+                                            )
+                                          : const Text(
+                                              'تسجيل الدفع',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 16),
+
+                                  // Generate Receipt Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      onPressed: isPaymentSubmitted
+                                          ? _generateReceipt
+                                          : null,
+                                      icon: Icon(
+                                        Icons.receipt,
                                         color: isPaymentSubmitted
                                             ? Theme.of(
                                                 context,
                                               ).colorScheme.primary
                                             : Colors.grey,
                                       ),
-                                    ),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 14,
+                                      label: Text(
+                                        'إنشاء الإيصال',
+                                        style: TextStyle(
+                                          color: isPaymentSubmitted
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.primary
+                                              : Colors.grey,
+                                        ),
                                       ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      side: BorderSide(
-                                        color: isPaymentSubmitted
-                                            ? Theme.of(
-                                                context,
-                                              ).colorScheme.primary
-                                            : Colors.grey,
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        side: BorderSide(
+                                          color: isPaymentSubmitted
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.primary
+                                              : Colors.grey,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           ),
         ),
       ),

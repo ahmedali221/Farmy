@@ -1528,3 +1528,113 @@
 {"level":"info","message":"Fetched all customers","timestamp":"2025-09-07T21:16:19.676Z"}
 {"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-07T21:16:19.900Z"}
 {"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-07T21:16:25.255Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-07T21:16:53.479Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-07T21:16:53.837Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-07T21:16:54.034Z"}
+{"level":"info","message":"User admin logged in successfully","timestamp":"2025-09-09T09:18:23.137Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T09:18:23.504Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:18:24.694Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:18:24.793Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T09:18:26.228Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-09-09T09:18:27.014Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T09:18:54.757Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:18:54.979Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:18:55.098Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T09:18:57.346Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-09-09T09:18:57.818Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T09:19:01.690Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:19:02.507Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:19:02.608Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T09:19:16.940Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:19:17.133Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:19:17.243Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T09:19:19.445Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-09-09T09:19:19.925Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T09:19:34.121Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:19:34.335Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:19:34.427Z"}
+{"level":"info","message":"User 68b5f339138a3a4cc983a05c logged out","timestamp":"2025-09-09T09:19:36.544Z"}
+{"level":"info","message":"User employee1 logged in successfully","timestamp":"2025-09-09T09:19:46.200Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:19:48.544Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:19:48.623Z"}
+{"level":"info","message":"Loading created: 68bff1419869d1b99eae2fde by employee: 68b5f366138a3a4cc983a063","timestamp":"2025-09-09T09:20:02.001Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:20:02.188Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:20:02.251Z"}
+{"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-09T09:20:08.300Z"}
+{"level":"info","message":"Loadings fetched for employee: 68b5f366138a3a4cc983a063","timestamp":"2025-09-09T09:23:59.624Z"}
+{"level":"info","message":"Payment created: 68bff2389869d1b99eae2fe9 for order: 68bd306763a11c3f4bdd1ca3","timestamp":"2025-09-09T09:24:09.325Z"}
+{"level":"info","message":"Loadings fetched for employee: 68b5f366138a3a4cc983a063","timestamp":"2025-09-09T09:24:09.562Z"}
+{"level":"info","message":"User 68b5f366138a3a4cc983a063 logged out","timestamp":"2025-09-09T09:24:14.004Z"}
+{"level":"info","message":"User admin logged in successfully","timestamp":"2025-09-09T09:24:20.006Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T09:24:20.541Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:24:20.690Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:24:20.798Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T09:24:21.888Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-09-09T09:24:22.048Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T09:25:47.630Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:25:47.796Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:25:47.888Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T09:25:48.044Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:25:48.560Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:25:48.687Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T09:26:02.307Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:26:02.459Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:26:02.532Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:26:16.921Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T09:29:43.750Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:29:43.904Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:29:44.021Z"}
+{"level":"info","message":"User 68b5f339138a3a4cc983a05c logged out","timestamp":"2025-09-09T09:29:45.342Z"}
+{"level":"info","message":"User employee1 logged in successfully","timestamp":"2025-09-09T09:29:53.909Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:29:57.275Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:29:57.431Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:30:33.798Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:30:33.871Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:44:02.264Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:44:02.354Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:44:05.674Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:44:05.731Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:46:29.495Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:46:29.572Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:46:35.573Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T09:46:43.072Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T09:46:43.149Z"}
+{"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-09T09:46:46.530Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:04:07.469Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:04:48.807Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T10:04:50.782Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:04:50.835Z"}
+{"level":"info","message":"Loading created: 68bffbcd77d900ed38c7df8a by employee: 68b5f366138a3a4cc983a063","timestamp":"2025-09-09T10:05:01.746Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T10:05:01.870Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:05:01.924Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:05:06.009Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:07:43.822Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:11:19.017Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:13:18.439Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:16:28.011Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:17:38.342Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:17:57.387Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T10:18:00.054Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:18:00.117Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:18:01.553Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:19:10.970Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:20:33.079Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:21:19.595Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:21:34.432Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:22:45.340Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:22:57.124Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:26:40.113Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:27:06.246Z"}
+{"level":"error","message":"Error creating payment: Payment validation failed: remainingAmount: Path `remainingAmount` is required.","timestamp":"2025-09-09T10:27:17.417Z"}
+{"level":"info","message":"Payment created: 68c0017a299ba8b452be5cfe for order: undefined","timestamp":"2025-09-09T10:29:15.287Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:29:15.699Z"}
+{"level":"info","message":"User admin logged in successfully","timestamp":"2025-09-09T10:53:01.796Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T10:53:02.084Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:53:02.241Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T10:53:02.314Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T10:53:04.237Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T10:53:05.332Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T10:53:05.445Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T10:53:05.524Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T10:53:07.166Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-09-09T10:53:07.277Z"}

@@ -4,7 +4,7 @@ const chickenTypeSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    enum: ['تسمين', 'بلدي', 'احمر', 'ساسو', 'بط']
+    enum: ['تسمين', 'بلدي', 'أحمر', 'احمر', 'ساسو', 'بط', 'فراخ بيضاء']
   },
   price: {
     type: Number,
