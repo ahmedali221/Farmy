@@ -9,6 +9,7 @@ import '../services/order_api_service.dart';
 import '../services/payment_api_service.dart';
 import '../services/expense_api_service.dart';
 import '../services/loading_api_service.dart';
+import '../services/employee_expense_api_service.dart';
 
 final GetIt serviceLocator = GetIt.instance;
 
@@ -33,6 +34,9 @@ class ServiceLocator {
     );
     serviceLocator.registerSingleton<PaymentApiService>(
       PaymentApiService(tokenService: serviceLocator<TokenService>()),
+    );
+    serviceLocator.registerSingleton<EmployeeExpenseApiService>(
+      EmployeeExpenseApiService(tokenService: serviceLocator<TokenService>()),
     );
     serviceLocator.registerSingleton<ExpenseApiService>(
       ExpenseApiService(tokenService: serviceLocator<TokenService>()),

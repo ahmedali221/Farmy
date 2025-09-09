@@ -1,5 +1,6 @@
 const Payment = require('../models/Payment');
 const Customer = require('../../customers/models/Customer');
+const Order = require('../../orders/models/Order');
 const Joi = require('joi');
 const logger = require('../../utils/logger');
 
@@ -145,6 +146,35 @@ exports.getPaymentSummary = async (req, res) => {
     res.json(summary);
   } catch (err) {
     logger.error(`Error fetching payment summary: ${err.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Summary of total collected per employee
+exports.getEmployeeCollectionSummary = async (req, res) => {
+  try {
+    const summary = await Payment.aggregate([
+      {
+        $group: {
+          _id: '$employee',
+          totalCollected: { $sum: { $ifNull: ['$paidAmount', 0] } },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          employeeId: '$_id',
+          totalCollected: 1,
+          count: 1
+        }
+      },
+      { $sort: { totalCollected: -1 } }
+    ]);
+
+    res.json(summary);
+  } catch (err) {
+    logger.error(`Error fetching employee collection summary: ${err.message}`);
     res.status(500).json({ message: 'Server error' });
   }
 };

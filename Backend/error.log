@@ -16,3 +16,17 @@
 {"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-09T09:46:46.530Z"}
 {"level":"error","message":"Error creating payment: Payment validation failed: remainingAmount: Path `remainingAmount` is required.","timestamp":"2025-09-09T10:27:17.417Z"}
 {"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T10:53:07.166Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T10:58:19.620Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T10:58:45.816Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T11:04:12.105Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T11:04:53.386Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T11:06:44.448Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T11:21:05.217Z"}
+{"level":"error","message":"Error fetching payment summary: Order is not defined","timestamp":"2025-09-09T11:21:05.220Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T11:22:26.896Z"}
+{"level":"error","message":"Error fetching payment summary: Order is not defined","timestamp":"2025-09-09T11:22:26.900Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T11:25:35.335Z"}
+{"level":"error","message":"Error fetching payment summary: Order is not defined","timestamp":"2025-09-09T11:25:35.341Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T11:25:46.401Z"}
+{"level":"error","message":"Error fetching payment summary: Order is not defined","timestamp":"2025-09-09T11:25:46.407Z"}
+{"level":"error","message":"Error fetching payment summary: Order is not defined","timestamp":"2025-09-09T11:28:34.764Z"}

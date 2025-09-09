@@ -33,6 +33,7 @@ const financeRoutes = require('./src/finances/routes/financeRoutes');
 const paymentRoutes = require('./src/payments/routes/paymentRoutes');
 const expenseRoutes = require('./src/expenses/routes/expenseRoutes');
 const loadingRoutes = require('./src/loadings/routes/loadingRoutes');
+const employeeExpenseRoutes = require('./src/employeeExpenses/routes/employeeExpenseRoutes');
 
 // Public routes
 app.post('/api/login', authController.login);
@@ -55,6 +56,7 @@ app.use('/api/finances', auth(['manager']), financeRoutes);
 app.use('/api/payments', auth(['manager', 'employee']), paymentRoutes);
 app.use('/api/expenses', auth(['manager', 'employee']), expenseRoutes);
 app.use('/api/loadings', auth(['manager', 'employee']), loadingRoutes);
+app.use('/api/employee-expenses', auth(['manager']), employeeExpenseRoutes);
 
 app.use(errorHandler);
 

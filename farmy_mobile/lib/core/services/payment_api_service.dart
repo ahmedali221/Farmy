@@ -120,6 +120,33 @@ class PaymentApiService {
     }
   }
 
+  /// Get employee collections summary
+  Future<List<Map<String, dynamic>>> getEmployeeCollectionsSummary() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/payments/summary/employee'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        final dynamic errorData = json.decode(response.body);
+        throw ApiException(
+          message: (errorData is Map<String, dynamic>)
+              ? (errorData['message'] ?? 'Failed to load employee collections')
+              : 'Failed to load employee collections',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
   /// Update payment
   Future<Map<String, dynamic>> updatePayment(
     String id,
