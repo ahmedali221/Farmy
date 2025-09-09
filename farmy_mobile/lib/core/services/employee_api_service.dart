@@ -20,6 +20,118 @@ class EmployeeApiService {
     };
   }
 
+  /// Create a distribution record
+  Future<Map<String, dynamic>> createDistribution(
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.post(
+        Uri.parse('$baseUrl/distributions'),
+        headers: headers,
+        body: json.encode(data),
+      );
+
+      if (response.statusCode == 201) {
+        return json.decode(response.body);
+      } else {
+        final errorData = json.decode(response.body);
+        throw ApiException(
+          message: errorData['message'] ?? 'Failed to create distribution',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get daily total net weight for distributions
+  Future<Map<String, dynamic>> getDailyDistributionNetWeight({
+    DateTime? date,
+  }) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final q = date != null ? '?date=${date.toIso8601String()}' : '';
+      final response = await http.get(
+        Uri.parse('$baseUrl/distributions/daily-net-weight$q'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final errorData = json.decode(response.body);
+        throw ApiException(
+          message: errorData['message'] ?? 'Failed to fetch daily net weight',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Upsert daily stock record (manager only)
+  Future<Map<String, dynamic>> upsertDailyStock({
+    required DateTime date,
+    required double netDistributionWeight,
+    required double adminAdjustment,
+    String? notes,
+  }) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final body = {
+        'date': date.toIso8601String(),
+        'netDistributionWeight': netDistributionWeight,
+        'adminAdjustment': adminAdjustment,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      };
+      final response = await http.post(
+        Uri.parse('${ApiConstants.baseUrl}/stocks/upsert'),
+        headers: headers,
+        body: json.encode(body),
+      );
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final errorData = json.decode(response.body);
+        throw ApiException(
+          message: errorData['message'] ?? 'Failed to save daily stock',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get weekly stocks
+  Future<List<Map<String, dynamic>>> getWeeklyStocks() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('${ApiConstants.baseUrl}/stocks/week'),
+        headers: headers,
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load weekly stocks',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
   /// Get all users with employee role
   Future<List<Map<String, dynamic>>> getAllEmployeeUsers() async {
     try {

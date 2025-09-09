@@ -34,6 +34,8 @@ const paymentRoutes = require('./src/payments/routes/paymentRoutes');
 const expenseRoutes = require('./src/expenses/routes/expenseRoutes');
 const loadingRoutes = require('./src/loadings/routes/loadingRoutes');
 const employeeExpenseRoutes = require('./src/employeeExpenses/routes/employeeExpenseRoutes');
+const distributionRoutes = require('./src/distributions/routes/distributionRoutes');
+const dailyStockController = require('./src/stocks/controllers/dailyStockController');
 
 // Public routes
 app.post('/api/login', authController.login);
@@ -57,6 +59,10 @@ app.use('/api/payments', auth(['manager', 'employee']), paymentRoutes);
 app.use('/api/expenses', auth(['manager', 'employee']), expenseRoutes);
 app.use('/api/loadings', auth(['manager', 'employee']), loadingRoutes);
 app.use('/api/employee-expenses', auth(['manager']), employeeExpenseRoutes);
+app.use('/api/distributions', auth(['manager', 'employee']), distributionRoutes);
+// Stocks endpoints
+app.get('/api/stocks/week', auth(['manager']), dailyStockController.getWeek);
+app.post('/api/stocks/upsert', auth(['manager']), dailyStockController.upsertForDate);
 
 app.use(errorHandler);
 

@@ -1809,3 +1809,82 @@
 {"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T11:52:42.609Z"}
 {"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T11:52:42.728Z"}
 {"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T11:52:42.805Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T12:05:04.868Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:05:05.332Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T12:05:05.404Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T12:05:06.993Z"}
+{"level":"info","message":"EmployeeExpense created: 68c017fbadc9792e31a9e92e for employee 68b5f366138a3a4cc983a063","timestamp":"2025-09-09T12:05:15.145Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T12:05:18.865Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:05:18.992Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T12:05:19.080Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T12:09:59.053Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:09:59.178Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T12:09:59.246Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T12:10:10.748Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:10:10.868Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T12:10:10.931Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T12:11:53.351Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:11:53.492Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T12:11:53.559Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T12:12:15.233Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:12:15.723Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T12:12:15.799Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T12:13:36.017Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:13:36.179Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T12:13:36.261Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T12:13:37.357Z"}
+{"level":"info","message":"User employee1 logged in successfully","timestamp":"2025-09-09T12:23:35.271Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:23:36.904Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T12:23:38.663Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:23:38.719Z"}
+{"level":"info","message":"Loading created: 68c01c6d8270782c6be6a5f8 by employee: 68b5f366138a3a4cc983a063","timestamp":"2025-09-09T12:24:13.893Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T12:24:14.061Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:24:14.110Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:24:23.863Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:26:00.361Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T12:26:14.784Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:26:14.836Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:45:38.442Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:46:36.939Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:46:51.396Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:47:47.635Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:51:08.703Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T12:55:23.359Z"}
+{"level":"info","message":"Distribution created: 68c023ced170a71ed7651549 by employee: 68b5f366138a3a4cc983a063","timestamp":"2025-09-09T12:55:42.230Z"}
+{"level":"info","message":"User 68b5f366138a3a4cc983a063 logged out","timestamp":"2025-09-09T12:59:57.258Z"}
+{"level":"info","message":"User admin logged in successfully","timestamp":"2025-09-09T13:00:04.723Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T13:00:04.988Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T13:00:05.127Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T13:00:05.206Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T13:00:06.283Z"}
+{"level":"info","message":"Loading statistics fetched","timestamp":"2025-09-09T13:00:06.354Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T13:01:51.436Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T13:01:51.617Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T13:01:51.723Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T13:02:01.553Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T13:02:01.700Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T13:02:01.834Z"}
+{"level":"info","message":"Loading statistics fetched","timestamp":"2025-09-09T13:02:23.867Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T13:02:23.869Z"}
+{"level":"info","message":"Loading statistics fetched","timestamp":"2025-09-09T13:02:31.239Z"}
+{"level":"info","message":"Loading statistics fetched","timestamp":"2025-09-09T13:02:41.208Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T13:04:29.528Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T13:04:29.719Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T13:04:29.873Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T13:04:53.427Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T13:04:53.579Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T13:04:53.680Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T13:05:14.356Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T13:05:14.829Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T13:05:14.950Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T13:05:15.037Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T13:05:15.053Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T13:05:15.162Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T13:08:15.751Z"}
+{"level":"info","message":"Loading statistics fetched","timestamp":"2025-09-09T13:08:15.770Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T13:08:53.471Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T13:08:53.585Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T13:08:53.677Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-09T13:08:56.405Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-09T13:08:56.575Z"}
+{"level":"info","message":"Fetched all chicken types","timestamp":"2025-09-09T13:08:56.683Z"}

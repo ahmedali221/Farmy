@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/customer_api_service.dart';
+import '../../../../core/services/employee_api_service.dart';
 
 class DistributionView extends StatefulWidget {
   const DistributionView({super.key});
@@ -25,6 +26,8 @@ class _DistributionViewState extends State<DistributionView> {
   double _totalAccount = 0;
   bool _loading = true;
   bool _saving = false;
+  bool _posting = false;
+  String _debugLog = '';
 
   @override
   void initState() {
@@ -134,6 +137,124 @@ class _DistributionViewState extends State<DistributionView> {
       _showErrorDialog('فشل تحديث مديونية العميل: $e');
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _postDistributionRecord() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_selectedCustomer == null) {
+      _showErrorDialog('يرجى اختيار العميل أولاً');
+      return;
+    }
+
+    setState(() => _posting = true);
+    try {
+      _recalculate();
+      final quantity = int.tryParse(_quantityCtrl.text) ?? 0;
+      final gross = double.tryParse(_grossWeightCtrl.text) ?? 0;
+      final price = double.tryParse(_priceCtrl.text) ?? 0;
+      final net = double.tryParse(_netWeightCtrl.text) ?? 0;
+      final total = _mealAccount;
+
+      final service = serviceLocator<EmployeeApiService>();
+      final payload = {
+        'customer': _selectedCustomer!['_id'],
+        'quantity': quantity,
+        'grossWeight': gross,
+        'price': price,
+        'netWeight': net,
+        'totalAmount': total,
+      };
+      final created = await service.createDistribution(payload);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم تسجيل التوزيع #${created['_id'] ?? ''}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorDialog('فشل تسجيل التوزيع: $e');
+    } finally {
+      if (mounted) setState(() => _posting = false);
+    }
+  }
+
+  Future<void> _submitBoth() async {
+    _debugLog = '';
+    void log(String m) {
+      _debugLog += m + '\n';
+      // ignore: avoid_print
+      print('[DistributionSubmit] ' + m);
+    }
+
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      log('Validation failed');
+      setState(() {});
+      return;
+    }
+    if (_selectedCustomer == null) {
+      log('No customer selected');
+      _showErrorDialog('يرجى اختيار العميل أولاً');
+      setState(() {});
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _posting = true;
+    });
+
+    try {
+      _recalculate();
+      log(
+        'Inputs -> qty=${_quantityCtrl.text}, gross=${_grossWeightCtrl.text}, price=${_priceCtrl.text}',
+      );
+      log(
+        'Calculated -> net=${_netWeightCtrl.text}, meal=${_mealAccount.toStringAsFixed(2)}',
+      );
+
+      // Create distribution (backend also increments outstanding)
+      final employeeService = serviceLocator<EmployeeApiService>();
+      final payload = {
+        'customer': _selectedCustomer!['_id'],
+        'quantity': int.tryParse(_quantityCtrl.text) ?? 0,
+        'grossWeight': double.tryParse(_grossWeightCtrl.text) ?? 0.0,
+        'price': double.tryParse(_priceCtrl.text) ?? 0.0,
+      };
+      log('POST /distributions payload: ' + payload.toString());
+      final created = await employeeService.createDistribution(payload);
+      log('Created distribution: ${created['_id']}');
+
+      // Optimistically update selected customer outstanding locally
+      final updatedOutstanding =
+          ((_selectedCustomer?['outstandingDebts'] as num?)?.toDouble() ??
+              0.0) +
+          _mealAccount;
+      setState(() {
+        _selectedCustomer = {
+          ..._selectedCustomer!,
+          'outstandingDebts': updatedOutstanding,
+        };
+        final idx = _customers.indexWhere(
+          (c) => c['_id'] == _selectedCustomer!['_id'],
+        );
+        if (idx != -1) _customers[idx] = _selectedCustomer!;
+        _totalAccount = _mealAccount + updatedOutstanding;
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تسجيل التوزيع وتحديث المديونية')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorDialog('فشل العملية: $e');
+      log('Error: $e');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _posting = false;
+      });
     }
   }
 
@@ -327,9 +448,10 @@ class _DistributionViewState extends State<DistributionView> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        Row(
+                        Column(
                           children: [
-                            Expanded(
+                            SizedBox(
+                              width: double.infinity,
                               child: ElevatedButton.icon(
                                 onPressed: () {
                                   if (_formKey.currentState?.validate() ??
@@ -348,11 +470,14 @@ class _DistributionViewState extends State<DistributionView> {
                                 label: const Text('حساب'),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
                               child: ElevatedButton.icon(
-                                onPressed: _saving ? null : _applyToOutstanding,
-                                icon: _saving
+                                onPressed: (_saving || _posting)
+                                    ? null
+                                    : _submitBoth,
+                                icon: (_saving || _posting)
                                     ? const SizedBox(
                                         width: 18,
                                         height: 18,
@@ -361,8 +486,26 @@ class _DistributionViewState extends State<DistributionView> {
                                           color: Colors.white,
                                         ),
                                       )
-                                    : const Icon(Icons.add_task),
-                                label: const Text('إضافة للمديونية'),
+                                    : const Icon(Icons.done_all),
+                                label: const Text(
+                                  'تسجيل وتحديث المديونية معاً',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              child: Text(
+                                _debugLog.isEmpty
+                                    ? 'Debug: لا يوجد سجل بعد'
+                                    : _debugLog,
+                                style: const TextStyle(fontSize: 12),
                               ),
                             ),
                           ],
