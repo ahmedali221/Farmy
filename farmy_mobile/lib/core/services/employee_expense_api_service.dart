@@ -22,8 +22,9 @@ class EmployeeExpenseApiService {
   Future<Map<String, dynamic>> createExpense(
     String employeeId,
     String name,
-    double value,
-  ) async {
+    double value, {
+    String note = '',
+  }) async {
     try {
       final headers = await _getAuthHeaders();
       final response = await http.post(
@@ -33,6 +34,7 @@ class EmployeeExpenseApiService {
           'employee': employeeId,
           'name': name,
           'value': value,
+          'note': note,
         }),
       );
       if (response.statusCode == 201) {

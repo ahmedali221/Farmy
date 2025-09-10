@@ -22,6 +22,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.0",
     "morgan": "^1.10.1",
+    "vercel": "^41.0.2",
     "winston": "^3.17.0"
   },
   "devDependencies": {

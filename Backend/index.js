@@ -58,7 +58,7 @@ app.use('/api/finances', auth(['manager']), financeRoutes);
 app.use('/api/payments', auth(['manager', 'employee']), paymentRoutes);
 app.use('/api/expenses', auth(['manager', 'employee']), expenseRoutes);
 app.use('/api/loadings', auth(['manager', 'employee']), loadingRoutes);
-app.use('/api/employee-expenses', auth(['manager']), employeeExpenseRoutes);
+app.use('/api/employee-expenses', auth(['manager', 'employee']), employeeExpenseRoutes);
 app.use('/api/distributions', auth(['manager', 'employee']), distributionRoutes);
 // Stocks endpoints
 app.get('/api/stocks/week', auth(['manager']), dailyStockController.getWeek);

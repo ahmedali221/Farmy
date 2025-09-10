@@ -3,11 +3,11 @@ const logger = require('../../utils/logger');
 
 exports.createExpense = async (req, res) => {
   try {
-    const { employee, name, value } = req.body;
+    const { employee, name, value, note = '' } = req.body;
     if (!employee || !name || value == null) {
       return res.status(400).json({ message: 'employee, name, and value are required' });
     }
-    const exp = await EmployeeExpense.create({ employee, name, value });
+    const exp = await EmployeeExpense.create({ employee, name, value, note });
     logger.info(`EmployeeExpense created: ${exp._id} for employee ${employee}`);
     res.status(201).json(exp);
   } catch (err) {
@@ -19,6 +19,10 @@ exports.createExpense = async (req, res) => {
 exports.listByEmployee = async (req, res) => {
   try {
     const { employeeId } = req.params;
+    // If role is employee, restrict to own id
+    if (req.user && req.user.role === 'employee' && req.user.id !== employeeId) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
     const list = await EmployeeExpense.find({ employee: employeeId }).sort({ createdAt: -1 });
     res.json(list);
   } catch (err) {

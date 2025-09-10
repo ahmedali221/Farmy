@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/service_locator.dart';
-import '../../../../core/services/order_api_service.dart';
-import '../../../../core/services/expense_api_service.dart';
+import '../../../../core/services/employee_expense_api_service.dart';
+import '../../../../features/authentication/services/token_service.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class ExpenseManagementView extends StatefulWidget {
@@ -13,53 +13,54 @@ class ExpenseManagementView extends StatefulWidget {
 }
 
 class _ExpenseManagementViewState extends State<ExpenseManagementView> {
-  List<Map<String, dynamic>> orders = [];
   List<Map<String, dynamic>> expenses = [];
-  String? selectedOrderId;
+  String? employeeId;
   bool loading = true;
 
   final _titleCtrl = TextEditingController();
   final _amountCtrl = TextEditingController();
-  final _noteCtrl = TextEditingController();
+  final _noteCtrl = TextEditingController(text: '');
   final _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
     super.initState();
-    _loadOrders();
+    _initAndLoad();
   }
 
-  Future<void> _loadOrders() async {
+  Future<void> _initAndLoad() async {
     setState(() => loading = true);
-    final orderService = serviceLocator<OrderApiService>();
-    final list = await orderService.getOrdersByEmployee();
+    final tokenService = serviceLocator<TokenService>();
+    final user = await tokenService.getUser();
     if (!mounted) return;
     setState(() {
-      orders = list;
-      loading = false;
+      employeeId = user?.id;
     });
+    await _loadExpenses();
+    if (!mounted) return;
+    setState(() => loading = false);
   }
 
   Future<void> _loadExpenses() async {
-    if (selectedOrderId == null) return;
-    final expenseService = serviceLocator<ExpenseApiService>();
-    final list = await expenseService.getExpensesByOrder(selectedOrderId!);
+    if (employeeId == null) return;
+    final expenseService = serviceLocator<EmployeeExpenseApiService>();
+    final list = await expenseService.listByEmployee(employeeId!);
     if (!mounted) return;
     setState(() => expenses = list);
   }
 
   Future<void> _addExpense() async {
-    if (!_formKey.currentState!.validate() || selectedOrderId == null) return;
-    final expenseService = serviceLocator<ExpenseApiService>();
-    await expenseService.createExpense({
-      'order': selectedOrderId,
-      'title': _titleCtrl.text,
-      'amount': double.parse(_amountCtrl.text),
-      'note': _noteCtrl.text.isEmpty ? null : _noteCtrl.text,
-    });
+    if (!_formKey.currentState!.validate() || employeeId == null) return;
+    final expenseService = serviceLocator<EmployeeExpenseApiService>();
+    await expenseService.createExpense(
+      employeeId!,
+      _titleCtrl.text,
+      double.parse(_amountCtrl.text),
+      note: _noteCtrl.text,
+    );
     _titleCtrl.clear();
     _amountCtrl.clear();
-    _noteCtrl.clear();
+    _noteCtrl.text = '';
     await _loadExpenses();
   }
 
@@ -90,27 +91,7 @@ class _ExpenseManagementViewState extends State<ExpenseManagementView> {
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        DropdownButtonFormField<String>(
-                          value: selectedOrderId,
-                          decoration: const InputDecoration(
-                            labelText: 'اختر الطلب',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: orders.map<DropdownMenuItem<String>>((o) {
-                            final c = o['customer'];
-                            final t = o['chickenType'];
-                            final q = o['quantity'];
-                            return DropdownMenuItem<String>(
-                              value: o['_id']?.toString(),
-                              child: Text('${c['name']} - ${t['name']} - $q ك'),
-                            );
-                          }).toList(),
-                          onChanged: (String? v) async {
-                            setState(() => selectedOrderId = v);
-                            await _loadExpenses();
-                          },
-                        ),
-                        const SizedBox(height: 12),
+                        // Employee personal expenses form
                         Form(
                           key: _formKey,
                           child: Column(
@@ -118,7 +99,7 @@ class _ExpenseManagementViewState extends State<ExpenseManagementView> {
                               TextFormField(
                                 controller: _titleCtrl,
                                 decoration: const InputDecoration(
-                                  labelText: 'البند',
+                                  labelText: 'اسم المصروف',
                                   border: OutlineInputBorder(),
                                   alignLabelWithHint: true,
                                 ),
@@ -155,7 +136,7 @@ class _ExpenseManagementViewState extends State<ExpenseManagementView> {
                                 ),
                                 textDirection: TextDirection.rtl,
                                 textAlign: TextAlign.right,
-                                maxLines: 3,
+                                maxLines: 2,
                               ),
                               const SizedBox(height: 8),
                               SizedBox(
@@ -185,7 +166,7 @@ class _ExpenseManagementViewState extends State<ExpenseManagementView> {
                                       ),
                                       const SizedBox(height: 16),
                                       Text(
-                                        'No expenses recorded yet',
+                                        'لا توجد مصروفات مسجلة بعد',
                                         style: Theme.of(context)
                                             .textTheme
                                             .bodyLarge
@@ -198,7 +179,7 @@ class _ExpenseManagementViewState extends State<ExpenseManagementView> {
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        'Add expenses for the selected order above',
+                                        'أضف مصروفاتك باستخدام النموذج بالأعلى',
                                         style: Theme.of(context)
                                             .textTheme
                                             .bodySmall
@@ -234,29 +215,58 @@ class _ExpenseManagementViewState extends State<ExpenseManagementView> {
                                           ),
                                         ),
                                         title: Text(
-                                          e['title'] ?? 'Unknown Expense',
+                                          e['name']?.toString() ?? 'مصروف',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.w600,
                                             fontSize: 16,
                                           ),
                                         ),
-                                        subtitle:
-                                            e['note'] != null &&
-                                                e['note'].toString().isNotEmpty
-                                            ? Text(
-                                                e['note'],
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .bodySmall
-                                                    ?.copyWith(
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .onSurface
-                                                          .withOpacity(0.7),
-                                                      fontSize: 14,
-                                                    ),
-                                              )
-                                            : null,
+                                        subtitle: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              e['createdAt']
+                                                      ?.toString()
+                                                      .split('T')
+                                                      .first ??
+                                                  '',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurface
+                                                        .withOpacity(0.7),
+                                                    fontSize: 14,
+                                                  ),
+                                            ),
+                                            if ((e['note']
+                                                    ?.toString()
+                                                    .trim()
+                                                    .isNotEmpty ??
+                                                false))
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  top: 4,
+                                                ),
+                                                child: Text(
+                                                  e['note'],
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.copyWith(
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurface
+                                                            .withOpacity(0.7),
+                                                      ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
                                         trailing: Container(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 12,
@@ -277,20 +287,46 @@ class _ExpenseManagementViewState extends State<ExpenseManagementView> {
                                                   .withOpacity(0.3),
                                             ),
                                           ),
-                                          child: Text(
-                                            'EGP ${e['amount']?.toString() ?? '0'}',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.error,
-                                              fontSize: 14,
-                                            ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                'EGP ${e['value']?.toString() ?? '0'}',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.delete_outline,
+                                                  size: 20,
+                                                ),
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.error,
+                                                tooltip: 'حذف',
+                                                onPressed: () async {
+                                                  final id = e['_id']
+                                                      ?.toString();
+                                                  if (id == null) return;
+                                                  final expenseService =
+                                                      serviceLocator<
+                                                        EmployeeExpenseApiService
+                                                      >();
+                                                  await expenseService
+                                                      .deleteExpense(id);
+                                                  await _loadExpenses();
+                                                },
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        isThreeLine:
-                                            e['note'] != null &&
-                                            e['note'].toString().isNotEmpty,
+                                        isThreeLine: false,
                                       ),
                                     );
                                   },
