@@ -198,6 +198,18 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
     );
   }
 
+  bool _isEmployee() {
+    try {
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthAuthenticated) {
+        return authState.user.role == 'employee';
+      }
+      return true; // Default to employee if not authenticated
+    } catch (e) {
+      return true; // Default to employee on error
+    }
+  }
+
   Future<void> _showPaymentHistory() async {
     await showDialog(
       context: context,
@@ -837,42 +849,43 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
 
                                     const SizedBox(height: 16),
 
-                                    // History Button
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: OutlinedButton.icon(
-                                        onPressed: _showPaymentHistory,
-                                        icon: Icon(
-                                          Icons.history,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.primary,
-                                        ),
-                                        label: Text(
-                                          'سجل المدفوعات',
-                                          style: TextStyle(
+                                    // History Button - Only show if user is not an employee
+                                    if (!_isEmployee()) ...[
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: OutlinedButton.icon(
+                                          onPressed: _showPaymentHistory,
+                                          icon: Icon(
+                                            Icons.history,
                                             color: Theme.of(
                                               context,
                                             ).colorScheme.primary,
                                           ),
-                                        ),
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 14,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
+                                          label: Text(
+                                            'سجل المدفوعات',
+                                            style: TextStyle(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
                                             ),
                                           ),
-                                          side: BorderSide(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
+                                          style: OutlinedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 14,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            side: BorderSide(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
+                                    ],
 
                                     const SizedBox(height: 16),
 

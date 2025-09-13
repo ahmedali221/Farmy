@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/customer_api_service.dart';
 import '../../../../core/services/employee_api_service.dart';
 import '../../../../core/services/distribution_api_service.dart';
+import '../../../authentication/cubit/auth_cubit.dart';
+import '../../../authentication/cubit/auth_state.dart';
 
 class DistributionView extends StatefulWidget {
   const DistributionView({super.key});
@@ -285,6 +288,18 @@ class _DistributionViewState extends State<DistributionView> {
     );
   }
 
+  bool _isEmployee() {
+    try {
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthAuthenticated) {
+        return authState.user.role == 'employee';
+      }
+      return true; // Default to employee if not authenticated
+    } catch (e) {
+      return true; // Default to employee on error
+    }
+  }
+
   Future<void> _showDistributionHistory() async {
     await showDialog(
       context: context,
@@ -529,22 +544,27 @@ class _DistributionViewState extends State<DistributionView> {
                                   ),
                                 ),
                                 const SizedBox(height: 12),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    onPressed: _showDistributionHistory,
-                                    icon: const Icon(Icons.history),
-                                    label: const Text('سجل التوزيعات'),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 14,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                // Only show history button if user is not an employee
+                                if (!_isEmployee()) ...[
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      onPressed: _showDistributionHistory,
+                                      icon: const Icon(Icons.history),
+                                      label: const Text('سجل التوزيعات'),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
+                                ],
                                 const SizedBox(height: 12),
                                 Container(
                                   width: double.infinity,

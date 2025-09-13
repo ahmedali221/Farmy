@@ -271,85 +271,88 @@ class _PaymentHistoryViewState extends State<PaymentHistoryView> {
 
               // Payment list
               Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _error != null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.error,
-                              size: 64,
-                              color: Colors.red,
-                            ),
-                            const SizedBox(height: 16),
-                            Text('خطأ: $_error'),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: () =>
-                                  _loadPaymentsForDate(_selectedDate),
-                              child: const Text('إعادة المحاولة'),
-                            ),
-                          ],
-                        ),
-                      )
-                    : _filteredPayments.isEmpty
-                    ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.inbox, size: 64, color: Colors.grey),
-                            SizedBox(height: 16),
-                            Text('لا توجد مدفوعات في هذا التاريخ'),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _filteredPayments.length,
-                        itemBuilder: (context, index) {
-                          final payment = _filteredPayments[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.green[100],
-                                child: const Icon(
-                                  Icons.payment,
-                                  color: Colors.green,
+                child: RefreshIndicator(
+                  onRefresh: () => _loadPaymentsForDate(_selectedDate),
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _error != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.error,
+                                size: 64,
+                                color: Colors.red,
+                              ),
+                              const SizedBox(height: 16),
+                              Text('خطأ: $_error'),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: () =>
+                                    _loadPaymentsForDate(_selectedDate),
+                                child: const Text('إعادة المحاولة'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _filteredPayments.isEmpty
+                      ? const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.inbox, size: 64, color: Colors.grey),
+                              SizedBox(height: 16),
+                              Text('لا توجد مدفوعات في هذا التاريخ'),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _filteredPayments.length,
+                          itemBuilder: (context, index) {
+                            final payment = _filteredPayments[index];
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Colors.green[100],
+                                  child: const Icon(
+                                    Icons.payment,
+                                    color: Colors.green,
+                                  ),
                                 ),
-                              ),
-                              title: Text(
-                                payment['customer']?['name'] ??
-                                    'عميل غير معروف',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
+                                title: Text(
+                                  payment['customer']?['name'] ??
+                                      'عميل غير معروف',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'الموظف: ${payment['employee']?['username'] ?? 'غير محدد'}',
+                                    ),
+                                    Text(
+                                      'المبلغ المدفوع: ${payment['paidAmount']} ج.م',
+                                    ),
+                                    Text('الخصم: ${payment['discount']} ج.م'),
+                                    Text(
+                                      'طريقة الدفع: ${_getPaymentMethodText(payment['paymentMethod'])}',
+                                    ),
+                                    Text(
+                                      'التاريخ: ${_formatDateTime(payment['createdAt'])}',
+                                    ),
+                                  ],
+                                ),
+                                isThreeLine: true,
                               ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'الموظف: ${payment['employee']?['username'] ?? 'غير محدد'}',
-                                  ),
-                                  Text(
-                                    'المبلغ المدفوع: ${payment['paidAmount']} ج.م',
-                                  ),
-                                  Text('الخصم: ${payment['discount']} ج.م'),
-                                  Text(
-                                    'طريقة الدفع: ${_getPaymentMethodText(payment['paymentMethod'])}',
-                                  ),
-                                  Text(
-                                    'التاريخ: ${_formatDateTime(payment['createdAt'])}',
-                                  ),
-                                ],
-                              ),
-                              isThreeLine: true,
-                            ),
-                          );
-                        },
-                      ),
+                            );
+                          },
+                        ),
+                ),
               ),
             ],
           ),

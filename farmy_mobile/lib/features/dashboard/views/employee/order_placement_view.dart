@@ -192,6 +192,18 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     );
   }
 
+  bool _isEmployee() {
+    try {
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthAuthenticated) {
+        return authState.user.role == 'employee';
+      }
+      return true; // Default to employee if not authenticated
+    } catch (e) {
+      return true; // Default to employee on error
+    }
+  }
+
   Future<void> _showLoadingHistory() async {
     await showDialog(
       context: context,
@@ -871,42 +883,43 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
 
                                     const SizedBox(height: 16),
 
-                                    // History Button
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: OutlinedButton.icon(
-                                        onPressed: _showLoadingHistory,
-                                        icon: Icon(
-                                          Icons.history,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.primary,
-                                        ),
-                                        label: Text(
-                                          'سجل التحميلات',
-                                          style: TextStyle(
+                                    // History Button - Only show if user is not an employee
+                                    if (!_isEmployee()) ...[
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: OutlinedButton.icon(
+                                          onPressed: _showLoadingHistory,
+                                          icon: Icon(
+                                            Icons.history,
                                             color: Theme.of(
                                               context,
                                             ).colorScheme.primary,
                                           ),
-                                        ),
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 14,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
+                                          label: Text(
+                                            'سجل التحميلات',
+                                            style: TextStyle(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
                                             ),
                                           ),
-                                          side: BorderSide(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
+                                          style: OutlinedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 14,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            side: BorderSide(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
+                                    ],
 
                                     const SizedBox(height: 16),
 

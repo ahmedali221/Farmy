@@ -364,14 +364,20 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2, // Reduced elevation for better performance
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Row(
+      elevation: 2,
+      child: Column(
+        children: [
+          // Header with order info and total amount
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.05),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: Row(
               children: [
                 CircleAvatar(
                   backgroundColor: Colors.blue.withOpacity(0.1),
@@ -415,134 +421,101 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+          ),
 
-            // Details grid - using const constructors where possible
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDetailItem(
-                    'نوع الدجاج',
-                    chickenType,
-                    Icons.category,
-                    Colors.green,
-                  ),
-                ),
-                Expanded(
-                  child: _buildDetailItem(
-                    'العميل',
-                    customerName,
-                    Icons.person,
-                    Colors.orange,
-                  ),
-                ),
-              ],
+          // Details as ListTiles
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.green.withOpacity(0.1),
+              child: const Icon(Icons.category, color: Colors.green, size: 20),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDetailItem(
-                    'الكمية',
-                    '${quantity.toInt()} وحدة',
-                    Icons.inventory,
-                    Colors.purple,
-                  ),
-                ),
-                Expanded(
-                  child: _buildDetailItem(
-                    'الوزن القائم',
-                    '${grossWeight.toDouble().toStringAsFixed(1)} كجم',
-                    Icons.scale,
-                    Colors.red,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDetailItem(
-                    'الوزن الصافي',
-                    '${netWeight.toDouble().toStringAsFixed(1)} كجم',
-                    Icons.scale_outlined,
-                    Colors.blue,
-                  ),
-                ),
-                Expanded(
-                  child: _buildDetailItem(
-                    'سعر التحميل',
-                    '${loadingPrice.toDouble().toStringAsFixed(0)} ج.م/كجم',
-                    Icons.attach_money,
-                    Colors.green,
-                  ),
-                ),
-              ],
-            ),
+            title: const Text('نوع الدجاج'),
+            subtitle: Text(chickenType),
+            dense: true,
+          ),
+          const Divider(height: 1),
 
-            // Notes if available
-            if (notes != null && notes.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.note, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        notes,
-                        style: TextStyle(color: Colors.grey[700], fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.orange.withOpacity(0.1),
+              child: const Icon(Icons.person, color: Colors.orange, size: 20),
+            ),
+            title: const Text('العميل'),
+            subtitle: Text(customerName),
+            dense: true,
+          ),
+          const Divider(height: 1),
+
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.purple.withOpacity(0.1),
+              child: const Icon(
+                Icons.inventory,
+                color: Colors.purple,
+                size: 20,
               ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailItem(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: color,
             ),
-            textAlign: TextAlign.center,
+            title: const Text('الكمية'),
+            subtitle: Text('${quantity.toInt()} وحدة'),
+            dense: true,
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 11, color: Colors.grey),
-            textAlign: TextAlign.center,
+          const Divider(height: 1),
+
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.red.withOpacity(0.1),
+              child: const Icon(Icons.scale, color: Colors.red, size: 20),
+            ),
+            title: const Text('الوزن القائم'),
+            subtitle: Text('${grossWeight.toDouble().toStringAsFixed(1)} كجم'),
+            dense: true,
           ),
+          const Divider(height: 1),
+
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.blue.withOpacity(0.1),
+              child: const Icon(
+                Icons.scale_outlined,
+                color: Colors.blue,
+                size: 20,
+              ),
+            ),
+            title: const Text('الوزن الصافي'),
+            subtitle: Text('${netWeight.toDouble().toStringAsFixed(1)} كجم'),
+            dense: true,
+          ),
+          const Divider(height: 1),
+
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.green.withOpacity(0.1),
+              child: const Icon(
+                Icons.attach_money,
+                color: Colors.green,
+                size: 20,
+              ),
+            ),
+            title: const Text('سعر التحميل'),
+            subtitle: Text(
+              '${loadingPrice.toDouble().toStringAsFixed(0)} ج.م/كجم',
+            ),
+            dense: true,
+          ),
+
+          // Notes if available
+          if (notes != null && notes.isNotEmpty) ...[
+            const Divider(height: 1),
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Colors.grey.withOpacity(0.1),
+                child: const Icon(Icons.note, color: Colors.grey, size: 20),
+              ),
+              title: const Text('ملاحظات'),
+              subtitle: Text(notes),
+              dense: true,
+            ),
+          ],
         ],
       ),
     );
