@@ -46,224 +46,93 @@ class _OrderDetailViewState extends State<OrderDetailView> {
     final double netProfit = orderRevenue - totalExpenses;
 
     return PopScope(
-      canPop: false,
+      canPop: true,
       onPopInvoked: (didPop) {
-        if (didPop) return;
-        context.pop();
+        if (!didPop) {
+          context.go('/admin-dashboard');
+        }
       },
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            'طلب رقم #${order['_id']?.substring(0, 8) ?? 'غير معروف'}',
+          appBar: AppBar(
+            title: Text(
+              'طلب رقم #${order['_id']?.substring(0, 8) ?? 'غير معروف'}',
+            ),
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                } else {
+                  context.go('/admin-dashboard');
+                }
+              },
+            ),
           ),
-          backgroundColor: Theme.of(context).primaryColor,
-          foregroundColor: Colors.white,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
-          ),
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Order Status Card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: _getOrderStatusColor(order['status']),
-                        child: Icon(
-                          _getOrderStatusIcon(order['status']),
-                          color: Colors.white,
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Order Status Card
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: _getOrderStatusColor(
+                            order['status'],
+                          ),
+                          child: Icon(
+                            _getOrderStatusIcon(order['status']),
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'حالة الطلب',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              _getOrderStatusArabic(order['status']),
-                              style: TextStyle(
-                                color: _getOrderStatusColor(order['status']),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'حالة الطلب',
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.bold),
                               ),
-                            ),
-                          ],
+                              Text(
+                                _getOrderStatusArabic(order['status']),
+                                style: TextStyle(
+                                  color: _getOrderStatusColor(order['status']),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      Text(
-                        _formatDate(order['orderDate']),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
+                        Text(
+                          _formatDate(order['orderDate']),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.edit, size: 20),
-                        onPressed: () => _showOrderStatusDialog(),
-                        tooltip: 'تحديث حالة الطلب',
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Financial Summary
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'الملخص المالي',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildFinancialListTile(
-                        'الإيرادات',
-                        'ج.م ${orderRevenue.toStringAsFixed(2)}',
-                        Icons.attach_money,
-                        Colors.green,
-                      ),
-                      _buildFinancialListTile(
-                        'المصروفات',
-                        'ج.م ${totalExpenses.toStringAsFixed(2)}',
-                        Icons.money_off,
-                        Colors.red,
-                      ),
-                      _buildFinancialListTile(
-                        'صافي الربح',
-                        'ج.م ${netProfit.toStringAsFixed(2)}',
-                        Icons.account_balance,
-                        netProfit >= 0 ? Colors.blue : Colors.orange,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Order Details
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'تفاصيل الطلب',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildDetailRow(
-                        'معرّف الطلب',
-                        order['_id']?.toString() ?? 'غير معروف',
-                      ),
-                      _buildDetailRow(
-                        'الكمية',
-                        '${order['quantity'] ?? 0} وحدة',
-                      ),
-                      _buildDetailRow(
-                        'تاريخ الطلب',
-                        _formatDate(order['orderDate']),
-                      ),
-                      if (order['offer'] != null &&
-                          order['offer'].toString().isNotEmpty)
-                        _buildDetailRow('العرض', order['offer']),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Customer Information
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'معلومات العميل',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildDetailRow(
-                        'الاسم',
-                        order['customer']?['name'] ?? 'غير معروف',
-                      ),
-                      if (order['customer']?['contactInfo']?['phone'] != null)
-                        _buildDetailRow(
-                          'الهاتف',
-                          order['customer']?['contactInfo']?['phone'],
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.edit, size: 20),
+                          onPressed: () => _showOrderStatusDialog(),
+                          tooltip: 'تحديث حالة الطلب',
                         ),
-                      if (order['customer']?['contactInfo']?['address'] != null)
-                        _buildDetailRow(
-                          'العنوان',
-                          order['customer']?['contactInfo']?['address'],
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Chicken Type Information
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'معلومات المنتج',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildDetailRow(
-                        'نوع الدجاج',
-                        order['chickenType']?['name'] ?? 'غير معروف',
-                      ),
-                      _buildDetailRow(
-                        'السعر للوحدة',
-                        'ج.م ${order['chickenType']?['price'] ?? 0}',
-                      ),
-                      _buildDetailRow(
-                        'السعر الإجمالي',
-                        'ج.م ${orderRevenue.toStringAsFixed(2)}',
-                      ),
-                      _buildDetailRow(
-                        'المخزون المتاح',
-                        '${order['chickenType']?['stock'] ?? 0} وحدة',
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Employee Information (from expenses)
-              if (expenses.isNotEmpty) ...[
+                // Financial Summary
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -271,102 +140,243 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'معلومات الموظف',
+                          'الملخص المالي',
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
-                        _buildDetailRow(
-                          'الموظف',
-                          expenses[0]['employee']?['username'] ?? 'غير معروف',
+                        _buildFinancialListTile(
+                          'الإيرادات',
+                          'ج.م ${orderRevenue.toStringAsFixed(2)}',
+                          Icons.attach_money,
+                          Colors.green,
                         ),
-                        _buildDetailRow(
-                          'الدور',
-                          expenses[0]['employee']?['role'] ?? 'غير معروف',
+                        _buildFinancialListTile(
+                          'المصروفات',
+                          'ج.م ${totalExpenses.toStringAsFixed(2)}',
+                          Icons.money_off,
+                          Colors.red,
+                        ),
+                        _buildFinancialListTile(
+                          'صافي الربح',
+                          'ج.م ${netProfit.toStringAsFixed(2)}',
+                          Icons.account_balance,
+                          netProfit >= 0 ? Colors.blue : Colors.orange,
                         ),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
-              ],
 
-              // Expenses Details
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'تفاصيل المصروفات',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      if (expenses.isEmpty) ...[
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.info_outline,
-                                color: Colors.grey[600],
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'لا توجد مصروفات مسجلة لهذا الطلب',
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
-                            ],
-                          ),
+                // Order Details
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'تفاصيل الطلب',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
-                      ] else ...[
-                        ...expenses
-                            .map((expense) => _buildExpenseItem(expense))
-                            .toList(),
                         const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.red[50],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.red[200]!),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'إجمالي المصروفات',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.red[700],
-                                ),
-                              ),
-                              Text(
-                                'ج.م ${totalExpenses.toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.red[700],
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
+                        _buildDetailRow(
+                          'معرّف الطلب',
+                          order['_id']?.toString() ?? 'غير معروف',
                         ),
+                        _buildDetailRow(
+                          'الكمية',
+                          '${order['quantity'] ?? 0} وحدة',
+                        ),
+                        _buildDetailRow(
+                          'تاريخ الطلب',
+                          _formatDate(order['orderDate']),
+                        ),
+                        if (order['offer'] != null &&
+                            order['offer'].toString().isNotEmpty)
+                          _buildDetailRow('العرض', order['offer']),
                       ],
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+
+                // Customer Information
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'معلومات العميل',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildDetailRow(
+                          'الاسم',
+                          order['customer']?['name'] ?? 'غير معروف',
+                        ),
+                        if (order['customer']?['contactInfo']?['phone'] != null)
+                          _buildDetailRow(
+                            'الهاتف',
+                            order['customer']?['contactInfo']?['phone'],
+                          ),
+                        if (order['customer']?['contactInfo']?['address'] !=
+                            null)
+                          _buildDetailRow(
+                            'العنوان',
+                            order['customer']?['contactInfo']?['address'],
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Chicken Type Information
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'معلومات المنتج',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildDetailRow(
+                          'نوع الدجاج',
+                          order['chickenType']?['name'] ?? 'غير معروف',
+                        ),
+                        _buildDetailRow(
+                          'السعر للوحدة',
+                          'ج.م ${order['chickenType']?['price'] ?? 0}',
+                        ),
+                        _buildDetailRow(
+                          'السعر الإجمالي',
+                          'ج.م ${orderRevenue.toStringAsFixed(2)}',
+                        ),
+                        _buildDetailRow(
+                          'المخزون المتاح',
+                          '${order['chickenType']?['stock'] ?? 0} وحدة',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Employee Information (from expenses)
+                if (expenses.isNotEmpty) ...[
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'معلومات الموظف',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildDetailRow(
+                            'الموظف',
+                            expenses[0]['employee']?['username'] ?? 'غير معروف',
+                          ),
+                          _buildDetailRow(
+                            'الدور',
+                            expenses[0]['employee']?['role'] ?? 'غير معروف',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Expenses Details
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'تفاصيل المصروفات',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 16),
+                        if (expenses.isEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.grey[600],
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'لا توجد مصروفات مسجلة لهذا الطلب',
+                                  style: TextStyle(color: Colors.grey[600]),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else ...[
+                          ...expenses
+                              .map((expense) => _buildExpenseItem(expense))
+                              .toList(),
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red[200]!),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'إجمالي المصروفات',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red[700],
+                                  ),
+                                ),
+                                Text(
+                                  'ج.م ${totalExpenses.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red[700],
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
         ),
       ),
     );

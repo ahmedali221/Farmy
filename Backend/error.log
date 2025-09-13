@@ -30,3 +30,7 @@
 {"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-09T11:25:46.401Z"}
 {"level":"error","message":"Error fetching payment summary: Order is not defined","timestamp":"2025-09-09T11:25:46.407Z"}
 {"level":"error","message":"Error fetching payment summary: Order is not defined","timestamp":"2025-09-09T11:28:34.764Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-11T12:29:15.032Z"}
+{"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-11T12:32:17.999Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-13T12:19:33.950Z"}
+{"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-13T12:19:51.964Z"}

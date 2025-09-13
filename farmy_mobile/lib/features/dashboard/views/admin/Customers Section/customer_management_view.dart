@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../core/services/customer_api_service.dart';
-import '../../../../../core/services/order_api_service.dart';
-import '../../../../../core/services/expense_api_service.dart';
+import '../../../../../core/services/loading_api_service.dart';
 
 class CustomerManagementView extends StatefulWidget {
   const CustomerManagementView({super.key});
@@ -14,17 +13,14 @@ class CustomerManagementView extends StatefulWidget {
 
 class _CustomerManagementViewState extends State<CustomerManagementView> {
   List<Map<String, dynamic>> customers = [];
-  List<Map<String, dynamic>> orders = [];
-  Map<String, List<dynamic>> expensesByOrder = {};
+  List<Map<String, dynamic>> loadingOrders = [];
   bool isLoading = true;
-  late final OrderApiService _orderService;
-  late final ExpenseApiService _expenseService;
+  late final LoadingApiService _loadingService;
 
   @override
   void initState() {
     super.initState();
-    _orderService = serviceLocator<OrderApiService>();
-    _expenseService = serviceLocator<ExpenseApiService>();
+    _loadingService = serviceLocator<LoadingApiService>();
     _loadData();
   }
 
@@ -33,34 +29,17 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
     try {
       final customerService = serviceLocator<CustomerApiService>();
       final customersList = await customerService.getAllCustomers();
-      final ordersList = await _orderService.getAllOrders();
+      final loadingOrdersList = await _loadingService.getAllLoadings();
 
       setState(() {
         customers = customersList;
-        orders = ordersList;
+        loadingOrders = loadingOrdersList;
       });
-
-      // Load expenses for all orders
-      await _loadOrderExpenses();
 
       setState(() => isLoading = false);
     } catch (e) {
       setState(() => isLoading = false);
       _showErrorDialog('فشل في تحميل البيانات: $e');
-    }
-  }
-
-  Future<void> _loadOrderExpenses() async {
-    try {
-      for (final order in orders) {
-        final String? orderId = order['_id']?.toString();
-        if (orderId != null) {
-          final expenses = await _expenseService.getExpensesByOrder(orderId);
-          expensesByOrder[orderId] = expenses;
-        }
-      }
-    } catch (e) {
-      print('Error loading order expenses: $e');
     }
   }
 
@@ -139,136 +118,185 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
-        appBar: AppBar(
-          title: const Text('إدارة العملاء'),
-          backgroundColor: Theme.of(context).primaryColor,
-          foregroundColor: Colors.white,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/admin-dashboard'),
+          appBar: AppBar(
+            title: const Text('إدارة العملاء'),
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                } else {
+                  context.go('/admin-dashboard');
+                }
+              },
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: _showAddCustomerDialog,
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadCustomers,
+              ),
+            ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: _showAddCustomerDialog,
-            ),
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _loadCustomers,
-            ),
-          ],
-        ),
-        body: isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : customers.isEmpty
-            ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.people_outline, size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text('لا توجد عملاء', style: TextStyle(fontSize: 18)),
-                  ],
-                ),
-              )
-            : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: customers.length,
-                itemBuilder: (context, index) {
-                  final customer = customers[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.green,
-                        child: Text(
-                          customer['name']?.substring(0, 1).toUpperCase() ??
-                              'ع',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+          body: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : customers.isEmpty
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.people_outline, size: 64, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text('لا توجد عملاء', style: TextStyle(fontSize: 18)),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: customers.length,
+                  itemBuilder: (context, index) {
+                    final customer = customers[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.green,
+                          child: Text(
+                            customer['name']?.substring(0, 1).toUpperCase() ??
+                                'ع',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                      title: Text(
-                        customer['name'] ?? 'غير معروف',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'الهاتف: ${customer['contactInfo']?['phone'] ?? 'غير متوفر'}',
-                          ),
-                          Text(
-                            'العنوان: ${customer['contactInfo']?['address'] ?? 'غير متوفر'}',
-                          ),
-                          Text('الطلبات: ${customer['orders']?.length ?? 0}'),
-                        ],
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (customer['orders']?.isNotEmpty == true)
-                            IconButton(
-                              icon: const Icon(Icons.visibility, size: 20),
-                              onPressed: () =>
-                                  _navigateToCustomerOrders(context, customer),
-                              tooltip: 'عرض الطلبات',
+                        title: Text(
+                          customer['name'] ?? 'غير معروف',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'الهاتف: ${customer['contactInfo']?['phone'] ?? 'غير متوفر'}',
                             ),
-                          PopupMenuButton(
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.edit, size: 20),
-                                    SizedBox(width: 8),
-                                    Text('تعديل'),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
+                            Text(
+                              'العنوان: ${customer['contactInfo']?['address'] ?? 'غير متوفر'}',
+                            ),
+                            Text(
+                              'طلبات التحميل: ${_getCustomerLoadingOrdersCount(customer['_id'])}',
+                            ),
+                            Builder(
+                              builder: (context) {
+                                final paymentTotals = _getCustomerPaymentTotals(
+                                  customer['_id'],
+                                );
+                                final remaining =
+                                    paymentTotals['remaining'] ?? 0.0;
+                                return Row(
                                   children: [
                                     Icon(
-                                      Icons.delete,
-                                      size: 20,
-                                      color: Colors.red,
+                                      remaining > 0
+                                          ? Icons.pending_actions
+                                          : Icons.check_circle,
+                                      size: 16,
+                                      color: remaining > 0
+                                          ? Colors.red
+                                          : Colors.green,
                                     ),
-                                    SizedBox(width: 8),
+                                    const SizedBox(width: 4),
                                     Text(
-                                      'حذف',
-                                      style: TextStyle(color: Colors.red),
+                                      remaining > 0
+                                          ? 'مدين: ج.م ${remaining.toStringAsFixed(2)}'
+                                          : 'مُسدد بالكامل',
+                                      style: TextStyle(
+                                        color: remaining > 0
+                                            ? Colors.red
+                                            : Colors.green,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ],
-                                ),
-                              ),
-                            ],
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                _showEditCustomerDialog(customer);
-                              } else if (value == 'delete') {
-                                _deleteCustomer(
-                                  customer['_id'],
-                                  customer['name'],
                                 );
-                              }
-                            },
-                          ),
-                        ],
+                              },
+                            ),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_getCustomerLoadingOrdersCount(
+                                  customer['_id'],
+                                ) >
+                                0)
+                              IconButton(
+                                icon: const Icon(Icons.visibility, size: 20),
+                                onPressed: () =>
+                                    _navigateToCustomerLoadingOrders(
+                                      context,
+                                      customer,
+                                    ),
+                                tooltip: 'عرض طلبات التحميل',
+                              ),
+                            PopupMenuButton(
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit, size: 20),
+                                      SizedBox(width: 8),
+                                      Text('تعديل'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.delete,
+                                        size: 20,
+                                        color: Colors.red,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'حذف',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _showEditCustomerDialog(customer);
+                                } else if (value == 'delete') {
+                                  _deleteCustomer(
+                                    customer['_id'],
+                                    customer['name'],
+                                  );
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                        isThreeLine: true,
                       ),
-                      isThreeLine: true,
-                    ),
-                  );
-                },
-              ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: _showAddCustomerDialog,
-          child: const Icon(Icons.add),
+                    );
+                  },
+                ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: _showAddCustomerDialog,
+            child: const Icon(Icons.add),
+          ),
         ),
-      ),
       ),
     );
   }
@@ -335,22 +363,52 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
     );
   }
 
-  void _navigateToCustomerOrders(
+  int _getCustomerLoadingOrdersCount(String? customerId) {
+    if (customerId == null) return 0;
+    return loadingOrders
+        .where((order) => order['customer']?['_id'] == customerId)
+        .length;
+  }
+
+  Map<String, double> _getCustomerPaymentTotals(String? customerId) {
+    if (customerId == null)
+      return {'totalValue': 0.0, 'totalPaid': 0.0, 'remaining': 0.0};
+
+    final customerLoadingOrders = loadingOrders
+        .where((order) => order['customer']?['_id'] == customerId)
+        .toList();
+
+    final double totalValue = customerLoadingOrders.fold(
+      0.0,
+      (sum, order) => sum + ((order['totalLoading'] ?? 0) as num).toDouble(),
+    );
+
+    final double totalPaid = customerLoadingOrders.fold(
+      0.0,
+      (sum, order) => sum + ((order['paidAmount'] ?? 0) as num).toDouble(),
+    );
+
+    final double remaining = totalValue - totalPaid;
+
+    return {
+      'totalValue': totalValue,
+      'totalPaid': totalPaid,
+      'remaining': remaining,
+    };
+  }
+
+  void _navigateToCustomerLoadingOrders(
     BuildContext context,
     Map<String, dynamic> customer,
   ) {
-    // Get orders for this specific customer
-    final List<dynamic> customerOrders = orders
+    // Get loading orders for this specific customer
+    final List<dynamic> customerLoadingOrders = loadingOrders
         .where((order) => order['customer']?['_id'] == customer['_id'])
         .toList();
 
     context.push(
-      '/customer-orders',
-      extra: {
-        'customer': customer,
-        'orders': customerOrders,
-        'expensesByOrder': expensesByOrder,
-      },
+      '/customer-loading-orders',
+      extra: {'customer': customer, 'loadingOrders': customerLoadingOrders},
     );
   }
 }

@@ -106,33 +106,39 @@ class _EmployeeManagementViewState extends State<EmployeeManagementView> {
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
-        appBar: AppBar(
-          title: const Text('إدارة الموظفين'),
-          backgroundColor: Theme.of(context).primaryColor,
-          foregroundColor: Colors.white,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/admin-dashboard'),
+          appBar: AppBar(
+            title: const Text('إدارة الموظفين'),
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                } else {
+                  context.go('/admin-dashboard');
+                }
+              },
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: _showAddEmployeeUserDialog,
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadEmployeeUsers,
+              ),
+            ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: _showAddEmployeeUserDialog,
-            ),
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _loadEmployeeUsers,
-            ),
-          ],
+          body: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _buildEmployeeUsersList(),
+          floatingActionButton: FloatingActionButton(
+            onPressed: _showAddEmployeeUserDialog,
+            child: const Icon(Icons.add),
+          ),
         ),
-        body: isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _buildEmployeeUsersList(),
-        floatingActionButton: FloatingActionButton(
-          onPressed: _showAddEmployeeUserDialog,
-          child: const Icon(Icons.add),
-        ),
-      ),
       ),
     );
   }

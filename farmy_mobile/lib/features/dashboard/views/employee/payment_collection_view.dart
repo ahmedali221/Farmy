@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'dart:io';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -195,6 +194,22 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
             child: const Text('حسناً'),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showPaymentHistory() async {
+    await showDialog(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Dialog(
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            height: MediaQuery.of(context).size.height * 0.8,
+            child: _PaymentHistoryDialog(),
+          ),
+        ),
       ),
     );
   }
@@ -544,10 +559,11 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
     final size = MediaQuery.sizeOf(context);
 
     return PopScope(
-      canPop: false,
+      canPop: true,
       onPopInvoked: (didPop) {
         if (!didPop) {
-          context.go('/employee-dashboard');
+          // Use Navigator.pop() to go back to previous page
+          Navigator.of(context).pop();
         }
       },
       child: Theme(
@@ -578,290 +594,338 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
 
                 // المحتوى
                 SafeArea(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.only(bottom: 36),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 8),
-                        _HeaderBar(onRefresh: _loadCustomers),
-                        const SizedBox(height: 18),
+                  child: RefreshIndicator(
+                    onRefresh: _loadCustomers,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 36),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          _HeaderBar(onRefresh: _loadCustomers),
+                          const SizedBox(height: 18),
 
-                        if (isLoading)
-                          const Center(child: CircularProgressIndicator())
-                        else if (customers.isEmpty)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(32.0),
-                              child: Text(
-                                'لا يوجد عملاء متاحون',
-                                style: TextStyle(fontSize: 18),
+                          if (isLoading)
+                            const Center(child: CircularProgressIndicator())
+                          else if (customers.isEmpty)
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(32.0),
+                                child: Text(
+                                  'لا يوجد عملاء متاحون',
+                                  style: TextStyle(fontSize: 18),
+                                ),
                               ),
-                            ),
-                          )
-                        else
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Form(
-                              key: _formKey,
-                              child: Column(
-                                children: [
-                                  // Customer Selection
-                                  _SectionCard(
-                                    title: 'اختيار العميل',
-                                    child: _DropdownField(
-                                      label: 'العميل',
-                                      value: selectedCustomerId,
-                                      items: customers.map((c) {
-                                        return DropdownMenuItem<String>(
-                                          value: c['_id'],
-                                          child: Text(
-                                            c['name'] ?? '',
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                      onChanged: _onCustomerSelected,
-                                      validator: (value) {
-                                        if (value == null) {
-                                          return 'يرجى اختيار العميل';
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-
-                                  // Payment Details
-                                  _SectionCard(
-                                    title: 'تفاصيل الدفع',
-                                    child: Column(
-                                      children: [
-                                        if (selectedCustomerId != null)
-                                          Container(
-                                            padding: const EdgeInsets.all(12),
-                                            decoration: BoxDecoration(
-                                              color: Colors.blue[50],
-                                              border: Border.all(
-                                                color: Colors.blue[200]!,
+                            )
+                          else
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: Form(
+                                key: _formKey,
+                                child: Column(
+                                  children: [
+                                    // Customer Selection
+                                    _SectionCard(
+                                      title: 'اختيار العميل',
+                                      child: _DropdownField(
+                                        label: 'العميل',
+                                        value: selectedCustomerId,
+                                        items: customers.map((c) {
+                                          return DropdownMenuItem<String>(
+                                            value: c['_id'],
+                                            child: Text(
+                                              c['name'] ?? '',
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: Colors.black,
                                               ),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
                                             ),
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.info_outline,
-                                                  color: Colors.blue[700],
-                                                  size: 20,
+                                          );
+                                        }).toList(),
+                                        onChanged: _onCustomerSelected,
+                                        validator: (value) {
+                                          if (value == null) {
+                                            return 'يرجى اختيار العميل';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+
+                                    // Payment Details
+                                    _SectionCard(
+                                      title: 'تفاصيل الدفع',
+                                      child: Column(
+                                        children: [
+                                          if (selectedCustomerId != null)
+                                            Container(
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue[50],
+                                                border: Border.all(
+                                                  color: Colors.blue[200]!,
                                                 ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  'العميل المحدد: ',
-                                                  style: TextStyle(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.info_outline,
                                                     color: Colors.blue[700],
-                                                    fontWeight: FontWeight.w600,
+                                                    size: 20,
                                                   ),
-                                                ),
-                                                Expanded(
-                                                  child: Text(
-                                                    customers.firstWhere(
-                                                          (c) =>
-                                                              c['_id'] ==
-                                                              selectedCustomerId,
-                                                        )['name'] ??
-                                                        '',
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'العميل المحدد: ',
                                                     style: TextStyle(
                                                       color: Colors.blue[700],
                                                       fontWeight:
-                                                          FontWeight.bold,
+                                                          FontWeight.w600,
                                                     ),
                                                   ),
-                                                ),
-                                                const SizedBox(width: 12),
-                                                Text(
-                                                  'المستحق: ${_totalOutstandingController.text}',
-                                                  style: TextStyle(
-                                                    color: Colors.blue[600],
-                                                    fontWeight: FontWeight.w600,
+                                                  Expanded(
+                                                    child: Text(
+                                                      customers.firstWhere(
+                                                            (c) =>
+                                                                c['_id'] ==
+                                                                selectedCustomerId,
+                                                          )['name'] ??
+                                                          '',
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        color: Colors.blue[700],
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        if (selectedCustomerId != null)
-                                          const SizedBox(height: 12),
-                                        _NumField(
-                                          label: 'إجمالي الحساب (EGP)',
-                                          controller:
-                                              _totalOutstandingController,
-                                          enabled: false,
-                                        ),
-                                        const SizedBox(height: 10),
-                                        _NumField(
-                                          label: 'قيمة الخصم (EGP)',
-                                          controller: _discountController,
-                                          onChanged: (v) =>
-                                              _calculateRemaining(),
-                                        ),
-                                        const SizedBox(height: 10),
-
-                                        _NumField(
-                                          label: 'المبلغ المدفوع (EGP)',
-                                          controller: _paidAmountController,
-                                          onChanged: (value) =>
-                                              _calculateRemaining(),
-                                          validator: (value) {
-                                            if (value == null ||
-                                                value.isEmpty) {
-                                              return 'يرجى إدخال المبلغ المدفوع';
-                                            }
-                                            final amount = double.tryParse(
-                                              value,
-                                            );
-                                            if (amount == null || amount < 0) {
-                                              return 'يرجى إدخال مبلغ صحيح';
-                                            }
-                                            final total =
-                                                double.tryParse(
-                                                  _totalOutstandingController
-                                                      .text,
-                                                ) ??
-                                                0;
-                                            final discount =
-                                                double.tryParse(
-                                                  _discountController.text,
-                                                ) ??
-                                                0;
-                                            final maxPay = (total - discount)
-                                                .clamp(0, total);
-                                            if (amount > maxPay) {
-                                              return 'الحد الأقصى للدفع: ${maxPay.toStringAsFixed(2)}';
-                                            }
-                                            return null;
-                                          },
-                                        ),
-                                        const SizedBox(height: 10),
-
-                                        // Remaining amount (read-only)
-                                        _NumField(
-                                          label: 'المتبقي (EGP)',
-                                          controller: _remainingController,
-                                          enabled: false,
-                                        ),
-                                        const SizedBox(height: 10),
-
-                                        // Payment Method (cash only)
-                                        Align(
-                                          alignment: Alignment.centerRight,
-                                          child: Text(
-                                            'طريقة الدفع: نقداً',
-                                            style: TextStyle(
-                                              color: Theme.of(
-                                                context,
-                                              ).textTheme.bodyMedium?.color,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 10),
-                                        const SizedBox(height: 10),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-
-                                  // Submit Button
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      onPressed: isSubmitting
-                                          ? null
-                                          : _submitPayment,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 14,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                      ),
-                                      child: isSubmitting
-                                          ? const CircularProgressIndicator(
-                                              color: Colors.white,
-                                            )
-                                          : const Text(
-                                              'تسجيل الدفع',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w700,
+                                                  const SizedBox(width: 12),
+                                                  Text(
+                                                    'المستحق: ${_totalOutstandingController.text}',
+                                                    style: TextStyle(
+                                                      color: Colors.blue[600],
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
-                                    ),
-                                  ),
+                                          if (selectedCustomerId != null)
+                                            const SizedBox(height: 12),
+                                          _NumField(
+                                            label: 'إجمالي الحساب (EGP)',
+                                            controller:
+                                                _totalOutstandingController,
+                                            enabled: false,
+                                          ),
+                                          const SizedBox(height: 10),
+                                          _NumField(
+                                            label: 'قيمة الخصم (EGP)',
+                                            controller: _discountController,
+                                            onChanged: (v) =>
+                                                _calculateRemaining(),
+                                          ),
+                                          const SizedBox(height: 10),
 
-                                  const SizedBox(height: 16),
+                                          _NumField(
+                                            label: 'المبلغ المدفوع (EGP)',
+                                            controller: _paidAmountController,
+                                            onChanged: (value) =>
+                                                _calculateRemaining(),
+                                            validator: (value) {
+                                              if (value == null ||
+                                                  value.isEmpty) {
+                                                return 'يرجى إدخال المبلغ المدفوع';
+                                              }
+                                              final amount = double.tryParse(
+                                                value,
+                                              );
+                                              if (amount == null ||
+                                                  amount < 0) {
+                                                return 'يرجى إدخال مبلغ صحيح';
+                                              }
+                                              final total =
+                                                  double.tryParse(
+                                                    _totalOutstandingController
+                                                        .text,
+                                                  ) ??
+                                                  0;
+                                              final discount =
+                                                  double.tryParse(
+                                                    _discountController.text,
+                                                  ) ??
+                                                  0;
+                                              final maxPay = (total - discount)
+                                                  .clamp(0, total);
+                                              if (amount > maxPay) {
+                                                return 'الحد الأقصى للدفع: ${maxPay.toStringAsFixed(2)}';
+                                              }
+                                              return null;
+                                            },
+                                          ),
+                                          const SizedBox(height: 10),
 
-                                  // Generate Receipt Button
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: OutlinedButton.icon(
-                                      onPressed: isPaymentSubmitted
-                                          ? _generateReceipt
-                                          : null,
-                                      icon: Icon(
-                                        Icons.receipt,
-                                        color: isPaymentSubmitted
-                                            ? Theme.of(
-                                                context,
-                                              ).colorScheme.primary
-                                            : Colors.grey,
-                                      ),
-                                      label: Text(
-                                        'إنشاء الإيصال',
-                                        style: TextStyle(
-                                          color: isPaymentSubmitted
-                                              ? Theme.of(
+                                          // Remaining amount (read-only)
+                                          _NumField(
+                                            label: 'المتبقي (EGP)',
+                                            controller: _remainingController,
+                                            enabled: false,
+                                          ),
+                                          const SizedBox(height: 10),
+
+                                          // Payment Method (cash only)
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Text(
+                                              'طريقة الدفع: نقداً',
+                                              style: TextStyle(
+                                                color: Theme.of(
                                                   context,
-                                                ).colorScheme.primary
-                                              : Colors.grey,
-                                        ),
+                                                ).textTheme.bodyMedium?.color,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          const SizedBox(height: 10),
+                                        ],
                                       ),
-                                      style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 14,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
+                                    ),
+                                    const SizedBox(height: 24),
+
+                                    // Submit Button
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        onPressed: isSubmitting
+                                            ? null
+                                            : _submitPayment,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 14,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
                                         ),
-                                        side: BorderSide(
+                                        child: isSubmitting
+                                            ? const CircularProgressIndicator(
+                                                color: Colors.white,
+                                              )
+                                            : const Text(
+                                                'تسجيل الدفع',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                      ),
+                                    ),
+
+                                    const SizedBox(height: 16),
+
+                                    // History Button
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton.icon(
+                                        onPressed: _showPaymentHistory,
+                                        icon: Icon(
+                                          Icons.history,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                        ),
+                                        label: Text(
+                                          'سجل المدفوعات',
+                                          style: TextStyle(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                          ),
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 14,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          side: BorderSide(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+
+                                    const SizedBox(height: 16),
+
+                                    // Generate Receipt Button
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton.icon(
+                                        onPressed: isPaymentSubmitted
+                                            ? _generateReceipt
+                                            : null,
+                                        icon: Icon(
+                                          Icons.receipt,
                                           color: isPaymentSubmitted
                                               ? Theme.of(
                                                   context,
                                                 ).colorScheme.primary
                                               : Colors.grey,
                                         ),
+                                        label: Text(
+                                          'إنشاء الإيصال',
+                                          style: TextStyle(
+                                            color: isPaymentSubmitted
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary
+                                                : Colors.grey,
+                                          ),
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 14,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          side: BorderSide(
+                                            color: isPaymentSubmitted
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary
+                                                : Colors.grey,
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -889,7 +953,9 @@ class _HeaderBar extends StatelessWidget {
           // Back button
           IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/employee-dashboard'),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
           ),
           const SizedBox(width: 8),
           // صورة/أفاتار
@@ -1092,6 +1158,330 @@ class _DropdownField extends StatelessWidget {
       ),
       dropdownColor: Colors.white,
       icon: const Icon(Icons.arrow_drop_down),
+    );
+  }
+}
+
+class _PaymentHistoryDialog extends StatefulWidget {
+  @override
+  _PaymentHistoryDialogState createState() => _PaymentHistoryDialogState();
+}
+
+class _PaymentHistoryDialogState extends State<_PaymentHistoryDialog> {
+  late final PaymentApiService _paymentService;
+  List<Map<String, dynamic>> _payments = [];
+  bool _isLoading = true;
+  DateTime _selectedDate = DateTime.now();
+  String? _error;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _paymentService = serviceLocator<PaymentApiService>();
+    _loadPaymentsForDate(_selectedDate);
+  }
+
+  Future<void> _loadPaymentsForDate(DateTime date) async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final allPayments = await _paymentService.getAllPayments();
+
+      // Filter payments by selected date
+      final filteredPayments = allPayments.where((payment) {
+        final paymentDate = DateTime.parse(
+          payment['createdAt'] ?? payment['paymentDate'] ?? '',
+        );
+        return paymentDate.year == date.year &&
+            paymentDate.month == date.month &&
+            paymentDate.day == date.day;
+      }).toList();
+
+      setState(() {
+        _payments = filteredPayments;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _selectDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2024, 1, 1),
+      lastDate: DateTime.now(),
+    );
+
+    if (picked != null && picked != _selectedDate) {
+      setState(() => _selectedDate = picked);
+      _loadPaymentsForDate(picked);
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredPayments {
+    if (_searchQuery.isEmpty) return _payments;
+
+    return _payments.where((payment) {
+      final customerName =
+          payment['customer']?['name']?.toString().toLowerCase() ?? '';
+      final query = _searchQuery.toLowerCase();
+
+      return customerName.contains(query);
+    }).toList();
+  }
+
+  double _calculateTotalPaid() {
+    return _filteredPayments.fold<double>(0.0, (sum, payment) {
+      final paidAmount = (payment['paidAmount'] ?? 0) as num;
+      return sum + paidAmount.toDouble();
+    });
+  }
+
+  double _calculateTotalDiscount() {
+    return _filteredPayments.fold<double>(0.0, (sum, payment) {
+      final discount = (payment['discount'] ?? 0) as num;
+      return sum + discount.toDouble();
+    });
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  String _formatDateTime(String? dateTime) {
+    if (dateTime == null) return 'غير معروف';
+    try {
+      final dt = DateTime.parse(dateTime);
+      return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return 'تاريخ غير صحيح';
+    }
+  }
+
+  String _getPaymentMethodText(String? method) {
+    switch (method) {
+      case 'cash':
+        return 'نقداً';
+      case 'card':
+        return 'بطاقة';
+      case 'bank_transfer':
+        return 'تحويل بنكي';
+      default:
+        return 'غير محدد';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('سجل المدفوعات'),
+        backgroundColor: Theme.of(context).primaryColor,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => _loadPaymentsForDate(_selectedDate),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Header with date selector and search
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.grey[50],
+            child: Column(
+              children: [
+                // Date selector
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today, color: Colors.blue),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'تاريخ الدفع:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.calendar_today, size: 16),
+                      label: Text(_formatDate(_selectedDate)),
+                      onPressed: _selectDate,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Search bar
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'البحث في العملاء...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          // Summary cards
+          if (!_isLoading && _filteredPayments.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Card(
+                      color: Colors.green[50],
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.attach_money,
+                              color: Colors.green,
+                              size: 24,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${_calculateTotalPaid().toStringAsFixed(0)} ج.م',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Text('إجمالي المدفوع'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Card(
+                      color: Colors.orange[50],
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.discount,
+                              color: Colors.orange,
+                              size: 24,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${_calculateTotalDiscount().toStringAsFixed(0)} ج.م',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Text('إجمالي الخصم'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Payment list
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error, size: 64, color: Colors.red),
+                        const SizedBox(height: 16),
+                        Text('خطأ: $_error'),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => _loadPaymentsForDate(_selectedDate),
+                          child: const Text('إعادة المحاولة'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _filteredPayments.isEmpty
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.inbox, size: 64, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text('لا توجد مدفوعات في هذا التاريخ'),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredPayments.length,
+                    itemBuilder: (context, index) {
+                      final payment = _filteredPayments[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.green[100],
+                            child: const Icon(
+                              Icons.payment,
+                              color: Colors.green,
+                            ),
+                          ),
+                          title: Text(
+                            payment['customer']?['name'] ?? 'عميل غير معروف',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'المبلغ المدفوع: ${payment['paidAmount']} ج.م',
+                              ),
+                              Text('الخصم: ${payment['discount']} ج.م'),
+                              Text(
+                                'طريقة الدفع: ${_getPaymentMethodText(payment['paymentMethod'])}',
+                              ),
+                              Text(
+                                'التاريخ: ${_formatDateTime(payment['createdAt'])}',
+                              ),
+                            ],
+                          ),
+                          isThreeLine: true,
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

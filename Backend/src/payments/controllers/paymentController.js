@@ -49,6 +49,20 @@ exports.createPayment = async (req, res) => {
   }
 };
 
+exports.getAllPayments = async (req, res) => {
+  try {
+    const payments = await Payment.find()
+      .populate('customer', 'name contactInfo')
+      .populate('employee', 'username')
+      .sort({ createdAt: -1 });
+
+    res.json(payments);
+  } catch (err) {
+    logger.error(`Error fetching payments: ${err.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 exports.getPaymentById = async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id)

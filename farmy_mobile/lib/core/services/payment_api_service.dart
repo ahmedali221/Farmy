@@ -72,6 +72,30 @@ class PaymentApiService {
     }
   }
 
+  /// Get all payments
+  Future<List<Map<String, dynamic>>> getAllPayments() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/payments'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load payments',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
   /// Get payments by order ID
   Future<List<Map<String, dynamic>>> getPaymentsByOrder(String orderId) async {
     try {

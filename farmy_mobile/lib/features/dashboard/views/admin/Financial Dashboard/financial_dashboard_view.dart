@@ -29,32 +29,46 @@ class _FinancialDashboardViewState extends State<FinancialDashboardView>
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('الخزنة'),
-          backgroundColor: Theme.of(context).primaryColor,
-          foregroundColor: Colors.white,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/admin-dashboard'),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          context.go('/admin-dashboard');
+        }
+      },
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('الخزنة'),
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                } else {
+                  context.go('/admin-dashboard');
+                }
+              },
+            ),
+            actions: const [],
+            bottom: TabBar(
+              controller: _tabController,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              tabs: const [
+                Tab(text: 'الخزنة'),
+                Tab(text: 'خزنة الموظفين'),
+                Tab(text: 'المخزون'),
+              ],
+            ),
           ),
-          actions: const [],
-          bottom: TabBar(
+          body: TabBarView(
             controller: _tabController,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: const [
-              Tab(text: 'الخزنة'),
-              Tab(text: 'خزنة الموظفين'),
-              Tab(text: 'المخزون'),
-            ],
+            children: const [TreasuryTab(), EmployeeSafeTab(), InventoryTab()],
           ),
-        ),
-        body: TabBarView(
-          controller: _tabController,
-          children: const [TreasuryTab(), EmployeeSafeTab(), InventoryTab()],
         ),
       ),
     );

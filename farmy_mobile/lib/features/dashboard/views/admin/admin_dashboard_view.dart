@@ -6,6 +6,12 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/employee_api_service.dart';
 import '../../../../core/services/customer_api_service.dart';
 import '../../../../core/services/inventory_api_service.dart';
+import 'distribution_history_view.dart';
+import 'loading_history_view.dart';
+import 'payment_history_view.dart';
+import '../employee/distribution_view.dart';
+import '../employee/payment_collection_view.dart';
+import '../employee/order_placement_view.dart';
 
 class AdminDashboardView extends StatefulWidget {
   const AdminDashboardView({super.key});
@@ -259,9 +265,9 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
                 ),
               const SizedBox(height: 24),
 
-              // Management Actions
+              // History Section
               Text(
-                'الإدارة',
+                'السجلات والتقارير',
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -276,30 +282,111 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
                 children: [
                   _buildActionCard(
                     context,
+                    'سجل التوزيعات',
+                    Icons.outbound,
+                    Colors.green,
+                    () =>
+                        _navigateToHistoryView(const DistributionHistoryView()),
+                  ),
+                  _buildActionCard(
+                    context,
+                    'سجل التحميلات',
+                    Icons.local_shipping,
+                    Colors.blue,
+                    () => _navigateToHistoryView(const LoadingHistoryView()),
+                  ),
+                  _buildActionCard(
+                    context,
+                    'سجل المدفوعات',
+                    Icons.payment,
+                    Colors.orange,
+                    () => _navigateToHistoryView(const PaymentHistoryView()),
+                  ),
+                  _buildActionCard(
+                    context,
                     'لوحة التحكم المالية',
                     Icons.analytics,
-                    Colors.blue,
+                    Colors.purple,
                     () => context.go('/financial-dashboard'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Action Section
+              Text(
+                'إضافة السجلات',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                children: [
+                  _buildActionCard(
+                    context,
+                    'تسجيل التوزيع',
+                    Icons.outbound_outlined,
+                    Colors.green,
+                    () => _navigateToActionView(const DistributionView()),
+                  ),
+                  _buildActionCard(
+                    context,
+                    'تحصيل الدفع',
+                    Icons.payment_outlined,
+                    Colors.orange,
+                    () => _navigateToActionView(const PaymentCollectionView()),
+                  ),
+                  _buildActionCard(
+                    context,
+                    'تسجيل التحميل',
+                    Icons.local_shipping_outlined,
+                    Colors.blue,
+                    () => _navigateToActionView(const OrderPlacementView()),
                   ),
                   _buildActionCard(
                     context,
                     'إدارة الموظفين',
                     Icons.group,
-                    Colors.green,
+                    Colors.purple,
                     () => context.go('/employee-management'),
                   ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Management Section
+              Text(
+                'الإدارة العامة',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                children: [
                   _buildActionCard(
                     context,
                     'إدارة العملاء',
                     Icons.person,
-                    Colors.orange,
+                    Colors.teal,
                     () => context.go('/customer-management'),
                   ),
                   _buildActionCard(
                     context,
                     'إدارة المخزون',
                     Icons.inventory,
-                    Colors.purple,
+                    Colors.indigo,
                     () => context.go('/inventory-management'),
                   ),
                 ],
@@ -374,6 +461,24 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _navigateToHistoryView(Widget historyView) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => historyView,
+        fullscreenDialog: false,
+      ),
+    );
+  }
+
+  void _navigateToActionView(Widget actionView) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => actionView,
+        fullscreenDialog: false,
       ),
     );
   }

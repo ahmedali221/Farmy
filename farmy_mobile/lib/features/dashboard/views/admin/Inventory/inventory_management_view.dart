@@ -244,8 +244,9 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
-        if (didPop) return;
-        context.go('/admin-dashboard');
+        if (!didPop) {
+          context.go('/admin-dashboard');
+        }
       },
       child: Directionality(
         textDirection: TextDirection.rtl,
@@ -256,7 +257,13 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
             foregroundColor: Colors.white,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.go('/admin-dashboard'),
+              onPressed: () {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                } else {
+                  context.go('/admin-dashboard');
+                }
+              },
             ),
             actions: [
               IconButton(

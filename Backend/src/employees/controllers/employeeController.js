@@ -120,17 +120,8 @@ exports.updateEmployeeUser = async (req, res) => {
       return res.status(400).json({ message: 'Username already exists' });
     }
 
-    const updateData = { username };
-    if (password) {
-      updateData.password = password;
-    }
-
-    const user = await User.findByIdAndUpdate(
-      req.params.id, 
-      updateData, 
-      { new: true }
-    ).select('-password');
-
+    // Find the user first
+    const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'Employee user not found' });
     }
@@ -139,8 +130,23 @@ exports.updateEmployeeUser = async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
+    // Update username
+    user.username = username;
+    
+    // Update password if provided (this will trigger the pre-save middleware for hashing)
+    if (password) {
+      user.password = password;
+    }
+
+    // Save the user (this will trigger password hashing via pre-save middleware)
+    await user.save();
+
+    // Return user without password
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
     logger.info(`Updated employee user: ${username}`);
-    res.json(user);
+    res.json(userResponse);
   } catch (err) {
     logger.error(`Error updating employee user: ${err.message}`);
     res.status(500).json({ message: 'Server error' });

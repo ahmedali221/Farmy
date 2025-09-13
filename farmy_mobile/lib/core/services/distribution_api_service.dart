@@ -4,11 +4,11 @@ import '../../features/authentication/services/token_service.dart';
 import '../constants/api_constants.dart';
 import 'api_exception.dart';
 
-class EmployeeApiService {
+class DistributionApiService {
   static const String baseUrl = ApiConstants.baseUrl;
   final TokenService _tokenService;
 
-  EmployeeApiService({required TokenService tokenService})
+  DistributionApiService({required TokenService tokenService})
     : _tokenService = tokenService;
 
   /// Get authorization headers with token
@@ -20,16 +20,27 @@ class EmployeeApiService {
     };
   }
 
-  /// Create a distribution record
+  /// Create a new distribution record
+  ///
+  /// Required fields:
+  /// - customer: ID of the customer (العميل)
+  /// - employee: ID of the employee (الموظف)
+  /// - quantity: Number of units (الكمية)
+  /// - grossWeight: Gross weight in kg (الوزن القائم)
+  /// - netWeight: Net weight in kg (الوزن الصافي)
+  /// - price: Price per kg (سعر الكيلو)
+  /// - totalAmount: Total amount (المبلغ الإجمالي)
+  /// - distributionDate: Distribution date (تاريخ التوزيع)
+  /// - notes: Optional notes (ملاحظات)
   Future<Map<String, dynamic>> createDistribution(
-    Map<String, dynamic> data,
+    Map<String, dynamic> distributionData,
   ) async {
     try {
       final headers = await _getAuthHeaders();
       final response = await http.post(
         Uri.parse('$baseUrl/distributions'),
         headers: headers,
-        body: json.encode(data),
+        body: json.encode(distributionData),
       );
 
       if (response.statusCode == 201) {
@@ -71,158 +82,26 @@ class EmployeeApiService {
     }
   }
 
-  /// Get daily total net weight for distributions
-  Future<Map<String, dynamic>> getDailyDistributionNetWeight({
-    DateTime? date,
-  }) async {
-    try {
-      final headers = await _getAuthHeaders();
-      final q = date != null ? '?date=${date.toIso8601String()}' : '';
-      final response = await http.get(
-        Uri.parse('$baseUrl/distributions/daily-net-weight$q'),
-        headers: headers,
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        final errorData = json.decode(response.body);
-        throw ApiException(
-          message: errorData['message'] ?? 'Failed to fetch daily net weight',
-          statusCode: response.statusCode,
-        );
-      }
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException(message: 'Network error: $e', statusCode: 0);
-    }
-  }
-
-  /// Upsert daily stock record (manager only)
-  Future<Map<String, dynamic>> upsertDailyStock({
-    required DateTime date,
-    required double netDistributionWeight,
-    required double adminAdjustment,
-    String? notes,
-  }) async {
-    try {
-      final headers = await _getAuthHeaders();
-      final body = {
-        'date': date.toIso8601String(),
-        'netDistributionWeight': netDistributionWeight,
-        'adminAdjustment': adminAdjustment,
-        if (notes != null && notes.isNotEmpty) 'notes': notes,
-      };
-      final response = await http.post(
-        Uri.parse('${ApiConstants.baseUrl}/stocks/upsert'),
-        headers: headers,
-        body: json.encode(body),
-      );
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        final errorData = json.decode(response.body);
-        throw ApiException(
-          message: errorData['message'] ?? 'Failed to save daily stock',
-          statusCode: response.statusCode,
-        );
-      }
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException(message: 'Network error: $e', statusCode: 0);
-    }
-  }
-
-  /// Get weekly stocks
-  Future<List<Map<String, dynamic>>> getWeeklyStocks() async {
-    try {
-      final headers = await _getAuthHeaders();
-      final response = await http.get(
-        Uri.parse('${ApiConstants.baseUrl}/stocks/week'),
-        headers: headers,
-      );
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.cast<Map<String, dynamic>>();
-      } else {
-        throw ApiException(
-          message: 'Failed to load weekly stocks',
-          statusCode: response.statusCode,
-        );
-      }
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException(message: 'Network error: $e', statusCode: 0);
-    }
-  }
-
-  /// Get all users with employee role
-  Future<List<Map<String, dynamic>>> getAllEmployeeUsers() async {
-    try {
-      final headers = await _getAuthHeaders();
-      final response = await http.get(
-        Uri.parse('$baseUrl/employees/users'),
-        headers: headers,
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.cast<Map<String, dynamic>>();
-      } else {
-        throw ApiException(
-          message: 'Failed to load employee users',
-          statusCode: response.statusCode,
-        );
-      }
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException(message: 'Network error: $e', statusCode: 0);
-    }
-  }
-
-  /// Get employee by ID
-  Future<Map<String, dynamic>?> getEmployeeById(String id) async {
-    try {
-      final headers = await _getAuthHeaders();
-      final response = await http.get(
-        Uri.parse('$baseUrl/employees/$id'),
-        headers: headers,
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else if (response.statusCode == 404) {
-        return null;
-      } else {
-        throw ApiException(
-          message: 'Failed to load employee',
-          statusCode: response.statusCode,
-        );
-      }
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException(message: 'Network error: $e', statusCode: 0);
-    }
-  }
-
-  /// Create new employee user
-  Future<Map<String, dynamic>> createEmployeeUser(
-    Map<String, dynamic> userData,
+  /// Get distributions by date range
+  Future<List<Map<String, dynamic>>> getDistributionsByDateRange(
+    DateTime startDate,
+    DateTime endDate,
   ) async {
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.post(
-        Uri.parse('$baseUrl/employees/users'),
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/distributions/date-range?start=${startDate.toIso8601String()}&end=${endDate.toIso8601String()}',
+        ),
         headers: headers,
-        body: json.encode(userData),
       );
 
-      if (response.statusCode == 201) {
-        return json.decode(response.body);
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
       } else {
-        final errorData = json.decode(response.body);
         throw ApiException(
-          message: errorData['message'] ?? 'Failed to create employee user',
+          message: 'Failed to load distributions by date range',
           statusCode: response.statusCode,
         );
       }
@@ -232,17 +111,92 @@ class EmployeeApiService {
     }
   }
 
-  /// Update employee user
-  Future<Map<String, dynamic>> updateEmployeeUser(
+  /// Get distributions by customer ID
+  Future<List<Map<String, dynamic>>> getDistributionsByCustomer(
+    String customerId,
+  ) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/distributions/customer/$customerId'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load distributions by customer',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get distributions by employee ID
+  Future<List<Map<String, dynamic>>> getDistributionsByEmployee(
+    String employeeId,
+  ) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/distributions/employee/$employeeId'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load distributions by employee',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get distribution by ID
+  Future<Map<String, dynamic>> getDistributionById(String id) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/distributions/$id'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw ApiException(
+          message: 'Failed to load distribution',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Update distribution by ID
+  Future<Map<String, dynamic>> updateDistribution(
     String id,
-    Map<String, dynamic> userData,
+    Map<String, dynamic> distributionData,
   ) async {
     try {
       final headers = await _getAuthHeaders();
       final response = await http.put(
-        Uri.parse('$baseUrl/employees/users/$id'),
+        Uri.parse('$baseUrl/distributions/$id'),
         headers: headers,
-        body: json.encode(userData),
+        body: json.encode(distributionData),
       );
 
       if (response.statusCode == 200) {
@@ -250,7 +204,7 @@ class EmployeeApiService {
       } else {
         final errorData = json.decode(response.body);
         throw ApiException(
-          message: errorData['message'] ?? 'Failed to update employee user',
+          message: errorData['message'] ?? 'Failed to update distribution',
           statusCode: response.statusCode,
         );
       }
@@ -260,19 +214,19 @@ class EmployeeApiService {
     }
   }
 
-  /// Delete employee user
-  Future<void> deleteEmployeeUser(String id) async {
+  /// Delete distribution by ID
+  Future<void> deleteDistribution(String id) async {
     try {
       final headers = await _getAuthHeaders();
       final response = await http.delete(
-        Uri.parse('$baseUrl/employees/users/$id'),
+        Uri.parse('$baseUrl/distributions/$id'),
         headers: headers,
       );
 
-      if (response.statusCode != 200) {
+      if (response.statusCode != 200 && response.statusCode != 204) {
         final errorData = json.decode(response.body);
         throw ApiException(
-          message: errorData['message'] ?? 'Failed to delete employee user',
+          message: errorData['message'] ?? 'Failed to delete distribution',
           statusCode: response.statusCode,
         );
       }
@@ -282,25 +236,45 @@ class EmployeeApiService {
     }
   }
 
-  /// Add daily log to employee
-  Future<Map<String, dynamic>> addDailyLog(
-    String employeeId,
-    Map<String, dynamic> logData,
-  ) async {
+  /// Get daily net weight for distributions
+  Future<Map<String, dynamic>> getDailyNetWeight(DateTime date) async {
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.post(
-        Uri.parse('$baseUrl/employees/$employeeId/daily-logs'),
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/distributions/daily-net-weight?date=${date.toIso8601String()}',
+        ),
         headers: headers,
-        body: json.encode(logData),
       );
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        final errorData = json.decode(response.body);
         throw ApiException(
-          message: errorData['message'] ?? 'Failed to add daily log',
+          message: 'Failed to load daily net weight',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get distribution statistics
+  Future<Map<String, dynamic>> getDistributionStatistics() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/distributions/statistics'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw ApiException(
+          message: 'Failed to load distribution statistics',
           statusCode: response.statusCode,
         );
       }
@@ -310,3 +284,5 @@ class EmployeeApiService {
     }
   }
 }
+
+

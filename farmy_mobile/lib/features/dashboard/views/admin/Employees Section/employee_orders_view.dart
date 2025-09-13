@@ -29,10 +29,10 @@ class EmployeeOrdersView extends StatelessWidget {
     final double netProfit = totalRevenue - totalExpenses;
 
     return PopScope(
-      canPop: false,
+      canPop: true,
       onPopInvoked: (didPop) {
         if (!didPop) {
-          context.pop();
+          context.go('/admin-dashboard');
         }
       },
       child: Directionality(
@@ -44,7 +44,13 @@ class EmployeeOrdersView extends StatelessWidget {
             foregroundColor: Colors.white,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.pop(),
+              onPressed: () {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                } else {
+                  context.go('/admin-dashboard');
+                }
+              },
             ),
           ),
           body: CustomScrollView(

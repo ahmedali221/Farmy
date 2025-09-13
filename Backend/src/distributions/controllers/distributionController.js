@@ -49,6 +49,20 @@ exports.createDistribution = async (req, res) => {
   }
 };
 
+exports.getAllDistributions = async (req, res) => {
+  try {
+    const distributions = await Distribution.find()
+      .populate('customer', 'name contactInfo')
+      .populate('employee', 'username')
+      .sort({ distributionDate: -1 });
+
+    res.json(distributions);
+  } catch (err) {
+    logger.error(`Error fetching distributions: ${err.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 exports.getDailyNetWeight = async (req, res) => {
   try {
     const { date } = req.query; // optional ISO date

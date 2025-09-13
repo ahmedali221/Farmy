@@ -11,12 +11,15 @@ import '../../features/dashboard/views/admin/Financial Dashboard/financial_dashb
 import '../../features/dashboard/views/admin/Inventory/inventory_management_view.dart';
 import '../../features/dashboard/views/admin/order_detail_view.dart';
 import '../../features/dashboard/views/admin/Employees Section/employee_orders_view.dart';
-import '../../features/dashboard/views/admin/Customers Section/customer_orders_view.dart';
+import '../../features/dashboard/views/admin/Customers Section/customer_loading_orders_view.dart';
 import '../../features/dashboard/views/employee/daily_report_screen.dart';
 import '../../features/dashboard/views/employee/order_placement_view.dart';
 import '../../features/dashboard/views/employee/payment_collection_view.dart';
 import '../../features/dashboard/views/employee/expense_management_view.dart';
 import '../../features/dashboard/views/employee/distribution_view.dart';
+import '../../features/dashboard/views/admin/loading_history_view.dart';
+import '../../features/dashboard/views/admin/distribution_history_view.dart';
+import '../../features/dashboard/views/admin/payment_history_view.dart';
 
 class AppRouter {
   static GoRouter createRouter(AuthCubit authCubit) {
@@ -125,9 +128,10 @@ class AppRouter {
             );
           },
         ),
+
         GoRoute(
-          path: '/customer-orders',
-          name: 'customer-orders',
+          path: '/customer-loading-orders',
+          name: 'customer-loading-orders',
           builder: (context, state) {
             final extra = state.extra as Map<String, dynamic>?;
             if (extra == null) {
@@ -135,10 +139,9 @@ class AppRouter {
                 body: Center(child: Text('Customer data not found')),
               );
             }
-            return CustomerOrdersView(
+            return CustomerLoadingOrdersView(
               customer: extra['customer'],
-              orders: extra['orders'],
-              expensesByOrder: extra['expensesByOrder'],
+              loadingOrders: extra['loadingOrders'],
             );
           },
         ),
@@ -167,6 +170,22 @@ class AppRouter {
           path: '/expenses',
           name: 'expenses',
           builder: (context, state) => const ExpenseManagementView(),
+        ),
+        // History Routes
+        GoRoute(
+          path: '/loading-history',
+          name: 'loading-history',
+          builder: (context, state) => const LoadingHistoryView(),
+        ),
+        GoRoute(
+          path: '/distribution-history',
+          name: 'distribution-history',
+          builder: (context, state) => const DistributionHistoryView(),
+        ),
+        GoRoute(
+          path: '/payment-history',
+          name: 'payment-history',
+          builder: (context, state) => const PaymentHistoryView(),
         ),
       ],
       errorPageBuilder: (context, state) => MaterialPage(

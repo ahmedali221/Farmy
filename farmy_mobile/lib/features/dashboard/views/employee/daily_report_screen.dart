@@ -112,141 +112,146 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
         child: Directionality(
           textDirection: TextDirection.rtl,
           child: Scaffold(
-          body: Stack(
-            children: [
-              // خلفية متدرّجة مع حافة سفلية دائرية
-              Container(
-                height: size.height * 0.34,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Theme.of(context).colorScheme.surface,
-                      Theme.of(context).colorScheme.background,
-                    ],
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(36),
-                    bottomRight: Radius.circular(36),
+            body: Stack(
+              children: [
+                // خلفية متدرّجة مع حافة سفلية دائرية
+                Container(
+                  height: size.height * 0.34,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Theme.of(context).colorScheme.surface,
+                        Theme.of(context).colorScheme.background,
+                      ],
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(36),
+                      bottomRight: Radius.circular(36),
+                    ),
                   ),
                 ),
-              ),
 
-              // المحتوى
-              SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 36),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 8),
-                      _HeaderBar(),
-                      const SizedBox(height: 18),
+                // المحتوى
+                SafeArea(
+                  child: RefreshIndicator(
+                    onRefresh: _loadData,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 36),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          _HeaderBar(),
+                          const SizedBox(height: 18),
 
-                      // Navigation Buttons
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () => context.go('/order-placement'),
-                                icon: const Icon(Icons.add_shopping_cart),
-                                label: const Text('تسجيل طلب'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFF37B2A),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () =>
-                                    context.go('/payment-collection'),
-                                icon: const Icon(Icons.payment),
-                                label: const Text('تحصيل الدفع'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0EA57A),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                          // Navigation Buttons
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () =>
+                                        context.go('/order-placement'),
+                                    icon: const Icon(Icons.add_shopping_cart),
+                                    label: const Text('تسجيل طلب'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFF37B2A),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () =>
+                                        context.go('/payment-collection'),
+                                    icon: const Icon(Icons.payment),
+                                    label: const Text('تحصيل الدفع'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0EA57A),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // الكروت الملوّنة
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          children: const [
-                            // Values updated below in non-const section
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _StatCard(
-                                titleTop: 'الطلبات',
-                                value: _isLoading ? '—' : '$_ordersCount',
-                                color: const Color(0xFFF37B2A),
-                                icon: Icons.shopping_bag_rounded,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: _StatCard(
-                                titleTop: 'قيد التنفيذ',
-                                value: _isLoading ? '—' : '$_pendingCount',
-                                color: const Color(0xFF0EA57A),
-                                icon: Icons.timelapse_rounded,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // نظرة عامة (قابلة للتحديث من الباك)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: _SectionCard(
-                          title: 'نظرة عامة',
-                          child: _OverviewGrid(
-                            delivered: _deliveredCount,
-                            receipts: _receiptsCount,
-                            collected: _totalCollected,
-                            expenses: _totalExpenses,
-                            finalBalance: _finalBalance,
                           ),
-                        ),
-                      ),
+                          const SizedBox(height: 14),
 
-                      const SizedBox(height: 16),
-                    ],
+                          // الكروت الملوّنة
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              children: const [
+                                // Values updated below in non-const section
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: _StatCard(
+                                    titleTop: 'الطلبات',
+                                    value: _isLoading ? '—' : '$_ordersCount',
+                                    color: const Color(0xFFF37B2A),
+                                    icon: Icons.shopping_bag_rounded,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: _StatCard(
+                                    titleTop: 'قيد التنفيذ',
+                                    value: _isLoading ? '—' : '$_pendingCount',
+                                    color: const Color(0xFF0EA57A),
+                                    icon: Icons.timelapse_rounded,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // نظرة عامة (قابلة للتحديث من الباك)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: _SectionCard(
+                              title: 'نظرة عامة',
+                              child: _OverviewGrid(
+                                delivered: _deliveredCount,
+                                receipts: _receiptsCount,
+                                collected: _totalCollected,
+                                expenses: _totalExpenses,
+                                finalBalance: _finalBalance,
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           ),
         ),
       ),

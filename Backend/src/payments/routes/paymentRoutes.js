@@ -6,6 +6,9 @@ const paymentController = require('../controllers/paymentController');
 router.post('/', paymentController.createPayment);
 router.put('/:id', paymentController.updatePayment);
 
+// Get all payments
+router.get('/', paymentController.getAllPayments);
+
 // Collections & summaries (more specific first to avoid route shadowing)
 router.get('/summary/employee', paymentController.getEmployeeCollectionSummary);
 router.get('/summary/:orderId', paymentController.getPaymentSummary);

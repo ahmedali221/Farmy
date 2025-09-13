@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'dart:io';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -189,6 +188,22 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
             child: const Text('حسناً'),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showLoadingHistory() async {
+    await showDialog(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Dialog(
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            height: MediaQuery.of(context).size.height * 0.8,
+            child: _LoadingHistoryDialog(),
+          ),
+        ),
       ),
     );
   }
@@ -530,10 +545,11 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     final size = MediaQuery.sizeOf(context);
 
     return PopScope(
-      canPop: false,
+      canPop: true,
       onPopInvoked: (didPop) {
         if (!didPop) {
-          context.go('/employee-dashboard');
+          // Use Navigator.pop() to go back to previous page
+          Navigator.of(context).pop();
         }
       },
       child: Theme(
@@ -564,334 +580,386 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
 
                 // المحتوى
                 SafeArea(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.only(bottom: 36),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 8),
-                        _HeaderBar(onRefresh: _loadData),
-                        const SizedBox(height: 18),
+                  child: RefreshIndicator(
+                    onRefresh: _loadData,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 36),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          _HeaderBar(onRefresh: _loadData),
+                          const SizedBox(height: 18),
 
-                        if (isLoading)
-                          const Center(child: CircularProgressIndicator())
-                        else
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Form(
-                              key: _formKey,
-                              child: Column(
-                                children: [
-                                  // Customer Selection
-                                  _SectionCard(
-                                    title: 'اختيار العميل (المكان)',
-                                    child: _DropdownField(
-                                      label: 'العميل',
-                                      value: selectedCustomerId,
-                                      items: customers
-                                          .map(
-                                            (customer) =>
-                                                DropdownMenuItem<String>(
-                                                  value: customer['_id'],
-                                                  child: Text(
-                                                    customer['name'],
-                                                    style: const TextStyle(
-                                                      color: Colors.black,
-                                                      fontWeight:
-                                                          FontWeight.w500,
+                          if (isLoading)
+                            const Center(child: CircularProgressIndicator())
+                          else
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: Form(
+                                key: _formKey,
+                                child: Column(
+                                  children: [
+                                    // Customer Selection
+                                    _SectionCard(
+                                      title: 'اختيار العميل (المكان)',
+                                      child: _DropdownField(
+                                        label: 'العميل',
+                                        value: selectedCustomerId,
+                                        items: customers
+                                            .map(
+                                              (customer) =>
+                                                  DropdownMenuItem<String>(
+                                                    value: customer['_id'],
+                                                    child: Text(
+                                                      customer['name'],
+                                                      style: const TextStyle(
+                                                        color: Colors.black,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                      ),
                                                     ),
                                                   ),
-                                                ),
-                                          )
-                                          .toList(),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          selectedCustomerId = value;
-                                        });
-                                      },
-                                      validator: (value) {
-                                        if (value == null) {
-                                          return 'يرجى اختيار العميل';
-                                        }
-                                        return null;
-                                      },
+                                            )
+                                            .toList(),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            selectedCustomerId = value;
+                                          });
+                                        },
+                                        validator: (value) {
+                                          if (value == null) {
+                                            return 'يرجى اختيار العميل';
+                                          }
+                                          return null;
+                                        },
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 16),
+                                    const SizedBox(height: 16),
 
-                                  // Chicken Type Selection
-                                  _SectionCard(
-                                    title: 'نوع الدجاج (النوع)',
-                                    child: _DropdownField(
-                                      label: 'نوع الدجاج',
-                                      value: selectedChickenTypeId,
-                                      items: chickenTypes
-                                          .map(
-                                            (
-                                              chickenType,
-                                            ) => DropdownMenuItem<String>(
-                                              value: chickenType['_id'],
+                                    // Chicken Type Selection
+                                    _SectionCard(
+                                      title: 'نوع الدجاج (النوع)',
+                                      child: _DropdownField(
+                                        label: 'نوع الدجاج',
+                                        value: selectedChickenTypeId,
+                                        items: chickenTypes
+                                            .map(
+                                              (
+                                                chickenType,
+                                              ) => DropdownMenuItem<String>(
+                                                value: chickenType['_id'],
+                                                child: Row(
+                                                  children: [
+                                                    Text(
+                                                      chickenType['name'],
+                                                      style: const TextStyle(
+                                                        color: Colors.black,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 10),
+                                                    Text(
+                                                      'متاح: ${chickenType['stock']}',
+                                                      style: TextStyle(
+                                                        color: Colors.grey[600],
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            selectedChickenTypeId = value;
+                                          });
+                                        },
+                                        validator: (value) {
+                                          if (value == null) {
+                                            return 'يرجى اختيار نوع الدجاج';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+
+                                    // التحميل - Input Fields
+                                    _SectionCard(
+                                      title: 'بيانات التحميل',
+                                      child: Column(
+                                        children: [
+                                          if (selectedChickenTypeId != null)
+                                            Container(
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue[50],
+                                                border: Border.all(
+                                                  color: Colors.blue[200]!,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
                                               child: Row(
                                                 children: [
+                                                  Icon(
+                                                    Icons.info_outline,
+                                                    color: Colors.blue[700],
+                                                    size: 20,
+                                                  ),
+                                                  const SizedBox(width: 8),
                                                   Text(
-                                                    chickenType['name'],
-                                                    style: const TextStyle(
-                                                      color: Colors.black,
+                                                    'النوع المحدد: ',
+                                                    style: TextStyle(
+                                                      color: Colors.blue[700],
                                                       fontWeight:
-                                                          FontWeight.w500,
+                                                          FontWeight.w600,
                                                     ),
                                                   ),
-                                                  const SizedBox(width: 10),
                                                   Text(
-                                                    'متاح: ${chickenType['stock']}',
+                                                    chickenTypes.firstWhere(
+                                                      (type) =>
+                                                          type['_id'] ==
+                                                          selectedChickenTypeId,
+                                                    )['name'],
                                                     style: TextStyle(
-                                                      color: Colors.grey[600],
-                                                      fontSize: 12,
+                                                      color: Colors.blue[700],
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  const Spacer(),
+                                                  Text(
+                                                    'المتاح: ${_getAvailableStock()}',
+                                                    style: TextStyle(
+                                                      color: Colors.blue[600],
+                                                      fontWeight:
+                                                          FontWeight.w600,
                                                     ),
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                          )
-                                          .toList(),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          selectedChickenTypeId = value;
-                                        });
-                                      },
-                                      validator: (value) {
-                                        if (value == null) {
-                                          return 'يرجى اختيار نوع الدجاج';
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
+                                          const SizedBox(height: 16),
 
-                                  // التحميل - Input Fields
-                                  _SectionCard(
-                                    title: 'بيانات التحميل',
-                                    child: Column(
-                                      children: [
-                                        if (selectedChickenTypeId != null)
-                                          Container(
-                                            padding: const EdgeInsets.all(12),
-                                            decoration: BoxDecoration(
-                                              color: Colors.blue[50],
-                                              border: Border.all(
-                                                color: Colors.blue[200]!,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.info_outline,
-                                                  color: Colors.blue[700],
-                                                  size: 20,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  'النوع المحدد: ',
-                                                  style: TextStyle(
-                                                    color: Colors.blue[700],
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  chickenTypes.firstWhere(
-                                                    (type) =>
-                                                        type['_id'] ==
-                                                        selectedChickenTypeId,
-                                                  )['name'],
-                                                  style: TextStyle(
-                                                    color: Colors.blue[700],
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                const Spacer(),
-                                                Text(
-                                                  'المتاح: ${_getAvailableStock()}',
-                                                  style: TextStyle(
-                                                    color: Colors.blue[600],
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
+                                          // Input Fields - Vertical Layout
+                                          _NumField(
+                                            label: 'العدد',
+                                            controller: _quantityController,
+                                            validator: (value) {
+                                              if (value == null ||
+                                                  value.isEmpty) {
+                                                return 'يرجى إدخال العدد';
+                                              }
+                                              final quantity = double.tryParse(
+                                                value,
+                                              );
+                                              if (quantity == null ||
+                                                  quantity <= 0) {
+                                                return 'يرجى إدخال عدد صحيح';
+                                              }
+                                              final available =
+                                                  _getAvailableStock()
+                                                      .toDouble();
+                                              if (selectedChickenTypeId !=
+                                                      null &&
+                                                  quantity > available) {
+                                                return 'العدد يتجاوز المتاح: ${_getAvailableStock()}';
+                                              }
+                                              return null;
+                                            },
                                           ),
-                                        const SizedBox(height: 16),
+                                          const SizedBox(height: 12),
 
-                                        // Input Fields - Vertical Layout
-                                        _NumField(
-                                          label: 'العدد',
-                                          controller: _quantityController,
-                                          validator: (value) {
-                                            if (value == null ||
-                                                value.isEmpty) {
-                                              return 'يرجى إدخال العدد';
-                                            }
-                                            final quantity = double.tryParse(
-                                              value,
-                                            );
-                                            if (quantity == null ||
-                                                quantity <= 0) {
-                                              return 'يرجى إدخال عدد صحيح';
-                                            }
-                                            final available =
-                                                _getAvailableStock().toDouble();
-                                            if (selectedChickenTypeId != null &&
-                                                quantity > available) {
-                                              return 'العدد يتجاوز المتاح: ${_getAvailableStock()}';
-                                            }
-                                            return null;
-                                          },
-                                        ),
-                                        const SizedBox(height: 12),
-
-                                        _NumField(
-                                          label: 'الوزن القائم (كيلو)',
-                                          controller: _grossWeightController,
-                                          validator: (value) {
-                                            if (value == null ||
-                                                value.isEmpty) {
-                                              return 'يرجى إدخال الوزن القائم';
-                                            }
-                                            final weight = double.tryParse(
-                                              value,
-                                            );
-                                            if (weight == null || weight <= 0) {
-                                              return 'يرجى إدخال وزن صحيح';
-                                            }
-                                            return null;
-                                          },
-                                        ),
-                                        const SizedBox(height: 12),
-
-                                        _NumField(
-                                          label: 'سعر التحميل (EGP/كيلو)',
-                                          controller: _loadingPriceController,
-                                          validator: (value) {
-                                            if (value == null ||
-                                                value.isEmpty) {
-                                              return 'يرجى إدخال سعر التحميل';
-                                            }
-                                            final price = double.tryParse(
-                                              value,
-                                            );
-                                            if (price == null || price <= 0) {
-                                              return 'يرجى إدخال سعر صحيح';
-                                            }
-                                            return null;
-                                          },
-                                        ),
-                                        const SizedBox(height: 12),
-
-                                        _NumField(
-                                          label: 'الوزن الصافي (يحسب تلقائياً)',
-                                          controller: _netWeightController,
-                                          enabled: false,
-                                        ),
-                                        const SizedBox(height: 12),
-
-                                        _NumField(
-                                          label: 'إجمالي التحميل (EGP)',
-                                          controller: _totalLoadingController,
-                                          enabled: false,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-
-                                  // Submit Button
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      onPressed: isSubmitting
-                                          ? null
-                                          : _submitOrder,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 14,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
+                                          _NumField(
+                                            label: 'الوزن القائم (كيلو)',
+                                            controller: _grossWeightController,
+                                            validator: (value) {
+                                              if (value == null ||
+                                                  value.isEmpty) {
+                                                return 'يرجى إدخال الوزن القائم';
+                                              }
+                                              final weight = double.tryParse(
+                                                value,
+                                              );
+                                              if (weight == null ||
+                                                  weight <= 0) {
+                                                return 'يرجى إدخال وزن صحيح';
+                                              }
+                                              return null;
+                                            },
                                           ),
-                                        ),
+                                          const SizedBox(height: 12),
+
+                                          _NumField(
+                                            label: 'سعر التحميل (EGP/كيلو)',
+                                            controller: _loadingPriceController,
+                                            validator: (value) {
+                                              if (value == null ||
+                                                  value.isEmpty) {
+                                                return 'يرجى إدخال سعر التحميل';
+                                              }
+                                              final price = double.tryParse(
+                                                value,
+                                              );
+                                              if (price == null || price <= 0) {
+                                                return 'يرجى إدخال سعر صحيح';
+                                              }
+                                              return null;
+                                            },
+                                          ),
+                                          const SizedBox(height: 12),
+
+                                          _NumField(
+                                            label:
+                                                'الوزن الصافي (يحسب تلقائياً)',
+                                            controller: _netWeightController,
+                                            enabled: false,
+                                          ),
+                                          const SizedBox(height: 12),
+
+                                          _NumField(
+                                            label: 'إجمالي التحميل (EGP)',
+                                            controller: _totalLoadingController,
+                                            enabled: false,
+                                          ),
+                                        ],
                                       ),
-                                      child: isSubmitting
-                                          ? const CircularProgressIndicator(
-                                              color: Colors.white,
-                                            )
-                                          : const Text(
-                                              'تسجيل التحميل',
-                                              style: TextStyle(
-                                                fontSize: 16,
+                                    ),
+                                    const SizedBox(height: 24),
+
+                                    // Submit Button
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        onPressed: isSubmitting
+                                            ? null
+                                            : _submitOrder,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 14,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                        ),
+                                        child: isSubmitting
+                                            ? const CircularProgressIndicator(
                                                 color: Colors.white,
-                                                fontWeight: FontWeight.w700,
+                                              )
+                                            : const Text(
+                                                'تسجيل التحميل',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
                                               ),
-                                            ),
+                                      ),
                                     ),
-                                  ),
 
-                                  const SizedBox(height: 16),
+                                    const SizedBox(height: 16),
 
-                                  // Generate Invoice Button
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: OutlinedButton.icon(
-                                      onPressed: isOrderSubmitted
-                                          ? _generateInvoice
-                                          : null,
-                                      icon: Icon(
-                                        Icons.receipt,
-                                        color: isOrderSubmitted
-                                            ? Theme.of(
-                                                context,
-                                              ).colorScheme.primary
-                                            : Colors.grey,
-                                      ),
-                                      label: Text(
-                                        'إنشاء فاتورة التحميل',
-                                        style: TextStyle(
-                                          color: isOrderSubmitted
-                                              ? Theme.of(
-                                                  context,
-                                                ).colorScheme.primary
-                                              : Colors.grey,
+                                    // History Button
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton.icon(
+                                        onPressed: _showLoadingHistory,
+                                        icon: Icon(
+                                          Icons.history,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
                                         ),
-                                      ),
-                                      style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 14,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
+                                        label: Text(
+                                          'سجل التحميلات',
+                                          style: TextStyle(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
                                           ),
                                         ),
-                                        side: BorderSide(
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 14,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          side: BorderSide(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+
+                                    const SizedBox(height: 16),
+
+                                    // Generate Invoice Button
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton.icon(
+                                        onPressed: isOrderSubmitted
+                                            ? _generateInvoice
+                                            : null,
+                                        icon: Icon(
+                                          Icons.receipt,
                                           color: isOrderSubmitted
                                               ? Theme.of(
                                                   context,
                                                 ).colorScheme.primary
                                               : Colors.grey,
                                         ),
+                                        label: Text(
+                                          'إنشاء فاتورة التحميل',
+                                          style: TextStyle(
+                                            color: isOrderSubmitted
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary
+                                                : Colors.grey,
+                                          ),
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 14,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          side: BorderSide(
+                                            color: isOrderSubmitted
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary
+                                                : Colors.grey,
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -919,7 +987,9 @@ class _HeaderBar extends StatelessWidget {
           // Back button
           IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/employee-dashboard'),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
           ),
           const SizedBox(width: 8),
           // صورة/أفاتار
@@ -1126,6 +1196,320 @@ class _DropdownField extends StatelessWidget {
       ),
       dropdownColor: Colors.white,
       icon: const Icon(Icons.arrow_drop_down, color: Colors.black),
+    );
+  }
+}
+
+class _LoadingHistoryDialog extends StatefulWidget {
+  @override
+  _LoadingHistoryDialogState createState() => _LoadingHistoryDialogState();
+}
+
+class _LoadingHistoryDialogState extends State<_LoadingHistoryDialog> {
+  late final LoadingApiService _loadingService;
+  List<Map<String, dynamic>> _loadings = [];
+  bool _isLoading = true;
+  DateTime _selectedDate = DateTime.now();
+  String? _error;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadingService = serviceLocator<LoadingApiService>();
+    _loadLoadingsForDate(_selectedDate);
+  }
+
+  Future<void> _loadLoadingsForDate(DateTime date) async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final allLoadings = await _loadingService.getAllLoadings();
+
+      // Filter loadings by selected date
+      final filteredLoadings = allLoadings.where((loading) {
+        final loadingDate = DateTime.parse(
+          loading['createdAt'] ?? loading['date'] ?? '',
+        );
+        return loadingDate.year == date.year &&
+            loadingDate.month == date.month &&
+            loadingDate.day == date.day;
+      }).toList();
+
+      setState(() {
+        _loadings = filteredLoadings;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _selectDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2024, 1, 1),
+      lastDate: DateTime.now(),
+    );
+
+    if (picked != null && picked != _selectedDate) {
+      setState(() => _selectedDate = picked);
+      _loadLoadingsForDate(picked);
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredLoadings {
+    if (_searchQuery.isEmpty) return _loadings;
+
+    return _loadings.where((loading) {
+      final customerName =
+          loading['customer']?['name']?.toString().toLowerCase() ?? '';
+      final chickenType =
+          loading['chickenType']?['name']?.toString().toLowerCase() ?? '';
+      final query = _searchQuery.toLowerCase();
+
+      return customerName.contains(query) || chickenType.contains(query);
+    }).toList();
+  }
+
+  double _calculateTotalWeight() {
+    return _filteredLoadings.fold<double>(0.0, (sum, loading) {
+      final netWeight = (loading['netWeight'] ?? 0) as num;
+      return sum + netWeight.toDouble();
+    });
+  }
+
+  double _calculateTotalValue() {
+    return _filteredLoadings.fold<double>(0.0, (sum, loading) {
+      final totalLoading = (loading['totalLoading'] ?? 0) as num;
+      return sum + totalLoading.toDouble();
+    });
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  String _formatDateTime(String? dateTime) {
+    if (dateTime == null) return 'غير معروف';
+    try {
+      final dt = DateTime.parse(dateTime);
+      return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return 'تاريخ غير صحيح';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('سجل التحميلات'),
+        backgroundColor: Theme.of(context).primaryColor,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => _loadLoadingsForDate(_selectedDate),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Header with date selector and search
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.grey[50],
+            child: Column(
+              children: [
+                // Date selector
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today, color: Colors.blue),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'تاريخ التحميل:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.calendar_today, size: 16),
+                      label: Text(_formatDate(_selectedDate)),
+                      onPressed: _selectDate,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Search bar
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'البحث في العملاء أو نوع الدجاج...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          // Summary cards
+          if (!_isLoading && _filteredLoadings.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Card(
+                      color: Colors.blue[50],
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.scale,
+                              color: Colors.blue,
+                              size: 24,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${_calculateTotalWeight().toStringAsFixed(1)} كجم',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Text('إجمالي الوزن'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Card(
+                      color: Colors.green[50],
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.attach_money,
+                              color: Colors.green,
+                              size: 24,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${_calculateTotalValue().toStringAsFixed(0)} ج.م',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Text('إجمالي القيمة'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Loading list
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error, size: 64, color: Colors.red),
+                        const SizedBox(height: 16),
+                        Text('خطأ: $_error'),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => _loadLoadingsForDate(_selectedDate),
+                          child: const Text('إعادة المحاولة'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _filteredLoadings.isEmpty
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.inbox, size: 64, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text('لا توجد تحميلات في هذا التاريخ'),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredLoadings.length,
+                    itemBuilder: (context, index) {
+                      final loading = _filteredLoadings[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.blue[100],
+                            child: const Icon(
+                              Icons.local_shipping,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          title: Text(
+                            loading['customer']?['name'] ?? 'عميل غير معروف',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'نوع الدجاج: ${loading['chickenType']?['name'] ?? 'غير محدد'}',
+                              ),
+                              Text('الكمية: ${loading['quantity']}'),
+                              Text('الوزن الصافي: ${loading['netWeight']} كجم'),
+                              Text(
+                                'إجمالي التحميل: ${loading['totalLoading']} ج.م',
+                              ),
+                              Text(
+                                'التاريخ: ${_formatDateTime(loading['createdAt'])}',
+                              ),
+                            ],
+                          ),
+                          isThreeLine: true,
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -28,133 +28,141 @@ class EmployeeDashboardView extends StatelessWidget {
               ),
             ],
           ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Welcome Card
-                Card(
-                  elevation: 4,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundColor: Theme.of(context).primaryColor,
-                          child: Text(
-                            user?.username.substring(0, 1).toUpperCase() ?? 'م',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+          body: RefreshIndicator(
+            onRefresh: () async {
+              // Refresh functionality - could be expanded to reload user data
+              await Future.delayed(const Duration(milliseconds: 500));
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Welcome Card
+                  Card(
+                    elevation: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 30,
+                            backgroundColor: Theme.of(context).primaryColor,
+                            child: Text(
+                              user?.username.substring(0, 1).toUpperCase() ??
+                                  'م',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'مرحباً بك!',
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                user?.username ?? 'موظف',
-                                style: Theme.of(context).textTheme.bodyLarge
-                                    ?.copyWith(color: Colors.grey[600]),
-                              ),
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'مرحباً بك!',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.secondary.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(12),
+                                const SizedBox(height: 4),
+                                Text(
+                                  user?.username ?? 'موظف',
+                                  style: Theme.of(context).textTheme.bodyLarge
+                                      ?.copyWith(color: Colors.grey[600]),
                                 ),
-                                child: Text(
-                                  'موظف',
-                                  style: TextStyle(
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
                                     color: Theme.of(
                                       context,
-                                    ).colorScheme.secondary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                                    ).colorScheme.secondary.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    'موظف',
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.secondary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                // Quick Actions
-                Text(
-                  'الإجراءات السريعة',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  children: [
-                    _buildActionCard(
-                      context,
-                      'التقرير اليومي',
-                      Icons.assessment,
-                      Theme.of(context).colorScheme.primary,
-                      () => context.go('/daily-report'),
+                  // Quick Actions
+                  Text(
+                    'الإجراءات السريعة',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
-                    _buildActionCard(
-                      context,
-                      'التحميل',
-                      Icons.add_shopping_cart,
-                      Theme.of(context).colorScheme.secondary,
-                      () => context.go('/order-placement'),
-                    ),
-                    _buildActionCard(
-                      context,
-                      'التوزيع',
-                      Icons.horizontal_distribute,
-                      Theme.of(context).colorScheme.secondary,
-                      () => context.go('/distribution'),
-                    ),
-                    _buildActionCard(
-                      context,
-                      'تحصيل الدفع',
-                      Icons.payment,
-                      Theme.of(context).colorScheme.tertiary ??
-                          Theme.of(context).colorScheme.primary,
-                      () => context.go('/payment-collection'),
-                    ),
-                    _buildActionCard(
-                      context,
-                      'مصروفات الطلب',
-                      Icons.money_off,
-                      Theme.of(context).colorScheme.error,
-                      () => context.go('/expenses'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-              ],
+                  ),
+                  const SizedBox(height: 16),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    children: [
+                      _buildActionCard(
+                        context,
+                        'التقرير اليومي',
+                        Icons.assessment,
+                        Theme.of(context).colorScheme.primary,
+                        () => context.push('/daily-report'),
+                      ),
+                      _buildActionCard(
+                        context,
+                        'التحميل',
+                        Icons.add_shopping_cart,
+                        Theme.of(context).colorScheme.secondary,
+                        () => context.push('/order-placement'),
+                      ),
+                      _buildActionCard(
+                        context,
+                        'التوزيع',
+                        Icons.horizontal_distribute,
+                        Theme.of(context).colorScheme.secondary,
+                        () => context.push('/distribution'),
+                      ),
+                      _buildActionCard(
+                        context,
+                        'تحصيل الدفع',
+                        Icons.payment,
+                        Theme.of(context).colorScheme.tertiary ??
+                            Theme.of(context).colorScheme.primary,
+                        () => context.push('/payment-collection'),
+                      ),
+                      _buildActionCard(
+                        context,
+                        'مصروفات الطلب',
+                        Icons.money_off,
+                        Theme.of(context).colorScheme.error,
+                        () => context.push('/expenses'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
         ),
