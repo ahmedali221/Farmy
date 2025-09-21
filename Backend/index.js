@@ -62,7 +62,9 @@ app.use('/api/employee-expenses', auth(['manager', 'employee']), employeeExpense
 app.use('/api/distributions', auth(['manager', 'employee']), distributionRoutes);
 // Stocks endpoints
 app.get('/api/stocks/week', auth(['manager']), dailyStockController.getWeek);
+app.get('/api/stocks/by-date', auth(['manager']), dailyStockController.getByDate);
 app.post('/api/stocks/upsert', auth(['manager']), dailyStockController.upsertForDate);
+app.get('/api/stocks/profit', auth(['manager']), dailyStockController.getDailyProfit);
 
 app.use(errorHandler);
 

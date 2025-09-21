@@ -158,203 +158,213 @@ class _PaymentHistoryViewState extends State<PaymentHistoryView> {
               ),
             ],
           ),
-          body: Column(
-            children: [
-              // Header with date selector and search
-              Container(
-                padding: const EdgeInsets.all(16),
-                color: Colors.grey[50],
-                child: Column(
-                  children: [
-                    // Date selector
-                    Row(
+          body: RefreshIndicator(
+            onRefresh: () => _loadPaymentsForDate(_selectedDate),
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                children: [
+                  // Header with date selector and search
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    color: Colors.grey[50],
+                    child: Column(
                       children: [
-                        const Icon(Icons.calendar_today, color: Colors.blue),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'تاريخ الدفع:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                        // Date selector
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.calendar_today,
+                              color: Colors.blue,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'تاريخ الدفع:',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            const Spacer(),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.calendar_today, size: 16),
+                              label: Text(_formatDate(_selectedDate)),
+                              onPressed: _selectDate,
+                            ),
+                          ],
                         ),
-                        const Spacer(),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today, size: 16),
-                          label: Text(_formatDate(_selectedDate)),
-                          onPressed: _selectDate,
+                        const SizedBox(height: 12),
+                        // Search bar
+                        TextField(
+                          decoration: InputDecoration(
+                            hintText: 'البحث في العملاء أو الموظفين...',
+                            prefixIcon: const Icon(Icons.search),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    // Search bar
-                    TextField(
-                      decoration: InputDecoration(
-                        hintText: 'البحث في العملاء أو الموظفين...',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              // Summary cards
-              if (!_isLoading && _filteredPayments.isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Card(
-                          color: Colors.green[50],
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              children: [
-                                const Icon(
-                                  Icons.attach_money,
-                                  color: Colors.green,
-                                  size: 24,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '${_calculateTotalPaid().toStringAsFixed(0)} ج.م',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const Text('إجمالي المدفوع'),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Card(
-                          color: Colors.orange[50],
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              children: [
-                                const Icon(
-                                  Icons.discount,
-                                  color: Colors.orange,
-                                  size: 24,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '${_calculateTotalDiscount().toStringAsFixed(0)} ج.م',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const Text('إجمالي الخصم'),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
-                ),
-              ],
 
-              // Payment list
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () => _loadPaymentsForDate(_selectedDate),
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _error != null
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.error,
-                                size: 64,
-                                color: Colors.red,
-                              ),
-                              const SizedBox(height: 16),
-                              Text('خطأ: $_error'),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: () =>
-                                    _loadPaymentsForDate(_selectedDate),
-                                child: const Text('إعادة المحاولة'),
-                              ),
-                            ],
-                          ),
-                        )
-                      : _filteredPayments.isEmpty
-                      ? const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.inbox, size: 64, color: Colors.grey),
-                              SizedBox(height: 16),
-                              Text('لا توجد مدفوعات في هذا التاريخ'),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _filteredPayments.length,
-                          itemBuilder: (context, index) {
-                            final payment = _filteredPayments[index];
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Colors.green[100],
-                                  child: const Icon(
-                                    Icons.payment,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                                title: Text(
-                                  payment['customer']?['name'] ??
-                                      'عميل غير معروف',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                  // Summary cards
+                  if (!_isLoading && _filteredPayments.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Card(
+                              color: Colors.green[50],
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
                                   children: [
-                                    Text(
-                                      'الموظف: ${payment['employee']?['username'] ?? 'غير محدد'}',
+                                    const Icon(
+                                      Icons.attach_money,
+                                      color: Colors.green,
+                                      size: 24,
                                     ),
+                                    const SizedBox(height: 8),
                                     Text(
-                                      'المبلغ المدفوع: ${payment['paidAmount']} ج.م',
+                                      '${_calculateTotalPaid().toStringAsFixed(0)} ج.م',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                    Text('الخصم: ${payment['discount']} ج.م'),
-                                    Text(
-                                      'طريقة الدفع: ${_getPaymentMethodText(payment['paymentMethod'])}',
-                                    ),
-                                    Text(
-                                      'التاريخ: ${_formatDateTime(payment['createdAt'])}',
-                                    ),
+                                    const Text('إجمالي المدفوع'),
                                   ],
                                 ),
-                                isThreeLine: true,
                               ),
-                            );
-                          },
-                        ),
-                ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Card(
+                              color: Colors.orange[50],
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  children: [
+                                    const Icon(
+                                      Icons.discount,
+                                      color: Colors.orange,
+                                      size: 24,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '${_calculateTotalDiscount().toStringAsFixed(0)} ج.م',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const Text('إجمالي الخصم'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Payment list
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _error != null
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.error,
+                                  size: 64,
+                                  color: Colors.red,
+                                ),
+                                const SizedBox(height: 16),
+                                Text('خطأ: $_error'),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: () =>
+                                      _loadPaymentsForDate(_selectedDate),
+                                  child: const Text('إعادة المحاولة'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : _filteredPayments.isEmpty
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.inbox, size: 64, color: Colors.grey),
+                                SizedBox(height: 16),
+                                Text('لا توجد مدفوعات في هذا التاريخ'),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _filteredPayments.length,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemBuilder: (context, index) {
+                              final payment = _filteredPayments[index];
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.green[100],
+                                    child: const Icon(
+                                      Icons.payment,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    payment['customer']?['name'] ??
+                                        'عميل غير معروف',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'الموظف: ${payment['employee']?['username'] ?? 'غير محدد'}',
+                                      ),
+                                      Text(
+                                        'المبلغ المدفوع: ${payment['paidAmount']} ج.م',
+                                      ),
+                                      Text('الخصم: ${payment['discount']} ج.م'),
+                                      Text(
+                                        'طريقة الدفع: ${_getPaymentMethodText(payment['paymentMethod'])}',
+                                      ),
+                                      Text(
+                                        'التاريخ: ${_formatDateTime(payment['createdAt'])}',
+                                      ),
+                                    ],
+                                  ),
+                                  isThreeLine: true,
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

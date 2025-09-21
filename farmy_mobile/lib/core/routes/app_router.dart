@@ -12,6 +12,7 @@ import '../../features/dashboard/views/admin/Inventory/inventory_management_view
 import '../../features/dashboard/views/admin/order_detail_view.dart';
 import '../../features/dashboard/views/admin/Employees Section/employee_orders_view.dart';
 import '../../features/dashboard/views/admin/Customers Section/customer_loading_orders_view.dart';
+import '../../features/dashboard/views/admin/Customers Section/customer_history_view.dart';
 import '../../features/dashboard/views/employee/daily_report_screen.dart';
 import '../../features/dashboard/views/employee/order_placement_view.dart';
 import '../../features/dashboard/views/employee/payment_collection_view.dart';
@@ -143,6 +144,19 @@ class AppRouter {
               customer: extra['customer'],
               loadingOrders: extra['loadingOrders'],
             );
+          },
+        ),
+        GoRoute(
+          path: '/customer-history',
+          name: 'customer-history',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>?;
+            if (extra == null) {
+              return const Scaffold(
+                body: Center(child: Text('Customer data not found')),
+              );
+            }
+            return CustomerHistoryView(customer: extra['customer']);
           },
         ),
         // Employee Routes

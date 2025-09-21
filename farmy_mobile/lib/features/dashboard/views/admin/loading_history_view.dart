@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/loading_api_service.dart';
+import '../../../../core/services/inventory_api_service.dart';
 
 class LoadingHistoryView extends StatefulWidget {
   const LoadingHistoryView({super.key});
@@ -12,16 +13,19 @@ class LoadingHistoryView extends StatefulWidget {
 
 class _LoadingHistoryViewState extends State<LoadingHistoryView> {
   late final LoadingApiService _loadingService;
+  late final InventoryApiService _inventoryService;
   List<Map<String, dynamic>> _loadings = [];
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
   String? _error;
   String _searchQuery = '';
+  Map<String, dynamic>? _dailyStock;
 
   @override
   void initState() {
     super.initState();
     _loadingService = serviceLocator<LoadingApiService>();
+    _inventoryService = serviceLocator<InventoryApiService>();
     _loadLoadingsForDate(_selectedDate);
   }
 
@@ -34,18 +38,57 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
     try {
       final allLoadings = await _loadingService.getAllLoadings();
 
-      // Filter loadings by selected date
+      // Filter loadings strictly by operational date (loadingDate preferred)
       final filteredLoadings = allLoadings.where((loading) {
-        final loadingDate = DateTime.parse(
-          loading['createdAt'] ?? loading['date'] ?? '',
-        );
-        return loadingDate.year == date.year &&
-            loadingDate.month == date.month &&
-            loadingDate.day == date.day;
+        final String? raw =
+            (loading['loadingDate'] ?? loading['createdAt'] ?? loading['date'])
+                ?.toString();
+        if (raw == null || raw.isEmpty) return false;
+        DateTime dt;
+        try {
+          dt = DateTime.parse(raw);
+        } catch (_) {
+          return false;
+        }
+        return dt.year == date.year &&
+            dt.month == date.month &&
+            dt.day == date.day;
       }).toList();
+
+      // Debug totals for the selected day
+      final totalNetWeight = filteredLoadings.fold<num>(0, (sum, loading) {
+        final net = (loading['netWeight'] ?? 0) as num;
+        return sum + net;
+      });
+      debugPrint(
+        '[LoadingHistory] date=${_formatDate(date)} entries=${filteredLoadings.length}',
+      );
+      debugPrint('[LoadingHistory] totalNetWeight=$totalNetWeight');
+      for (final loading in filteredLoadings) {
+        final id = (loading['_id']?.toString() ?? '')
+            .padRight(8)
+            .substring(0, 8);
+        final net = (loading['netWeight'] ?? 0);
+        final createdAt = loading['createdAt'] ?? loading['date'];
+        debugPrint(
+          '[LoadingHistory] item#$id netWeight=$net createdAt=$createdAt',
+        );
+      }
+
+      // Fetch daily stock totals from backend for the selected date
+      final day = DateTime(date.year, date.month, date.day);
+      final daily = await _inventoryService.getDailyInventoryByDate(
+        day.toIso8601String(),
+      );
+
+      // Debug compare list-sum vs system daily
+      final sysNet = (daily['netLoadingWeight'] ?? 0) as num;
+      debugPrint('[LoadingHistory] system.netLoadingWeight=$sysNet');
+      debugPrint('[LoadingHistory] list.totalNetWeight=$totalNetWeight');
 
       setState(() {
         _loadings = filteredLoadings;
+        _dailyStock = daily;
         _isLoading = false;
       });
     } catch (e) {
@@ -112,6 +155,16 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
     }
   }
 
+  void _navigateToCustomerHistory(
+    BuildContext context,
+    Map<String, dynamic> loading,
+  ) {
+    final customer = loading['customer'];
+    if (customer != null) {
+      context.push('/customer-history', extra: {'customer': customer});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -143,100 +196,159 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
                 icon: const Icon(Icons.refresh),
                 onPressed: () => _loadLoadingsForDate(_selectedDate),
               ),
-            ],
-          ),
-          body: Column(
-            children: [
-              // Header with date selector and search
-              Container(
-                padding: const EdgeInsets.all(16),
-                color: Colors.grey[50],
-                child: Column(
-                  children: [
-                    // Date selector
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today, color: Colors.blue),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'تاريخ التحميل:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+              IconButton(
+                icon: const Icon(Icons.delete_forever),
+                tooltip: 'حذف كل سجلات التحميل',
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('تأكيد الحذف'),
+                      content: const Text(
+                        'هل أنت متأكد من حذف جميع سجلات التحميل؟ لا يمكن التراجع.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('إلغاء'),
                         ),
-                        const Spacer(),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today, size: 16),
-                          label: Text(_formatDate(_selectedDate)),
-                          onPressed: _selectDate,
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: const Text('حذف'),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    // Search bar
-                    TextField(
-                      decoration: InputDecoration(
-                        hintText: 'البحث في العملاء أو نوع الدجاج...',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  );
+                  if (confirm == true) {
+                    try {
+                      await _loadingService.deleteAllLoadings();
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('تم حذف كل سجلات التحميل'),
                         ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              // Summary cards
-              if (!_isLoading && _filteredLoadings.isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildSummaryCard(
-                          'عدد الطلبات',
-                          _filteredLoadings.length.toString(),
-                          Icons.list_alt,
-                          Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildSummaryCard(
-                          'إجمالي الوزن',
-                          '${_calculateTotalWeight().toStringAsFixed(1)} كجم',
-                          Icons.scale,
-                          Colors.green,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildSummaryCard(
-                          'إجمالي القيمة',
-                          '${_calculateTotalValue().toStringAsFixed(0)} ج.م',
-                          Icons.attach_money,
-                          Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              // Content
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () => _loadLoadingsForDate(_selectedDate),
-                  child: _buildContent(),
-                ),
+                      );
+                      await _loadLoadingsForDate(_selectedDate);
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('فشل الحذف: $e')));
+                    }
+                  }
+                },
               ),
             ],
+          ),
+          body: RefreshIndicator(
+            onRefresh: () => _loadLoadingsForDate(_selectedDate),
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                children: [
+                  // Header with date selector and search
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    color: Colors.grey[50],
+                    child: Column(
+                      children: [
+                        // Date selector
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.calendar_today,
+                              color: Colors.blue,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'تاريخ التحميل:',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            const Spacer(),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.calendar_today, size: 16),
+                              label: Text(_formatDate(_selectedDate)),
+                              onPressed: _selectDate,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Search bar
+                        TextField(
+                          decoration: InputDecoration(
+                            hintText: 'البحث في العملاء أو نوع الدجاج...',
+                            prefixIcon: const Icon(Icons.search),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Summary list (more compact & readable)
+                  if (!_isLoading && _filteredLoadings.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Card(
+                        elevation: 1,
+                        child: Column(
+                          children: [
+                            ListTile(
+                              leading: const Icon(Icons.info_outline),
+                              title: const Text('ملخص اليوم'),
+                              subtitle: Text(_formatDate(_selectedDate)),
+                            ),
+                            const Divider(height: 1),
+                            _buildSummaryTile(
+                              'عدد الطلبات',
+                              _filteredLoadings.length.toString(),
+                              Icons.list_alt,
+                              Colors.blue,
+                            ),
+                            const Divider(height: 1),
+                            _buildSummaryTile(
+                              'إجمالي الوزن (حسب القائمة)',
+                              '${_calculateTotalWeight().toStringAsFixed(1)} كجم',
+                              Icons.scale,
+                              Colors.green,
+                            ),
+                            const Divider(height: 1),
+                            _buildSummaryTile(
+                              'وزن اليوم (من النظام)',
+                              '${((_dailyStock?['netLoadingWeight'] ?? 0) as num).toDouble().toStringAsFixed(1)} كجم',
+                              Icons.calendar_today,
+                              Colors.purple,
+                            ),
+                            const Divider(height: 1),
+                            _buildSummaryTile(
+                              'إجمالي القيمة',
+                              '${_calculateTotalValue().toStringAsFixed(0)} ج.م',
+                              Icons.attach_money,
+                              Colors.orange,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // Content
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _buildContent(),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -308,6 +420,8 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _filteredLoadings.length,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemBuilder: (context, index) {
         final loading = _filteredLoadings[index];
         return _buildLoadingCard(loading);
@@ -315,36 +429,23 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
     );
   }
 
-  Widget _buildSummaryCard(
+  Widget _buildSummaryTile(
     String title,
     String value,
     IconData icon,
     Color color,
   ) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: color.withOpacity(0.1),
+        child: Icon(icon, color: color),
       ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      trailing: Text(
+        value,
+        style: TextStyle(color: color, fontWeight: FontWeight.bold),
+      ),
+      dense: true,
     );
   }
 
@@ -435,14 +536,23 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
           ),
           const Divider(height: 1),
 
-          ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.orange.withOpacity(0.1),
-              child: const Icon(Icons.person, color: Colors.orange, size: 20),
+          GestureDetector(
+            onTap: () => _navigateToCustomerHistory(context, loading),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Colors.orange.withOpacity(0.1),
+                child: const Icon(Icons.person, color: Colors.orange, size: 20),
+              ),
+              title: const Text('العميل'),
+              subtitle: Text(
+                customerName,
+                style: const TextStyle(
+                  color: Colors.blue,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+              dense: true,
             ),
-            title: const Text('العميل'),
-            subtitle: Text(customerName),
-            dense: true,
           ),
           const Divider(height: 1),
 

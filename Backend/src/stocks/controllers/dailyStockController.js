@@ -1,5 +1,8 @@
 const DailyStock = require('../models/DailyStock');
-const Order = require('../../orders/models/Order');
+const Loading = require('../../loadings/models/loading');
+const Distribution = require('../../distributions/models/Distribution');
+const Payment = require('../../payments/models/Payment');
+const EmployeeExpense = require('../../employeeExpenses/models/EmployeeExpense');
 const logger = require('../../utils/logger');
 
 function normalizeDate(d) {
@@ -25,25 +28,43 @@ exports.getWeek = async (req, res) => {
 
 exports.upsertForDate = async (req, res) => {
   try {
-    const { date, netDistributionWeight = 0, adminAdjustment = 0, notes } = req.body;
+    const { date, adminAdjustment = 0, notes } = req.body;
     if (!date) return res.status(400).json({ message: 'date is required' });
     const d = normalizeDate(date);
 
-    // Compute net loading weight from orders of that date
+    // Compute net loading weight from loadings of that date
     const nextDay = new Date(d);
     nextDay.setDate(d.getDate() + 1);
-    const orders = await Order.find({ orderDate: { $gte: d, $lt: nextDay } });
-    const netLoading = orders.reduce((s, o) => s + ((o.netWeight || 0)), 0);
+    const loadings = await Loading.find({
+      $or: [
+        { loadingDate: { $gte: d, $lt: nextDay } },
+        { $and: [ { loadingDate: { $exists: false } }, { createdAt: { $gte: d, $lt: nextDay } } ] },
+      ],
+    });
+    const netLoading = loadings.reduce((s, l) => s + ((l.netWeight || 0)), 0);
+    logger.info(`DailyStock upsert window ${d.toISOString()}..${nextDay.toISOString()} loadings=${loadings.length} netLoading=${netLoading}`);
 
-    const result = (netLoading - (Number(netDistributionWeight) || 0)) - (Number(adminAdjustment) || 0);
+    // Compute net distribution weight from distributions of that date
+    const distributions = await Distribution.find({
+      $or: [
+        { distributionDate: { $gte: d, $lt: nextDay } },
+        { $and: [ { distributionDate: { $exists: false } }, { createdAt: { $gte: d, $lt: nextDay } } ] },
+      ],
+    });
+    const netDistribution = distributions.reduce((s, dist) => s + ((dist.netWeight || 0)), 0);
+
+    // Use the provided adminAdjustment as the value for the day (not cumulative)
+    const newAdj = Number(adminAdjustment) || 0;
+
+    const result = (netLoading - netDistribution) - newAdj;
 
     const updated = await DailyStock.findOneAndUpdate(
       { date: d },
       {
         date: d,
         netLoadingWeight: netLoading,
-        netDistributionWeight: Number(netDistributionWeight) || 0,
-        adminAdjustment: Number(adminAdjustment) || 0,
+        netDistributionWeight: netDistribution,
+        adminAdjustment: newAdj,
         result,
         notes,
       },
@@ -54,6 +75,133 @@ exports.upsertForDate = async (req, res) => {
   } catch (err) {
     logger.error(`Error upserting daily stock: ${err.message}`);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+// Get daily stock by date without mutating data
+exports.getByDate = async (req, res) => {
+  try {
+    const { date } = req.query;
+    if (!date) return res.status(400).json({ message: 'date is required' });
+    const d = normalizeDate(date);
+
+    const nextDay = new Date(d);
+    nextDay.setDate(d.getDate() + 1);
+
+    // Compute net loading weight from loadings of that date
+    const loadings = await Loading.find({
+      $or: [
+        { loadingDate: { $gte: d, $lt: nextDay } },
+        { $and: [ { loadingDate: { $exists: false } }, { createdAt: { $gte: d, $lt: nextDay } } ] },
+      ],
+    });
+    const netLoading = loadings.reduce((s, l) => s + ((l.netWeight || 0)), 0);
+    logger.info(`DailyStock read window ${d.toISOString()}..${nextDay.toISOString()} loadings=${loadings.length} netLoading=${netLoading}`);
+
+    // Compute net distribution weight from distributions of that date
+    const distributions = await Distribution.find({
+      $or: [
+        { distributionDate: { $gte: d, $lt: nextDay } },
+        { $and: [ { distributionDate: { $exists: false } }, { createdAt: { $gte: d, $lt: nextDay } } ] },
+      ],
+    });
+    const netDistribution = distributions.reduce((s, dist) => s + ((dist.netWeight || 0)), 0);
+
+    // If there is an existing doc, return it; otherwise return computed snapshot
+    const existing = await DailyStock.findOne({ date: d });
+    if (existing) {
+      const adminAdj = Number(existing.adminAdjustment) || 0;
+      const recomputed = {
+        _id: existing._id,
+        date: d,
+        netLoadingWeight: netLoading,
+        netDistributionWeight: netDistribution,
+        adminAdjustment: adminAdj,
+        result: (netLoading - netDistribution) - adminAdj,
+        notes: existing.notes,
+        createdAt: existing.createdAt,
+        updatedAt: existing.updatedAt,
+      };
+      return res.json(recomputed);
+    }
+
+    const snapshot = {
+      date: d,
+      netLoadingWeight: netLoading,
+      netDistributionWeight: netDistribution,
+      adminAdjustment: 0,
+      result: (netLoading - netDistribution), // (netLoading - netDistribution) - 0
+      notes: undefined,
+    };
+    return res.json(snapshot);
+  } catch (err) {
+    logger.error(`Error fetching stock by date: ${err.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Daily profit:
+// الربح اليومي = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل − إجمالي المصروفات - مصروفات التحميل
+// Where:
+// - مبلغ إجمالي الوجبات: sum of distributions totalAmount for the day
+// - مبلغ إجمالي التحميل: sum of loadings totalLoading for the day
+// - إجمالي ما تم خصمه: sum of payments.discount for the day
+// - مصروفات التحميل: sum of employeeExpenses.value for the day
+exports.getDailyProfit = async (req, res) => {
+  try {
+    const { date } = req.query;
+    if (!date) return res.status(400).json({ message: 'date is required' });
+    const d = normalizeDate(date);
+    const nextDay = new Date(d);
+    nextDay.setDate(d.getDate() + 1);
+
+    const distAgg = await Distribution.aggregate([
+      { $match: { $or: [
+        { distributionDate: { $gte: d, $lt: nextDay } },
+        { $and: [ { distributionDate: { $exists: false } }, { createdAt: { $gte: d, $lt: nextDay } } ] },
+      ] } },
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$totalAmount', 0] } } } },
+    ]);
+    const distributionsTotal = (distAgg[0]?.total) || 0;
+
+    const loadAgg = await Loading.aggregate([
+      { $match: { $or: [
+        { loadingDate: { $gte: d, $lt: nextDay } },
+        { $and: [ { loadingDate: { $exists: false } }, { createdAt: { $gte: d, $lt: nextDay } } ] },
+      ] } },
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$totalLoading', 0] } } } },
+    ]);
+    const loadingsTotal = (loadAgg[0]?.total) || 0;
+
+    const expAgg = await EmployeeExpense.aggregate([
+      { $match: { createdAt: { $gte: d, $lt: nextDay } } },
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$value', 0] } } } },
+    ]);
+    const expensesTotal = (expAgg[0]?.total) || 0;
+
+    // Sum of loading prices for the day (مصروفات التحميل)
+    const loadPriceAgg = await Loading.aggregate([
+      { $match: { $or: [
+        { loadingDate: { $gte: d, $lt: nextDay } },
+        { $and: [ { loadingDate: { $exists: false } }, { createdAt: { $gte: d, $lt: nextDay } } ] },
+      ] } },
+      { $group: { _id: null, totalPrice: { $sum: { $ifNull: ['$loadingPrice', 0] } } } },
+    ]);
+    const loadingPricesSum = (loadPriceAgg[0]?.totalPrice) || 0;
+
+    const profit = distributionsTotal - loadingsTotal - expensesTotal - loadingPricesSum;
+
+    return res.json({
+      date: d,
+      profit,
+      distributionsTotal,
+      loadingsTotal,
+      expensesTotal,
+      loadingPricesSum,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 

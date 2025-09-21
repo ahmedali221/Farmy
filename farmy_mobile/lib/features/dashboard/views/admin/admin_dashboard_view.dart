@@ -197,74 +197,6 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
               ),
               const SizedBox(height: 24),
 
-              // Statistics Cards
-              Text(
-                'نظرة عامة',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              if (isLoading)
-                const Center(child: CircularProgressIndicator())
-              else
-                Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatCard(
-                            context,
-                            'الموظفين',
-                            dashboardData['employees'].toString(),
-                            Icons.people,
-                            Colors.orange,
-                            '',
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildStatCard(
-                            context,
-                            'العملاء',
-                            dashboardData['customers'].toString(),
-                            Icons.person,
-                            Colors.purple,
-                            '',
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatCard(
-                            context,
-                            'عناصر المخزون',
-                            dashboardData['inventoryItems'].toString(),
-                            Icons.inventory,
-                            Colors.blue,
-                            '',
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildStatCard(
-                            context,
-                            'القيمة الإجمالية',
-                            '${dashboardData['totalInventoryValue'].toStringAsFixed(0)} ج.م',
-                            Icons.wallet,
-                            Colors.green,
-                            '',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              const SizedBox(height: 24),
-
               // History Section
               Text(
                 'السجلات والتقارير',
@@ -381,13 +313,6 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
                     Icons.person,
                     Colors.teal,
                     () => context.go('/customer-management'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    'إدارة المخزون',
-                    Icons.inventory,
-                    Colors.indigo,
-                    () => context.go('/inventory-management'),
                   ),
                 ],
               ),

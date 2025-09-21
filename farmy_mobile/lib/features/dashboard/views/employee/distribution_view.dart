@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/customer_api_service.dart';
 import '../../../../core/services/employee_api_service.dart';
 import '../../../../core/services/distribution_api_service.dart';
+import '../../../../core/services/inventory_api_service.dart';
 import '../../../authentication/cubit/auth_cubit.dart';
 import '../../../authentication/cubit/auth_state.dart';
 
@@ -19,9 +24,11 @@ class _DistributionViewState extends State<DistributionView> {
 
   List<Map<String, dynamic>> _customers = [];
   Map<String, dynamic>? _selectedCustomer;
+  final TextEditingController _customerNameCtrl = TextEditingController();
 
   final TextEditingController _quantityCtrl = TextEditingController();
   final TextEditingController _grossWeightCtrl = TextEditingController();
+  final TextEditingController _emptyWeightCtrl = TextEditingController();
   final TextEditingController _netWeightCtrl = TextEditingController();
   final TextEditingController _priceCtrl = TextEditingController();
 
@@ -30,20 +37,22 @@ class _DistributionViewState extends State<DistributionView> {
   bool _loading = true;
   bool _saving = false;
   bool _posting = false;
+
   String _debugLog = '';
 
   @override
   void initState() {
     super.initState();
     _loadCustomers();
-    // Removed redundant listeners since onChanged handles updates
     WidgetsBinding.instance.addPostFrameCallback((_) => _recalculate());
   }
 
   @override
   void dispose() {
+    _customerNameCtrl.dispose();
     _quantityCtrl.dispose();
     _grossWeightCtrl.dispose();
+    _emptyWeightCtrl.dispose();
     _netWeightCtrl.dispose();
     _priceCtrl.dispose();
     super.dispose();
@@ -58,7 +67,6 @@ class _DistributionViewState extends State<DistributionView> {
         _customers = customers;
         _loading = false;
       });
-      // Debug: Log customer data
       print('Loaded customers: $_customers');
     } catch (e) {
       if (!mounted) return;
@@ -67,125 +75,245 @@ class _DistributionViewState extends State<DistributionView> {
     }
   }
 
+  Future<String> _ensureCustomerIdFromName() async {
+    final name = _customerNameCtrl.text.trim();
+    if (name.isEmpty) {
+      throw Exception('يرجى إدخال اسم العميل');
+    }
+
+    try {
+      final existing = _customers.firstWhere(
+        (c) =>
+            (c['name']?.toString().toLowerCase() ?? '') == name.toLowerCase(),
+      );
+      setState(() {
+        _selectedCustomer = existing;
+      });
+      return existing['_id'] as String;
+    } catch (_) {
+      final customerService = serviceLocator<CustomerApiService>();
+      final created = await customerService.createCustomer({'name': name});
+      setState(() {
+        _customers = [..._customers, created];
+        _selectedCustomer = created;
+      });
+      return created['_id'] as String;
+    }
+  }
+
+  void _onCustomerNameChanged(String value) {
+    try {
+      final match = _customers.firstWhere(
+        (c) =>
+            (c['name']?.toString().toLowerCase() ?? '') ==
+            value.trim().toLowerCase(),
+      );
+      setState(() {
+        _selectedCustomer = match;
+      });
+    } catch (_) {
+      setState(() {
+        _selectedCustomer = null;
+      });
+    }
+    _recalculate();
+  }
+
   void _recalculate() {
     final quantity = int.tryParse(_quantityCtrl.text) ?? 0;
     final gross = double.tryParse(_grossWeightCtrl.text) ?? 0;
     final price = double.tryParse(_priceCtrl.text) ?? 0;
 
-    final net = (gross - (quantity * 8)).clamp(0, double.infinity);
+    final emptyWeight = quantity * 8;
+    final net = (gross - emptyWeight).clamp(0, double.infinity);
     final mealAccount = price * net;
     final outstanding = (_selectedCustomer != null)
         ? (_selectedCustomer!['outstandingDebts'] as num? ?? 0).toDouble()
         : 0.0;
     final totalAccount = mealAccount + outstanding;
 
-    // Debug: Log calculation inputs and results
     print('Recalculate - Quantity: $quantity, Gross: $gross, Price: $price');
-    print('Net: $net, MealAccount: $mealAccount, TotalAccount: $totalAccount');
+    print(
+      'EmptyWeight: $emptyWeight, Net: $net, MealAccount: $mealAccount, TotalAccount: $totalAccount',
+    );
 
     setState(() {
+      _emptyWeightCtrl.text = emptyWeight.toStringAsFixed(2);
       _netWeightCtrl.text = net.toStringAsFixed(2);
       _mealAccount = mealAccount;
       _totalAccount = totalAccount;
     });
   }
 
-  Future<void> _applyToOutstanding() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_selectedCustomer == null) {
-      _showErrorDialog('يرجى اختيار العميل أولاً');
-      return;
-    }
-
-    setState(() => _saving = true);
+  Future<void> _generateAndPrintPdf() async {
     try {
-      _recalculate();
-      final currentOutstanding =
-          (_selectedCustomer!['outstandingDebts'] as num? ?? 0).toDouble();
-      final newOutstanding = (currentOutstanding + _mealAccount)
-          .clamp(0, double.infinity)
-          .toDouble();
+      final pdf = pw.Document();
 
-      final service = serviceLocator<CustomerApiService>();
-      final updated = await service.incrementOutstanding(
-        _selectedCustomer!['_id'] as String,
-        _mealAccount,
-      );
+      final fontData = await rootBundle.load('assets/fonts/Amiri-Regular.ttf');
+      final ttf = pw.Font.ttf(fontData);
 
-      if (!mounted) return;
-      setState(() {
-        _selectedCustomer = {
-          ..._selectedCustomer!,
-          'outstandingDebts': updated['outstandingDebts'] ?? newOutstanding,
-        };
-        // Update list item too
-        final idx = _customers.indexWhere((c) => c['_id'] == updated['_id']);
-        if (idx != -1) {
-          _customers[idx] = updated;
-        }
-        _totalAccount =
-            _mealAccount +
-            ((_selectedCustomer!['outstandingDebts'] as num?)?.toDouble() ?? 0);
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'تم إضافة ${_mealAccount.toStringAsFixed(2)} ج.م إلى مديونية العميل',
-          ),
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Directionality(
+              textDirection: pw.TextDirection.rtl,
+              child: pw.Padding(
+                padding: const pw.EdgeInsets.all(16.0),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'إيصال توزيع',
+                      style: pw.TextStyle(
+                        font: ttf,
+                        fontSize: 24,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                    pw.SizedBox(height: 16),
+                    pw.Text(
+                      'العميل: ${_selectedCustomer?['name'] ?? 'غير معروف'}',
+                      style: pw.TextStyle(font: ttf, fontSize: 16),
+                    ),
+                    pw.Text(
+                      'التاريخ: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+                      style: pw.TextStyle(font: ttf, fontSize: 16),
+                    ),
+                    pw.SizedBox(height: 16),
+                    pw.Table(
+                      border: pw.TableBorder.all(),
+                      columnWidths: {
+                        0: const pw.FlexColumnWidth(2),
+                        1: const pw.FlexColumnWidth(3),
+                      },
+                      children: [
+                        pw.TableRow(
+                          children: [
+                            pw.Padding(
+                              padding: const pw.EdgeInsets.all(8),
+                              child: pw.Text(
+                                'البيان',
+                                style: pw.TextStyle(
+                                  font: ttf,
+                                  fontWeight: pw.FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            pw.Padding(
+                              padding: const pw.EdgeInsets.all(8),
+                              child: pw.Text(
+                                'القيمة',
+                                style: pw.TextStyle(
+                                  font: ttf,
+                                  fontWeight: pw.FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        _buildTableRow('العدد', _quantityCtrl.text, ttf),
+                        _buildTableRow(
+                          'وزن القائم (كجم)',
+                          _grossWeightCtrl.text,
+                          ttf,
+                        ),
+                        _buildTableRow(
+                          'الوزن الفارغ (كجم)',
+                          _emptyWeightCtrl.text,
+                          ttf,
+                        ),
+                        _buildTableRow(
+                          'الوزن الصافي (كجم)',
+                          _netWeightCtrl.text,
+                          ttf,
+                        ),
+                        _buildTableRow('السعر (ج.م/كجم)', _priceCtrl.text, ttf),
+                        _buildTableRow(
+                          'حساب الوجبة (ج.م)',
+                          _mealAccount.toStringAsFixed(2),
+                          ttf,
+                        ),
+                        _buildTableRow(
+                          'القديم (المستحق) (ج.م)',
+                          (_selectedCustomer?['outstandingDebts'] ?? 0)
+                              .toString(),
+                          ttf,
+                        ),
+                        _buildTableRow(
+                          'إجمالي الحساب (ج.م)',
+                          _totalAccount.toStringAsFixed(2),
+                          ttf,
+                          isBold: true,
+                        ),
+                      ],
+                    ),
+                    pw.SizedBox(height: 16),
+                    pw.Center(
+                      child: pw.Text(
+                        'تم إنشاء هذا الإيصال تلقائياً بواسطة النظام',
+                        style: pw.TextStyle(font: ttf, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       );
+
+      final pdfBytes = await pdf.save();
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdfBytes,
+      );
     } catch (e) {
-      if (!mounted) return;
-      _showErrorDialog('فشل تحديث مديونية العميل: $e');
-    } finally {
-      if (mounted) setState(() => _saving = false);
+      _showErrorDialog('خطأ أثناء إنشاء ملف PDF: $e');
+      _debugLog += 'PDF Generation Error: $e\n';
+      setState(() {});
     }
   }
 
-  Future<void> _postDistributionRecord() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_selectedCustomer == null) {
-      _showErrorDialog('يرجى اختيار العميل أولاً');
-      return;
-    }
-
-    setState(() => _posting = true);
-    try {
-      _recalculate();
-      final quantity = int.tryParse(_quantityCtrl.text) ?? 0;
-      final gross = double.tryParse(_grossWeightCtrl.text) ?? 0;
-      final price = double.tryParse(_priceCtrl.text) ?? 0;
-      final net = double.tryParse(_netWeightCtrl.text) ?? 0;
-      final total = _mealAccount;
-
-      final service = serviceLocator<EmployeeApiService>();
-      final payload = {
-        'customer': _selectedCustomer!['_id'],
-        'quantity': quantity,
-        'grossWeight': gross,
-        'price': price,
-        'netWeight': net,
-        'totalAmount': total,
-      };
-      final created = await service.createDistribution(payload);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم تسجيل التوزيع #${created['_id'] ?? ''}')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      _showErrorDialog('فشل تسجيل التوزيع: $e');
-    } finally {
-      if (mounted) setState(() => _posting = false);
-    }
+  pw.TableRow _buildTableRow(
+    String label,
+    String value,
+    pw.Font font, {
+    bool isBold = false,
+  }) {
+    return pw.TableRow(
+      children: [
+        pw.Padding(
+          padding: const pw.EdgeInsets.all(8),
+          child: pw.Text(
+            label,
+            style: pw.TextStyle(
+              font: font,
+              fontSize: 12,
+              fontWeight: isBold ? pw.FontWeight.bold : null,
+            ),
+          ),
+        ),
+        pw.Padding(
+          padding: const pw.EdgeInsets.all(8),
+          child: pw.Text(
+            value,
+            style: pw.TextStyle(
+              font: font,
+              fontSize: 12,
+              fontWeight: isBold ? pw.FontWeight.bold : null,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _submitBoth() async {
     _debugLog = '';
     void log(String m) {
       _debugLog += m + '\n';
-      // ignore: avoid_print
       print('[DistributionSubmit] ' + m);
     }
 
@@ -194,9 +322,9 @@ class _DistributionViewState extends State<DistributionView> {
       setState(() {});
       return;
     }
-    if (_selectedCustomer == null) {
-      log('No customer selected');
-      _showErrorDialog('يرجى اختيار العميل أولاً');
+    if (_customerNameCtrl.text.trim().isEmpty) {
+      log('No customer name');
+      _showErrorDialog('يرجى إدخال اسم العميل أولاً');
       setState(() {});
       return;
     }
@@ -207,6 +335,22 @@ class _DistributionViewState extends State<DistributionView> {
     });
 
     try {
+      // Debug: capture pre-submit stock snapshot for the day
+      final now = DateTime.now();
+      final day = DateTime(now.year, now.month, now.day);
+      try {
+        final inventoryService = serviceLocator<InventoryApiService>();
+        final before = await inventoryService.getDailyInventoryByDate(
+          day.toIso8601String(),
+        );
+        debugPrint(
+          '[DistributionSubmit] before.netDistributionWeight=${before['netDistributionWeight']}',
+        );
+      } catch (e) {
+        debugPrint(
+          '[DistributionSubmit] failed to fetch before daily stock: $e',
+        );
+      }
       _recalculate();
       log(
         'Inputs -> qty=${_quantityCtrl.text}, gross=${_grossWeightCtrl.text}, price=${_priceCtrl.text}',
@@ -215,19 +359,34 @@ class _DistributionViewState extends State<DistributionView> {
         'Calculated -> net=${_netWeightCtrl.text}, meal=${_mealAccount.toStringAsFixed(2)}',
       );
 
-      // Create distribution (backend also increments outstanding)
+      // Ensure customer exists or create it, then post
+      final customerId = await _ensureCustomerIdFromName();
+
       final employeeService = serviceLocator<EmployeeApiService>();
       final payload = {
-        'customer': _selectedCustomer!['_id'],
+        'customer': customerId,
         'quantity': int.tryParse(_quantityCtrl.text) ?? 0,
         'grossWeight': double.tryParse(_grossWeightCtrl.text) ?? 0.0,
+        'emptyWeight': double.tryParse(_emptyWeightCtrl.text) ?? 0.0,
         'price': double.tryParse(_priceCtrl.text) ?? 0.0,
+        // Hint backend to set distributionDate explicitly to today (matches stock window)
+        'distributionDate': DateTime.now().toIso8601String(),
       };
       log('POST /distributions payload: ' + payload.toString());
       final created = await employeeService.createDistribution(payload);
       log('Created distribution: ${created['_id']}');
+      // Show record net weight
+      final net = double.tryParse(_netWeightCtrl.text) ?? 0;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'تم تسجيل التوزيع. الوزن الصافي للطلب: ${net.toStringAsFixed(2)} كجم',
+            ),
+          ),
+        );
+      }
 
-      // Optimistically update selected customer outstanding locally
       final updatedOutstanding =
           ((_selectedCustomer?['outstandingDebts'] as num?)?.toDouble() ??
               0.0) +
@@ -241,13 +400,30 @@ class _DistributionViewState extends State<DistributionView> {
           (c) => c['_id'] == _selectedCustomer!['_id'],
         );
         if (idx != -1) _customers[idx] = _selectedCustomer!;
-        _totalAccount = _mealAccount + updatedOutstanding;
+        _totalAccount = updatedOutstanding;
       });
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تم تسجيل التوزيع وتحديث المديونية')),
       );
+
+      await _generateAndPrintPdf();
+      log('PDF generated successfully');
+      // Debug: fetch after-submit stock snapshot
+      try {
+        final inventoryService = serviceLocator<InventoryApiService>();
+        final after = await inventoryService.getDailyInventoryByDate(
+          day.toIso8601String(),
+        );
+        debugPrint(
+          '[DistributionSubmit] after.netDistributionWeight=${after['netDistributionWeight']}',
+        );
+      } catch (e) {
+        debugPrint(
+          '[DistributionSubmit] failed to fetch after daily stock: $e',
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       _showErrorDialog('فشل العملية: $e');
@@ -259,17 +435,6 @@ class _DistributionViewState extends State<DistributionView> {
         _posting = false;
       });
     }
-  }
-
-  void _onSelectCustomer(String? id) {
-    if (id == null) return;
-    final selected = _customers.firstWhere((c) => c['_id'] == id);
-    setState(() {
-      _selectedCustomer = selected;
-      // Debug: Log selected customer
-      print('Selected customer: $_selectedCustomer');
-    });
-    _recalculate();
   }
 
   void _showErrorDialog(String message) {
@@ -294,9 +459,9 @@ class _DistributionViewState extends State<DistributionView> {
       if (authState is AuthAuthenticated) {
         return authState.user.role == 'employee';
       }
-      return true; // Default to employee if not authenticated
+      return true;
     } catch (e) {
-      return true; // Default to employee on error
+      return true;
     }
   }
 
@@ -322,7 +487,6 @@ class _DistributionViewState extends State<DistributionView> {
       canPop: true,
       onPopInvoked: (didPop) {
         if (!didPop) {
-          // Use Navigator.pop() to go back to previous page
           Navigator.of(context).pop();
         }
       },
@@ -353,24 +517,88 @@ class _DistributionViewState extends State<DistributionView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            DropdownButtonFormField<String>(
-                              decoration: const InputDecoration(
-                                labelText: 'العميل',
-                                border: OutlineInputBorder(),
+                            Directionality(
+                              textDirection: TextDirection.rtl,
+                              child: Autocomplete<String>(
+                                optionsBuilder: (TextEditingValue value) {
+                                  final query = value.text.trim().toLowerCase();
+                                  if (query.isEmpty) {
+                                    return const Iterable<String>.empty();
+                                  }
+                                  return _customers
+                                      .map((c) => c['name']?.toString() ?? '')
+                                      .where(
+                                        (name) =>
+                                            name.toLowerCase().contains(query),
+                                      )
+                                      .take(10);
+                                },
+                                onSelected: (String selection) {
+                                  _customerNameCtrl.text = selection;
+                                  _onCustomerNameChanged(selection);
+                                },
+                                fieldViewBuilder:
+                                    (
+                                      context,
+                                      textEditingController,
+                                      focusNode,
+                                      onFieldSubmitted,
+                                    ) {
+                                      // Keep controller in sync with our state controller
+                                      textEditingController.text =
+                                          _customerNameCtrl.text;
+                                      textEditingController.selection =
+                                          TextSelection.fromPosition(
+                                            TextPosition(
+                                              offset: textEditingController
+                                                  .text
+                                                  .length,
+                                            ),
+                                          );
+                                      return TextFormField(
+                                        controller: _customerNameCtrl,
+                                        focusNode: focusNode,
+                                        decoration: const InputDecoration(
+                                          labelText: 'اسم العميل',
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: _onCustomerNameChanged,
+                                        validator: (v) =>
+                                            (v == null || v.trim().isEmpty)
+                                            ? 'يرجى إدخال اسم العميل'
+                                            : null,
+                                      );
+                                    },
+                                optionsViewBuilder:
+                                    (context, onSelected, options) {
+                                      return Align(
+                                        alignment: Alignment.topRight,
+                                        child: Material(
+                                          elevation: 4,
+                                          child: SizedBox(
+                                            width:
+                                                MediaQuery.of(
+                                                  context,
+                                                ).size.width -
+                                                32,
+                                            child: ListView.builder(
+                                              padding: EdgeInsets.zero,
+                                              itemCount: options.length,
+                                              itemBuilder: (context, index) {
+                                                final option = options
+                                                    .elementAt(index);
+                                                return ListTile(
+                                                  title: Text(option),
+                                                  onTap: () =>
+                                                      onSelected(option),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
                               ),
-                              value: _selectedCustomer?['_id'],
-                              items: _customers
-                                  .map(
-                                    (c) => DropdownMenuItem<String>(
-                                      value: c['_id'],
-                                      child: Text(c['name'] ?? 'Unknown'),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: _onSelectCustomer,
-                              validator: (v) => (v == null || v.isEmpty)
-                                  ? 'يرجى اختيار العميل'
-                                  : null,
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
@@ -412,6 +640,15 @@ class _DistributionViewState extends State<DistributionView> {
                                   return 'أدخل وزناً صحيحاً';
                                 return null;
                               },
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _emptyWeightCtrl,
+                              readOnly: true,
+                              decoration: const InputDecoration(
+                                labelText: 'الوزن الفارغ (يُحسب تلقائياً)',
+                                border: OutlineInputBorder(),
+                              ),
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
@@ -505,7 +742,7 @@ class _DistributionViewState extends State<DistributionView> {
                                     onPressed: () {
                                       if (_formKey.currentState?.validate() ??
                                           false) {
-                                        _recalculate(); // Ensure latest values
+                                        _recalculate();
                                         ScaffoldMessenger.of(
                                           context,
                                         ).showSnackBar(
@@ -522,29 +759,7 @@ class _DistributionViewState extends State<DistributionView> {
                                   ),
                                 ),
                                 const SizedBox(height: 12),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: (_saving || _posting)
-                                        ? null
-                                        : _submitBoth,
-                                    icon: (_saving || _posting)
-                                        ? const SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.white,
-                                            ),
-                                          )
-                                        : const Icon(Icons.done_all),
-                                    label: const Text(
-                                      'تسجيل وتحديث المديونية معاً',
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                // Only show history button if user is not an employee
+
                                 if (!_isEmployee()) ...[
                                   SizedBox(
                                     width: double.infinity,
@@ -627,8 +842,6 @@ class _DistributionHistoryDialogState
 
     try {
       final allDistributions = await _distributionService.getAllDistributions();
-
-      // Filter distributions by selected date
       final filteredDistributions = allDistributions.where((distribution) {
         final distributionDate = DateTime.parse(
           distribution['createdAt'] ?? distribution['distributionDate'] ?? '',
@@ -726,13 +939,11 @@ class _DistributionHistoryDialogState
       ),
       body: Column(
         children: [
-          // Header with date selector and search
           Container(
             padding: const EdgeInsets.all(16),
             color: Colors.grey[50],
             child: Column(
               children: [
-                // Date selector
                 Row(
                   children: [
                     const Icon(Icons.calendar_today, color: Colors.blue),
@@ -750,7 +961,6 @@ class _DistributionHistoryDialogState
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Search bar
                 TextField(
                   decoration: InputDecoration(
                     hintText: 'البحث في العملاء أو الموظفين...',
@@ -770,8 +980,6 @@ class _DistributionHistoryDialogState
               ],
             ),
           ),
-
-          // Summary cards
           if (!_isLoading && _filteredDistributions.isNotEmpty) ...[
             Container(
               padding: const EdgeInsets.all(16),
@@ -834,8 +1042,6 @@ class _DistributionHistoryDialogState
               ),
             ),
           ],
-
-          // Distribution list
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())

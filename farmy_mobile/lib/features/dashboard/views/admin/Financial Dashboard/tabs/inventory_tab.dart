@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'dart:ui' as ui show TextDirection;
 import '../../../../../../core/di/service_locator.dart';
-import '../../../../../../core/services/employee_api_service.dart';
-import '../../../../../../core/services/loading_api_service.dart';
+import '../../../../../../core/services/inventory_api_service.dart';
 
 class InventoryTab extends StatefulWidget {
   const InventoryTab({super.key});
@@ -11,320 +12,483 @@ class InventoryTab extends StatefulWidget {
 }
 
 class _InventoryTabState extends State<InventoryTab> {
-  late final LoadingApiService _loadingService;
-  DateTime _selectedInventoryDate = DateTime.now();
-  double _dailyDistributionNet = 0.0;
-  int _dailyDistributionCount = 0;
-  double _dailyLoadingNet = 0.0;
-  bool _inventoryLoading = false;
-  final TextEditingController _adminSubtractCtrl = TextEditingController();
-  double _adminSubtractKg = 0.0;
-  final TextEditingController _adminNotesCtrl = TextEditingController();
+  final InventoryApiService _inventoryApi =
+      serviceLocator<InventoryApiService>();
+
+  DateTime _selectedDate = DateTime.now();
+  bool _loading = false;
+  Map<String, dynamic>? _data;
+
+  final TextEditingController _adjController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _loadingService = serviceLocator<LoadingApiService>();
-    _loadInventoryForDate(_selectedInventoryDate);
+    _fetch();
   }
 
   @override
   void dispose() {
-    _adminSubtractCtrl.dispose();
-    _adminNotesCtrl.dispose();
+    _adjController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadInventoryForDate(DateTime date) async {
-    setState(() {
-      _inventoryLoading = true;
-    });
-    try {
-      final dist = await serviceLocator<EmployeeApiService>()
-          .getDailyDistributionNetWeight(date: date);
-      _dailyDistributionNet = ((dist['totalNetWeight'] ?? 0) as num).toDouble();
-      _dailyDistributionCount = ((dist['count'] ?? 0) as num).toInt();
+  String _formatDate(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
 
-      final start = DateTime(date.year, date.month, date.day).toIso8601String();
-      final end = DateTime(
-        date.year,
-        date.month,
-        date.day + 1,
-      ).toIso8601String();
-      final stats = await _loadingService.getLoadingStats(
-        startDate: start,
-        endDate: end,
+  Future<void> _pickDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+      await _fetch();
+    }
+  }
+
+  Future<void> _fetch() async {
+    setState(() => _loading = true);
+    try {
+      final String dateStr = _formatDate(_selectedDate);
+      final data = await _inventoryApi.getDailyInventoryByDate(dateStr);
+      final profit = await _inventoryApi.getDailyProfit(dateStr);
+      debugPrint(
+        '[InventoryTab] fetched for date=${_formatDate(_selectedDate)}',
       );
-      _dailyLoadingNet = ((stats['totalNetWeight'] ?? 0) as num).toDouble();
+      debugPrint('[InventoryTab] netLoadingWeight=${data['netLoadingWeight']}');
+      debugPrint(
+        '[InventoryTab] netDistributionWeight=${data['netDistributionWeight']}',
+      );
+      debugPrint('[InventoryTab] adminAdjustment=${data['adminAdjustment']}');
+      setState(() {
+        _data = {
+          ...data,
+          'profit': profit['profit'],
+          'distributionsTotal': profit['distributionsTotal'],
+          'loadingsTotal': profit['loadingsTotal'],
+          'expensesTotal': profit['expensesTotal'],
+          'loadingPricesSum': profit['loadingPricesSum'],
+        };
+        // If backend has a saved adjustment, reflect it; otherwise start from 0
+        final num backendAdj = (data['adminAdjustment'] ?? 0) as num;
+        _adjController.text = backendAdj.toString();
+      });
+      debugPrint(
+        '[InventoryTab] input(adminAdjustment) now = ' + _adjController.text,
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('فشل تحميل بيانات المخزون: $e')));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('فشل تحميل المخزون: $e')));
     } finally {
-      if (mounted) setState(() => _inventoryLoading = false);
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() => _loading = true);
+    try {
+      final String dateStr = _formatDate(_selectedDate);
+      final num inputAdj = num.tryParse(_adjController.text) ?? 0;
+      final num netLoadingBefore = (_data?['netLoadingWeight'] ?? 0) as num;
+      final num netDistBefore = (_data?['netDistributionWeight'] ?? 0) as num;
+      final num resultBefore = (netLoadingBefore - netDistBefore) - inputAdj;
+      debugPrint(
+        '[InventoryTab] Saving upsert payload => date=' +
+            dateStr +
+            ', adminAdjustment=' +
+            inputAdj.toString(),
+      );
+      debugPrint(
+        '[InventoryTab] Local before-save calc: (' +
+            netLoadingBefore.toString() +
+            ' - ' +
+            netDistBefore.toString() +
+            ') - ' +
+            inputAdj.toString() +
+            ' = ' +
+            resultBefore.toString(),
+      );
+      final updated = await _inventoryApi.upsertDailyInventory(
+        date: dateStr,
+        adminAdjustment: inputAdj,
+      );
+      debugPrint(
+        '[InventoryTab] upsert response for date=${_formatDate(_selectedDate)}',
+      );
+      debugPrint(
+        '[InventoryTab] netLoadingWeight=${updated['netLoadingWeight']}',
+      );
+      debugPrint(
+        '[InventoryTab] netDistributionWeight=${updated['netDistributionWeight']}',
+      );
+      debugPrint(
+        '[InventoryTab] adminAdjustment=${updated['adminAdjustment']}',
+      );
+      final num netLoadingAfter = (updated['netLoadingWeight'] ?? 0) as num;
+      final num netDistAfter = (updated['netDistributionWeight'] ?? 0) as num;
+      final num adjAfter = (updated['adminAdjustment'] ?? 0) as num;
+      final num resultAfter = (netLoadingAfter - netDistAfter) - adjAfter;
+      debugPrint(
+        '[InventoryTab] Server after-save calc: (' +
+            netLoadingAfter.toString() +
+            ' - ' +
+            netDistAfter.toString() +
+            ') - ' +
+            adjAfter.toString() +
+            ' = ' +
+            resultAfter.toString(),
+      );
+      setState(() {
+        _data = updated;
+        _adjController.text = adjAfter.toString();
+      });
+      // Refetch to ensure the page reflects any concurrent data changes
+      await _fetch();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم الحفظ')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('فشل الحفظ: $e')));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    final num netLoading = (_data?['netLoadingWeight'] ?? 0) as num;
+    final num netDist = (_data?['netDistributionWeight'] ?? 0) as num;
+    final num prevAdj = (_data?['adminAdjustment'] ?? 0) as num;
+    // Admin adjustment is driven by the field, fallback to backend value
+    final num adj =
+        num.tryParse(_adjController.text) ??
+        (_data?['adminAdjustment'] ?? 0) as num;
+    final num result = (netLoading - netDist) - adj;
+    final num distributionsTotal = (_data?['distributionsTotal'] ?? 0) as num;
+    final num loadingsTotal = (_data?['loadingsTotal'] ?? 0) as num;
+    final num expensesTotal = (_data?['expensesTotal'] ?? 0) as num;
+    final num loadingPricesSum = (_data?['loadingPricesSum'] ?? 0) as num;
+    final num profit = (_data?['profit'] ?? 0) as num;
+
+    return Directionality(
+      textDirection: ui.TextDirection.rtl,
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.inventory_2, color: Colors.indigo),
-                const SizedBox(width: 8),
-                const Text(
-                  'المخزون اليومي',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.today, size: 16),
-                  label: Text(
-                    '${_selectedInventoryDate.year}-${_selectedInventoryDate.month.toString().padLeft(2, '0')}-${_selectedInventoryDate.day.toString().padLeft(2, '0')}',
-                  ),
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      firstDate: DateTime(2024, 1, 1),
-                      lastDate: DateTime.now().add(const Duration(days: 1)),
-                      initialDate: _selectedInventoryDate,
-                    );
-                    if (picked != null) {
-                      setState(() => _selectedInventoryDate = picked);
-                      _loadInventoryForDate(picked);
-                    }
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (_inventoryLoading)
-              const Center(child: CircularProgressIndicator())
-            else
-              Column(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  _inventoryCard(
-                    title: 'صافي وزن التوزيع اليومي',
-                    value: _dailyDistributionNet,
-                    subtitle: 'عدد العمليات: $_dailyDistributionCount',
-                    color: Colors.orange,
-                    icon: Icons.outbond,
+                  Text(
+                    'تاريخ اليوم: ${_formatDate(_selectedDate)}',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  const SizedBox(height: 12),
-                  _inventoryCard(
-                    title: 'صافي وزن التحميل اليومي',
-                    value: _dailyLoadingNet,
-                    subtitle: 'من تبويب التحميل',
-                    color: Colors.green,
-                    icon: Icons.move_up,
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: _loading ? null : _pickDate,
+                    icon: const Icon(Icons.date_range),
+                    label: const Text('اختيار التاريخ'),
                   ),
-                  const SizedBox(height: 16),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  const Spacer(),
+                  IconButton(
+                    onPressed: _loading ? null : _fetch,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'تحديث',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (_loading) const LinearProgressIndicator(),
+              const SizedBox(height: 12),
+
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'المعادلة: (وزن صافي التحميل - وزن صافي التوزيع) - قيمة',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Net loading (read-only)
+                      _SectionLabel('وزن صافي التحميل'),
+                      const SizedBox(height: 8),
+                      _MetricTile(
+                        label: 'وزن صافي التحميل',
+                        value: netLoading,
+                        color: Colors.blue,
+                      ),
+
+                      const SizedBox(height: 16),
+                      _SectionLabel('وزن صافي التوزيع (محسوب تلقائياً)'),
+                      const SizedBox(height: 8),
+                      _MetricTile(
+                        label: 'وزن صافي التوزيع',
+                        value: netDist,
+                        color: Colors.orange,
+                      ),
+
+                      const SizedBox(height: 16),
+                      _SectionLabel('قيمة (تسوية/هالك)'),
+                      const SizedBox(height: 8),
+                      _NumberField(
+                        controller: _adjController,
+                        label: 'اكتب القيمة',
+                        onChanged: (_) => setState(() {}),
+                      ),
+
+                      const SizedBox(height: 8),
+                      Row(
                         children: [
-                          const Text(
-                            'مدخل إداري (كجم)',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _adminSubtractCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'قيمة تُخصم من المخزون',
-                              border: OutlineInputBorder(),
-                              hintText: 'أدخل قيمة بالكيلو جرام',
-                            ),
-                            onChanged: (v) {
-                              final val = double.tryParse(v) ?? 0.0;
-                              setState(() => _adminSubtractKg = val);
-                            },
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _adminNotesCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'ملاحظات (اختياري)',
-                              border: OutlineInputBorder(),
+                          Expanded(
+                            child: Text(
+                              'المحفوظ سابقاً: ' +
+                                  NumberFormat('#,##0.###').format(prevAdj),
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: ElevatedButton.icon(
-                              onPressed: _inventoryLoading
-                                  ? null
-                                  : () async {
-                                      try {
-                                        setState(
-                                          () => _inventoryLoading = true,
-                                        );
-                                        final saved =
-                                            await serviceLocator<
-                                                  EmployeeApiService
-                                                >()
-                                                .upsertDailyStock(
-                                                  date: _selectedInventoryDate,
-                                                  netDistributionWeight:
-                                                      _dailyDistributionNet,
-                                                  adminAdjustment:
-                                                      _adminSubtractKg,
-                                                  notes: _adminNotesCtrl.text,
-                                                );
-                                        if (!mounted) return;
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'تم حفظ مخزون اليوم: ${saved['result']?.toStringAsFixed(2) ?? saved['result']}',
-                                            ),
-                                          ),
-                                        );
-                                      } catch (e) {
-                                        if (!mounted) return;
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'فشل حفظ المخزون: $e',
-                                            ),
-                                          ),
-                                        );
-                                      } finally {
-                                        if (mounted)
-                                          setState(
-                                            () => _inventoryLoading = false,
-                                          );
-                                      }
-                                    },
-                              icon: const Icon(Icons.save),
-                              label: const Text('حفظ مخزون اليوم'),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'الإدخال الحالي: ' +
+                                  NumberFormat('#,##0.###').format(
+                                    num.tryParse(_adjController.text) ?? 0,
+                                  ),
+                              textAlign: TextAlign.end,
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ),
                         ],
                       ),
-                    ),
+
+                      const SizedBox(height: 16),
+                      _SectionLabel('المخزون الحالي'),
+                      const SizedBox(height: 8),
+                      _ReadOnlyNumberField(
+                        label: 'المخزون الحالي',
+                        value: result,
+                      ),
+
+                      const SizedBox(height: 16),
+                      _SectionLabel('المخزون اليومي (ناتج المعادلة)'),
+                      const SizedBox(height: 8),
+                      _MetricTile(
+                        label: 'المخزون اليومي',
+                        value: result,
+                        color: Colors.green,
+                      ),
+
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _loading ? null : _save,
+                          icon: const Icon(Icons.save),
+                          label: const Text('حفظ'),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 16),
+
+                      Text(
+                        'الربح اليومي',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.teal,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _MetricTile(
+                        label:
+                            'الربح = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل - إجمالي المصروفات - مصروفات التحميل',
+                        value: profit,
+                        color: Colors.teal,
+                      ),
+                      const SizedBox(height: 8),
+                      Card(
+                        elevation: 0,
+                        color: Colors.teal.withOpacity(0.02),
+                        child: Column(
+                          children: [
+                            ListTile(
+                              dense: true,
+                              leading: const Icon(
+                                Icons.receipt_long,
+                                color: Colors.teal,
+                              ),
+                              title: const Text('مبلغ إجمالي الوجبات'),
+                              trailing: Text(
+                                NumberFormat(
+                                  '#,##0.###',
+                                ).format(distributionsTotal),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            ListTile(
+                              dense: true,
+                              leading: const Icon(
+                                Icons.local_shipping,
+                                color: Colors.orange,
+                              ),
+                              title: const Text('مبلغ إجمالي التحميل'),
+                              trailing: Text(
+                                NumberFormat('#,##0.###').format(loadingsTotal),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            ListTile(
+                              dense: true,
+                              leading: const Icon(
+                                Icons.money_off,
+                                color: Colors.redAccent,
+                              ),
+                              title: const Text('إجمالي المصروفات'),
+                              trailing: Text(
+                                NumberFormat('#,##0.###').format(expensesTotal),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            ListTile(
+                              dense: true,
+                              leading: const Icon(
+                                Icons.price_change,
+                                color: Colors.purple,
+                              ),
+                              title: const Text(
+                                'مصروفات التحميل (مجموع أسعار التحميل)',
+                              ),
+                              trailing: Text(
+                                NumberFormat(
+                                  '#,##0.###',
+                                ).format(loadingPricesSum),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  _inventorySummaryCard(),
-                ],
+                ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _inventorySummaryCard() {
-    final double difference = _dailyLoadingNet - _dailyDistributionNet;
-    final double stock = difference - _adminSubtractKg;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'حساب المخزون اليومي',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            _formulaRow('التحميل الصافي', _dailyLoadingNet, Colors.green),
-            _formulaRow('التوزيع الصافي', _dailyDistributionNet, Colors.orange),
-            const Divider(),
-            _formulaRow('الفرق (تحميل - توزيع)', difference, Colors.blue),
-            _formulaRow('خصم إداري', _adminSubtractKg, Colors.red),
-            const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'المخزون اليومي',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  '${stock.toStringAsFixed(2)} كجم',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.purple,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+class _MetricTile extends StatelessWidget {
+  final String label;
+  final num value;
+  final Color color;
+  const _MetricTile({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: color.withOpacity(0.4)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(color: color)),
+          const SizedBox(height: 6),
+          Text(
+            NumberFormat('#,##0.###').format(value),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(color: color),
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget _formulaRow(String label, double value, Color color) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label),
-        Text(
-          '${value.toStringAsFixed(2)} كجم',
-          style: TextStyle(color: color, fontWeight: FontWeight.w600),
-        ),
-      ],
+class _NumberField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final void Function(String)? onChanged;
+  const _NumberField({
+    required this.controller,
+    required this.label,
+    this.onChanged,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
+      onChanged: onChanged,
     );
   }
+}
 
-  Widget _inventoryCard({
-    required String title,
-    required double value,
-    required String subtitle,
-    required Color color,
-    required IconData icon,
-  }) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: color.withOpacity(0.15),
-              child: Icon(icon, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            Text(
-              '${value.toStringAsFixed(2)} كجم',
-              style: TextStyle(
-                color: color,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+        color: Theme.of(context).colorScheme.primary,
+      ),
+    );
+  }
+}
+
+class _ReadOnlyNumberField extends StatelessWidget {
+  final String label;
+  final num value;
+  const _ReadOnlyNumberField({required this.label, required this.value});
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: TextEditingController(
+        text: NumberFormat('#,##0.###').format(value),
+      ),
+      enabled: false,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
       ),
     );
   }

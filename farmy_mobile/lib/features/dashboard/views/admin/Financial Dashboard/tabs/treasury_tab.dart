@@ -3,6 +3,7 @@ import '../../../../../../core/di/service_locator.dart';
 import '../../../../../../core/services/payment_api_service.dart';
 import '../../../../../../core/services/employee_api_service.dart';
 import '../../../../../../core/services/employee_expense_api_service.dart';
+import '../../../../../../core/services/loading_api_service.dart';
 
 class TreasuryTab extends StatefulWidget {
   const TreasuryTab({super.key});
@@ -15,12 +16,14 @@ class _TreasuryTabState extends State<TreasuryTab> {
   late final PaymentApiService _paymentService;
   late final EmployeeApiService _employeeService;
   late final EmployeeExpenseApiService _employeeExpenseService;
+  late final LoadingApiService _loadingService;
 
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _employeeCollections = [];
   final Map<String, String> _employeeIdToName = {};
   final Map<String, List<Map<String, dynamic>>> _otherExpensesByEmployee = {};
+  double _totalLoadingAmount = 0.0;
 
   @override
   void initState() {
@@ -28,16 +31,32 @@ class _TreasuryTabState extends State<TreasuryTab> {
     _paymentService = serviceLocator<PaymentApiService>();
     _employeeService = serviceLocator<EmployeeApiService>();
     _employeeExpenseService = serviceLocator<EmployeeExpenseApiService>();
+    _loadingService = serviceLocator<LoadingApiService>();
     _loadData();
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final list = await _paymentService.getEmployeeCollectionsSummary();
+      // Load all data in parallel
+      final results = await Future.wait([
+        _paymentService.getEmployeeCollectionsSummary(),
+        _loadingService.getAllLoadings(),
+      ]);
+
+      final list = results[0];
+      final allLoadings = results[1];
+
+      // Calculate total loading amount
+      final totalLoading = allLoadings.fold<double>(0.0, (sum, loading) {
+        final num totalLoadingAmount = (loading['totalLoading'] ?? 0) as num;
+        return sum + totalLoadingAmount.toDouble();
+      });
+
       try {
         final users = await _employeeService.getAllEmployeeUsers();
         _employeeIdToName.clear();
@@ -58,17 +77,21 @@ class _TreasuryTabState extends State<TreasuryTab> {
         } catch (_) {}
       }
 
+      if (!mounted) return;
       setState(() {
         _employeeCollections = list;
+        _totalLoadingAmount = totalLoading;
         _otherExpensesByEmployee
           ..clear()
           ..addAll(serverExpenses);
       });
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _employeeCollections = [];
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _employeeCollections = [];
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -138,7 +161,7 @@ class _TreasuryTabState extends State<TreasuryTab> {
 
     final double total = _totalCollected();
     final double totalOther = _sumAllOtherExpenses();
-    final double net = total - totalOther;
+    final double net = total - _totalLoadingAmount - totalOther;
 
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -181,6 +204,12 @@ class _TreasuryTabState extends State<TreasuryTab> {
                   ),
                   const SizedBox(height: 8),
                   _summaryRow('إجمالي التحصيل', total, Colors.greenAccent),
+                  const SizedBox(height: 6),
+                  _summaryRow(
+                    'إجمالي التحميل',
+                    _totalLoadingAmount,
+                    Colors.blueAccent,
+                  ),
                   const SizedBox(height: 6),
                   _summaryRow(
                     'المصاريف الأخرى',

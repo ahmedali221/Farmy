@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/distribution_api_service.dart';
+import '../../../../core/services/inventory_api_service.dart';
 
 class DistributionHistoryView extends StatefulWidget {
   const DistributionHistoryView({super.key});
@@ -13,16 +14,19 @@ class DistributionHistoryView extends StatefulWidget {
 
 class _DistributionHistoryViewState extends State<DistributionHistoryView> {
   late final DistributionApiService _distributionService;
+  late final InventoryApiService _inventoryService;
   List<Map<String, dynamic>> _distributions = [];
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
   String? _error;
   String _searchQuery = '';
+  Map<String, dynamic>? _dailyStock;
 
   @override
   void initState() {
     super.initState();
     _distributionService = serviceLocator<DistributionApiService>();
+    _inventoryService = serviceLocator<InventoryApiService>();
     _loadDistributionsForDate(_selectedDate);
   }
 
@@ -35,18 +39,41 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
     try {
       final allDistributions = await _distributionService.getAllDistributions();
 
-      // Filter distributions by selected date
+      // Filter distributions strictly by operational date (distributionDate preferred)
       final filteredDistributions = allDistributions.where((distribution) {
-        final distributionDate = DateTime.parse(
-          distribution['createdAt'] ?? distribution['distributionDate'] ?? '',
-        );
-        return distributionDate.year == date.year &&
-            distributionDate.month == date.month &&
-            distributionDate.day == date.day;
+        final String? raw =
+            (distribution['distributionDate'] ?? distribution['createdAt'])
+                ?.toString();
+        if (raw == null || raw.isEmpty) return false;
+        DateTime dt;
+        try {
+          dt = DateTime.parse(raw);
+        } catch (_) {
+          return false;
+        }
+        return dt.year == date.year &&
+            dt.month == date.month &&
+            dt.day == date.day;
       }).toList();
+
+      // Debug totals for the selected day
+      final totalNetWeight = filteredDistributions.fold<num>(0, (sum, d) {
+        final net = (d['netWeight'] ?? 0) as num;
+        return sum + net;
+      });
+
+      // Fetch daily stock totals from backend for the selected date
+      final day = DateTime(date.year, date.month, date.day);
+      final daily = await _inventoryService.getDailyInventoryByDate(
+        day.toIso8601String(),
+      );
+      final sysNet = (daily['netDistributionWeight'] ?? 0) as num;
+      debugPrint('[DistributionHistory] system.netDistributionWeight=$sysNet');
+      debugPrint('[DistributionHistory] list.totalNetWeight=$totalNetWeight');
 
       setState(() {
         _distributions = filteredDistributions;
+        _dailyStock = daily;
         _isLoading = false;
       });
     } catch (e) {
@@ -113,6 +140,16 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
     }
   }
 
+  void _navigateToCustomerHistory(
+    BuildContext context,
+    Map<String, dynamic> distribution,
+  ) {
+    final customer = distribution['customer'];
+    if (customer != null) {
+      context.push('/customer-history', extra: {'customer': customer});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -144,100 +181,159 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
                 icon: const Icon(Icons.refresh),
                 onPressed: () => _loadDistributionsForDate(_selectedDate),
               ),
-            ],
-          ),
-          body: Column(
-            children: [
-              // Header with date selector and search
-              Container(
-                padding: const EdgeInsets.all(16),
-                color: Colors.grey[50],
-                child: Column(
-                  children: [
-                    // Date selector
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today, color: Colors.green),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'تاريخ التوزيع:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+              IconButton(
+                icon: const Icon(Icons.delete_forever),
+                tooltip: 'حذف كل سجلات التوزيع',
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('تأكيد الحذف'),
+                      content: const Text(
+                        'هل أنت متأكد من حذف جميع سجلات التوزيع؟ لا يمكن التراجع.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('إلغاء'),
                         ),
-                        const Spacer(),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today, size: 16),
-                          label: Text(_formatDate(_selectedDate)),
-                          onPressed: _selectDate,
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: const Text('حذف'),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    // Search bar
-                    TextField(
-                      decoration: InputDecoration(
-                        hintText: 'البحث في العملاء أو الموظفين...',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  );
+                  if (confirm == true) {
+                    try {
+                      await _distributionService.deleteAllDistributions();
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('تم حذف كل سجلات التوزيع'),
                         ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              // Summary cards
-              if (!_isLoading && _filteredDistributions.isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildSummaryCard(
-                          'عدد الطلبات',
-                          _filteredDistributions.length.toString(),
-                          Icons.list_alt,
-                          Colors.green,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildSummaryCard(
-                          'إجمالي الوزن',
-                          '${_calculateTotalWeight().toStringAsFixed(1)} كجم',
-                          Icons.scale,
-                          Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildSummaryCard(
-                          'إجمالي القيمة',
-                          '${_calculateTotalValue().toStringAsFixed(0)} ج.م',
-                          Icons.attach_money,
-                          Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              // Content
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () => _loadDistributionsForDate(_selectedDate),
-                  child: _buildContent(),
-                ),
+                      );
+                      await _loadDistributionsForDate(_selectedDate);
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('فشل الحذف: $e')));
+                    }
+                  }
+                },
               ),
             ],
+          ),
+          body: RefreshIndicator(
+            onRefresh: () => _loadDistributionsForDate(_selectedDate),
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                children: [
+                  // Header with date selector and search
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    color: Colors.grey[50],
+                    child: Column(
+                      children: [
+                        // Date selector
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.calendar_today,
+                              color: Colors.green,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'تاريخ التوزيع:',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            const Spacer(),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.calendar_today, size: 16),
+                              label: Text(_formatDate(_selectedDate)),
+                              onPressed: _selectDate,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Search bar
+                        TextField(
+                          decoration: InputDecoration(
+                            hintText: 'البحث في العملاء أو الموظفين...',
+                            prefixIcon: const Icon(Icons.search),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Summary list (more compact & readable)
+                  if (!_isLoading && _filteredDistributions.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Card(
+                        elevation: 1,
+                        child: Column(
+                          children: [
+                            ListTile(
+                              leading: const Icon(Icons.info_outline),
+                              title: const Text('ملخص اليوم'),
+                              subtitle: Text(_formatDate(_selectedDate)),
+                            ),
+                            const Divider(height: 1),
+                            _buildSummaryTile(
+                              'عدد الطلبات',
+                              _filteredDistributions.length.toString(),
+                              Icons.list_alt,
+                              Colors.green,
+                            ),
+                            const Divider(height: 1),
+                            _buildSummaryTile(
+                              'إجمالي الوزن (حسب القائمة)',
+                              '${_calculateTotalWeight().toStringAsFixed(1)} كجم',
+                              Icons.scale,
+                              Colors.blue,
+                            ),
+                            const Divider(height: 1),
+                            _buildSummaryTile(
+                              'وزن اليوم (من النظام)',
+                              '${((_dailyStock?['netDistributionWeight'] ?? 0) as num).toDouble().toStringAsFixed(1)} كجم',
+                              Icons.calendar_today,
+                              Colors.purple,
+                            ),
+                            const Divider(height: 1),
+                            _buildSummaryTile(
+                              'إجمالي القيمة',
+                              '${_calculateTotalValue().toStringAsFixed(0)} ج.م',
+                              Icons.attach_money,
+                              Colors.orange,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // Content
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _buildContent(),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -305,6 +401,8 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _filteredDistributions.length,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemBuilder: (context, index) {
         final distribution = _filteredDistributions[index];
         return _buildDistributionCard(distribution);
@@ -312,36 +410,23 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
     );
   }
 
-  Widget _buildSummaryCard(
+  Widget _buildSummaryTile(
     String title,
     String value,
     IconData icon,
     Color color,
   ) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: color.withOpacity(0.1),
+        child: Icon(icon, color: color),
       ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      trailing: Text(
+        value,
+        style: TextStyle(color: color, fontWeight: FontWeight.bold),
+      ),
+      dense: true,
     );
   }
 
@@ -423,14 +508,23 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
           ),
 
           // Details as ListTiles
-          ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.orange.withOpacity(0.1),
-              child: const Icon(Icons.person, color: Colors.orange, size: 20),
+          GestureDetector(
+            onTap: () => _navigateToCustomerHistory(context, distribution),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Colors.orange.withOpacity(0.1),
+                child: const Icon(Icons.person, color: Colors.orange, size: 20),
+              ),
+              title: const Text('العميل'),
+              subtitle: Text(
+                customerName,
+                style: const TextStyle(
+                  color: Colors.blue,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+              dense: true,
             ),
-            title: const Text('العميل'),
-            subtitle: Text(customerName),
-            dense: true,
           ),
           const Divider(height: 1),
 

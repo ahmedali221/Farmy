@@ -4,7 +4,7 @@ const chickenTypeSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    enum: ['تسمين', 'بلدي', 'أحمر', 'احمر', 'ساسو', 'بط', 'فراخ بيضاء']
+    enum: ['أبيض', 'تسمين', 'بلدي', 'احمر', 'ساسو', 'بط']
   },
   price: {
     type: Number,
@@ -16,7 +16,16 @@ const chickenTypeSchema = new mongoose.Schema({
     type: Number,
     required: true,
     min: 0
+  },
+  date: {
+    type: Date,
+    required: true,
+    default: Date.now,
+    index: true // Add index for better query performance
   }
 }, { timestamps: true });
+
+// Add compound index for efficient date-based queries
+chickenTypeSchema.index({ date: 1, name: 1 });
 
 module.exports = mongoose.model('ChickenType', chickenTypeSchema);

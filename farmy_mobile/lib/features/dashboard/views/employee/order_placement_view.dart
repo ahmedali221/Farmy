@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/loading_api_service.dart';
-import '../../../../core/services/inventory_api_service.dart';
 import '../../../../core/services/customer_api_service.dart';
+import '../../../../core/services/inventory_api_service.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/pdf_arabic_utils.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../authentication/cubit/auth_cubit.dart';
 import '../../../authentication/cubit/auth_state.dart';
@@ -21,7 +18,16 @@ class OrderPlacementView extends StatefulWidget {
 }
 
 class _OrderPlacementViewState extends State<OrderPlacementView> {
-  List<Map<String, dynamic>> chickenTypes = [];
+  // Static list of predefined chicken types from backend enum
+  static const List<Map<String, String>> predefinedChickenTypes = [
+    {'id': 'أبيض', 'name': 'أبيض'},
+    {'id': 'تسمين', 'name': 'تسمين'},
+    {'id': 'بلدي', 'name': 'بلدي'},
+    {'id': 'احمر', 'name': 'احمر'},
+    {'id': 'ساسو', 'name': 'ساسو'},
+    {'id': 'بط', 'name': 'بط'},
+  ];
+
   List<Map<String, dynamic>> customers = [];
   bool isLoading = true;
   bool isSubmitting = false;
@@ -31,10 +37,12 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
   final _formKey = GlobalKey<FormState>();
   String? selectedChickenTypeId;
   String? selectedCustomerId;
+  final _customerNameController = TextEditingController();
   final _quantityController = TextEditingController();
   final _totalPriceController = TextEditingController();
   // التحميل controllers
   final _grossWeightController = TextEditingController();
+  final _emptyWeightController = TextEditingController();
   final _netWeightController = TextEditingController();
   final _loadingPriceController = TextEditingController();
   final _totalLoadingController = TextEditingController();
@@ -46,17 +54,26 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     _grossWeightController.addListener(_calculateLoadingValues);
     _quantityController.addListener(_calculateLoadingValues);
     _loadingPriceController.addListener(_calculateLoadingValues);
+    _quantityController.addListener(_onQuantityChanged);
   }
 
   @override
   void dispose() {
+    _customerNameController.dispose();
     _quantityController.dispose();
     _totalPriceController.dispose();
     _grossWeightController.dispose();
+    _emptyWeightController.dispose();
     _netWeightController.dispose();
     _loadingPriceController.dispose();
     _totalLoadingController.dispose();
     super.dispose();
+  }
+
+  void _onQuantityChanged() {
+    setState(() {
+      // Trigger rebuild to show/hide warning immediately
+    });
   }
 
   void _calculateLoadingValues() {
@@ -66,8 +83,12 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
 
     // Only calculate if all required values are provided
     if (gross != null && count != null && loadingPrice != null) {
-      // الوزن الصافي = الوزن القائم - (العدد × 8)
-      final netWeight = gross - (count * 8);
+      // الوزن الفارغ = العدد × 8
+      final emptyWeight = count * 8;
+      _emptyWeightController.text = emptyWeight.toStringAsFixed(2);
+
+      // الوزن الصافي = الوزن القائم - الوزن الفارغ
+      final netWeight = gross - emptyWeight;
       _netWeightController.text = netWeight.toStringAsFixed(2);
 
       // إجمالي التحميل = الوزن الصافي × سعر التحميل
@@ -78,6 +99,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
       _totalPriceController.text = totalLoading.toStringAsFixed(2);
     } else {
       // Clear calculated fields if any required value is missing
+      _emptyWeightController.clear();
       _netWeightController.clear();
       _totalLoadingController.clear();
       _totalPriceController.clear();
@@ -88,37 +110,46 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     setState(() => isLoading = true);
 
     try {
-      final inventoryService = serviceLocator<InventoryApiService>();
       final customerService = serviceLocator<CustomerApiService>();
-
-      final futures = await Future.wait([
-        inventoryService.getAllChickenTypes(),
-        customerService.getAllCustomers(),
-      ]);
+      final customersList = await customerService.getAllCustomers();
 
       if (mounted) {
         setState(() {
-          chickenTypes = futures[0];
-          customers = futures[1];
+          customers = customersList;
           isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => isLoading = false);
-        _showErrorDialog('فشل في تحميل البيانات: $e');
+        _showErrorDialog('فشل في تحميل العملاء: $e');
       }
     }
   }
 
-  int _getAvailableStock() {
+  // Removed stock checking logic as per requirements
+
+  // Resolve or create customer by typed name
+  Future<String> _ensureCustomerIdFromName() async {
+    final name = _customerNameController.text.trim();
+    if (name.isEmpty) {
+      throw Exception('يرجى إدخال اسم العميل');
+    }
+
+    // Try local list first (case-insensitive match)
     try {
-      final type = chickenTypes.firstWhere(
-        (t) => t['_id'] == selectedChickenTypeId,
+      final existing = customers.firstWhere(
+        (c) =>
+            (c['name']?.toString().toLowerCase() ?? '') == name.toLowerCase(),
       );
-      return (type['stock'] as int);
+      return existing['_id'] as String;
     } catch (_) {
-      return 0;
+      // Not found → create new customer
+      final customerService = serviceLocator<CustomerApiService>();
+      final created = await customerService.createCustomer({'name': name});
+      // Update local cache
+      customers = [...customers, created];
+      return created['_id'] as String;
     }
   }
 
@@ -128,14 +159,35 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     setState(() => isSubmitting = true);
 
     try {
+      // Debug: capture pre-submit stock snapshot for the day
+      final now = DateTime.now();
+      final day = DateTime(now.year, now.month, now.day);
+      try {
+        final inventoryService = serviceLocator<InventoryApiService>();
+        final before = await inventoryService.getDailyInventoryByDate(
+          day.toIso8601String(),
+        );
+        debugPrint(
+          '[OrderPlacement] before.netLoadingWeight=${before['netLoadingWeight']}',
+        );
+      } catch (e) {
+        debugPrint('[OrderPlacement] failed to fetch before daily stock: $e');
+      }
+
       final loadingService = serviceLocator<LoadingApiService>();
+
+      // Resolve or create customer from typed name
+      selectedCustomerId = await _ensureCustomerIdFromName();
 
       final loadingData = {
         'chickenType': selectedChickenTypeId,
         'customer': selectedCustomerId,
         'quantity': double.parse(_quantityController.text),
         'grossWeight': double.tryParse(_grossWeightController.text) ?? 0,
+        'emptyWeight': double.tryParse(_emptyWeightController.text) ?? 0,
         'loadingPrice': double.tryParse(_loadingPriceController.text) ?? 0,
+        // Hint backend to set loadingDate explicitly to today (matches stock window)
+        'loadingDate': DateTime.now().toIso8601String(),
         'notes': null, // Default to null as per requirements
       };
 
@@ -145,9 +197,30 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
         setState(() {
           isOrderSubmitted = true;
         });
-        _showSuccessDialog();
-        // Refresh inventory to reflect decremented stock
+        // User feedback
+        final net = double.tryParse(_netWeightController.text) ?? 0;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'تم تسجيل التحميل. الوزن الصافي للطلب: ${net.toStringAsFixed(2)} كجم',
+            ),
+          ),
+        );
+        // Debug: fetch after-submit stock snapshot
+        try {
+          final inventoryService = serviceLocator<InventoryApiService>();
+          final after = await inventoryService.getDailyInventoryByDate(
+            day.toIso8601String(),
+          );
+          debugPrint(
+            '[OrderPlacement] after.netLoadingWeight=${after['netLoadingWeight']}',
+          );
+        } catch (e) {
+          debugPrint('[OrderPlacement] failed to fetch after daily stock: $e');
+        }
+        // Refresh data
         await _loadData();
+        await _generateAndPrintPdf();
       }
     } catch (e) {
       if (mounted) {
@@ -160,20 +233,46 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     }
   }
 
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('نجح'),
-        content: const Text('تم إنشاء التحميل بنجاح'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('حسناً'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _generateAndPrintPdf() async {
+    try {
+      const appName = 'Farmy';
+      final customerName = _customerNameController.text.trim().isEmpty
+          ? 'غير معروف'
+          : _customerNameController.text.trim();
+
+      final now = DateTime.now();
+      final qty = _quantityController.text;
+      final gross = _grossWeightController.text;
+      final empty = _emptyWeightController.text;
+      final net = _netWeightController.text;
+      final price = _loadingPriceController.text;
+      final total = _totalLoadingController.text;
+
+      final html =
+          '''
+<div dir="rtl" style="font-family: NotoArabic, sans-serif;">
+  <div style="display:flex;justify-content:space-between;align-items:center;background:#e3f2fd;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+    <div style="font-weight:700;font-size:18px;color:#0d47a1;">$appName</div>
+    <div style="font-size:12px;color:#0d47a1;">${now.day}/${now.month}/${now.year} ${now.hour}:${now.minute.toString().padLeft(2, '0')}</div>
+  </div>
+  <h2 style="margin:6px 0 10px 0;">إيصال تحميل</h2>
+  <div style="border:1px solid #e0e0e0;border-radius:8px;padding:10px;margin-bottom:12px;background:#fafafa;">
+    <div><strong>العميل:</strong> $customerName</div>
+  </div>
+  <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+    <tr><td style="border:1px solid #e0e0e0;padding:8px;width:40%;">العدد</td><td style="border:1px solid #e0e0e0;padding:8px;">$qty</td></tr>
+    <tr><td style="border:1px solid #e0e0e0;padding:8px;">وزن القائم (كجم)</td><td style="border:1px solid #e0e0e0;padding:8px;">$gross</td></tr>
+    <tr><td style="border:1px solid #e0e0e0;padding:8px;">الوزن الفارغ (كجم)</td><td style="border:1px solid #e0e0e0;padding:8px;">$empty</td></tr>
+    <tr><td style="border:1px solid #e0e0e0;padding:8px;">الوزن الصافي (كجم)</td><td style="border:1px solid #e0e0e0;padding:8px;">$net</td></tr>
+    <tr><td style="border:1px solid #e0e0e0;padding:8px;">سعر التحميل (ج.م/كجم)</td><td style="border:1px solid #e0e0e0;padding:8px;">$price</td></tr>
+    <tr><td style="border:1px solid #e0e0e0;padding:8px;font-weight:700;">إجمالي التحميل (ج.م)</td><td style="border:1px solid #e0e0e0;padding:8px;font-weight:700;">$total</td></tr>
+  </table>
+  <div style="margin-top:14px;text-align:center;color:#555;">شكراً لاستخدامك تطبيق $appName</div>
+</div>
+''';
+
+      await PdfArabicUtils.printArabicHtml(htmlBody: html);
+    } catch (_) {}
   }
 
   void _showErrorDialog(String message) {
@@ -218,338 +317,6 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
         ),
       ),
     );
-  }
-
-  void _showSuccessDialogWithPath(String title, String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('تم إنشاء الملف بنجاح!'),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('حسناً'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatToday() {
-    final now = DateTime.now();
-    const months = [
-      'يناير',
-      'فبراير',
-      'مارس',
-      'أبريل',
-      'مايو',
-      'يونيو',
-      'يوليو',
-      'أغسطس',
-      'سبتمبر',
-      'أكتوبر',
-      'نوفمبر',
-      'ديسمبر',
-    ];
-    return '${now.day.toString().padLeft(2, '0')} ${months[now.month - 1]} ${now.year}';
-  }
-
-  Future<void> _generateInvoice() async {
-    try {
-      // Check if required data is available
-      if (selectedCustomerId == null ||
-          selectedChickenTypeId == null ||
-          _quantityController.text.isEmpty) {
-        _showErrorDialog('يرجى ملء جميع البيانات المطلوبة أولاً');
-        return;
-      }
-
-      final customer = customers.firstWhere(
-        (c) => c['_id'] == selectedCustomerId,
-      );
-      final chickenType = chickenTypes.firstWhere(
-        (t) => t['_id'] == selectedChickenTypeId,
-      );
-      final quantity = double.tryParse(_quantityController.text) ?? 0;
-      final grossWeight = double.tryParse(_grossWeightController.text) ?? 0;
-      final loadingPrice = double.tryParse(_loadingPriceController.text) ?? 0;
-      final netWeight = grossWeight - (quantity * 8);
-      final totalLoading = netWeight * loadingPrice;
-
-      // Get current employee info from auth cubit
-      String employeeName = 'موظف النظام';
-      try {
-        // Get current user from auth cubit
-        final authState = context.read<AuthCubit>().state;
-        if (authState is AuthAuthenticated) {
-          employeeName = authState.user.username;
-        }
-      } catch (e) {
-        employeeName = 'موظف النظام';
-      }
-
-      final pdf = pw.Document();
-
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                // Header
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          'فارمي',
-                          style: pw.TextStyle(
-                            fontSize: 24,
-                            fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.blue,
-                          ),
-                        ),
-                        pw.Text(
-                          'نظام إدارة المزرعة',
-                          style: pw.TextStyle(
-                            fontSize: 12,
-                            color: PdfColors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.end,
-                      children: [
-                        pw.Text(
-                          'فاتورة التحميل',
-                          style: pw.TextStyle(
-                            fontSize: 20,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                        pw.Text(
-                          'التاريخ: ${_formatToday()}',
-                          style: pw.TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                pw.SizedBox(height: 30),
-
-                // Customer Information
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey),
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(5),
-                    ),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'معلومات العميل:',
-                        style: pw.TextStyle(
-                          fontSize: 14,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 5),
-                      pw.Text('الاسم: ${customer['name']}'),
-                      pw.Text(
-                        'الهاتف: ${customer['contactInfo']?['phone'] ?? 'غير متوفر'}',
-                      ),
-                      pw.Text(
-                        'العنوان: ${customer['contactInfo']?['address'] ?? 'غير متوفر'}',
-                      ),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
-
-                // Employee Information
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey),
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(5),
-                    ),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'معلومات الموظف:',
-                        style: pw.TextStyle(
-                          fontSize: 14,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 5),
-                      pw.Text('الموظف: $employeeName'),
-                      pw.Text('التاريخ: ${_formatToday()}'),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
-
-                // Order Details
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey),
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(5),
-                    ),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'تفاصيل التحميل:',
-                        style: pw.TextStyle(
-                          fontSize: 14,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 5),
-                      pw.Text('نوع الدجاج: ${chickenType['name']}'),
-                      pw.Text('العدد: ${quantity.toStringAsFixed(0)}'),
-                      pw.Text(
-                        'الوزن القائم: ${grossWeight.toStringAsFixed(2)} كيلو',
-                      ),
-                      pw.Text(
-                        'الوزن الصافي: ${netWeight.toStringAsFixed(2)} كيلو',
-                      ),
-                      pw.Text(
-                        'سعر التحميل: ${loadingPrice.toStringAsFixed(2)} ج.م/كيلو',
-                      ),
-                      pw.Text(
-                        'إجمالي التحميل: ${totalLoading.toStringAsFixed(2)} ج.م',
-                      ),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
-
-                // Total
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(15),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.grey300,
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(5),
-                    ),
-                  ),
-                  child: pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Text(
-                        'إجمالي التحميل:',
-                        style: pw.TextStyle(
-                          fontSize: 16,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.Text(
-                        '${totalLoading.toStringAsFixed(2)} ج.م',
-                        style: pw.TextStyle(
-                          fontSize: 18,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.blue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
-
-                // Footer
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey),
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(5),
-                    ),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'ملاحظات:',
-                        style: pw.TextStyle(
-                          fontSize: 12,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 5),
-                      pw.Text(
-                        '• هذا التحميل صالح لمدة 7 أيام من تاريخ الإصدار',
-                        style: pw.TextStyle(fontSize: 10),
-                      ),
-                      pw.Text(
-                        '• في حالة وجود أي استفسار، يرجى التواصل مع إدارة المزرعة',
-                        style: pw.TextStyle(fontSize: 10),
-                      ),
-                      pw.Text(
-                        '• شكراً لثقتكم في منتجاتنا',
-                        style: pw.TextStyle(fontSize: 10),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      );
-
-      // Save PDF to documents folder with customer name
-      final documentsDir = await getApplicationDocumentsDirectory();
-      final customerName = customer['name']
-          .replaceAll(RegExp(r'[^\w\s-]'), '')
-          .replaceAll(' ', '_');
-      final file = File(
-        '${documentsDir.path}/loading_invoice_${customerName}_${DateTime.now().millisecondsSinceEpoch}.pdf',
-      );
-      await file.writeAsBytes(await pdf.save());
-
-      // Try to open PDF, but handle errors gracefully
-      try {
-        await OpenFile.open(file.path);
-      } catch (openError) {
-        // If opening fails, show success with file path info
-        _showSuccessDialogWithPath(
-          'تم إنشاء فاتورة التحميل بنجاح',
-          'تم حفظ الملف في مجلد المستندات: ${file.path}',
-        );
-        return;
-      }
-
-      _showSuccessDialog();
-    } catch (e) {
-      _showErrorDialog('فشل في إنشاء فاتورة التحميل: $e');
-    }
   }
 
   @override
@@ -615,36 +382,16 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                 key: _formKey,
                                 child: Column(
                                   children: [
-                                    // Customer Selection
+                                    // Customer Selection (text input)
                                     _SectionCard(
-                                      title: 'اختيار العميل (المكان)',
-                                      child: _DropdownField(
-                                        label: 'العميل',
-                                        value: selectedCustomerId,
-                                        items: customers
-                                            .map(
-                                              (customer) =>
-                                                  DropdownMenuItem<String>(
-                                                    value: customer['_id'],
-                                                    child: Text(
-                                                      customer['name'],
-                                                      style: const TextStyle(
-                                                        color: Colors.black,
-                                                        fontWeight:
-                                                            FontWeight.w500,
-                                                      ),
-                                                    ),
-                                                  ),
-                                            )
-                                            .toList(),
-                                        onChanged: (value) {
-                                          setState(() {
-                                            selectedCustomerId = value;
-                                          });
-                                        },
+                                      title: 'المكان',
+                                      child: _TextField(
+                                        label: 'اكتب اسم المكان',
+                                        controller: _customerNameController,
                                         validator: (value) {
-                                          if (value == null) {
-                                            return 'يرجى اختيار العميل';
+                                          if (value == null ||
+                                              value.trim().isEmpty) {
+                                            return 'يرجى إدخال اسم العميل';
                                           }
                                           return null;
                                         },
@@ -654,50 +401,43 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
 
                                     // Chicken Type Selection
                                     _SectionCard(
-                                      title: 'نوع الدجاج (النوع)',
-                                      child: _DropdownField(
-                                        label: 'نوع الدجاج',
-                                        value: selectedChickenTypeId,
-                                        items: chickenTypes
-                                            .map(
-                                              (
-                                                chickenType,
-                                              ) => DropdownMenuItem<String>(
-                                                value: chickenType['_id'],
-                                                child: Row(
-                                                  children: [
-                                                    Text(
-                                                      chickenType['name'],
+                                      title: 'نوع الدجاج',
+                                      child: Column(
+                                        children: [
+                                          const SizedBox(height: 8),
+                                          _DropdownField(
+                                            label: 'نوع الدجاج',
+                                            value: selectedChickenTypeId,
+                                            items: predefinedChickenTypes
+                                                .map(
+                                                  (
+                                                    chickenType,
+                                                  ) => DropdownMenuItem<String>(
+                                                    value: chickenType['id'],
+                                                    child: Text(
+                                                      chickenType['name']!,
                                                       style: const TextStyle(
                                                         color: Colors.black,
                                                         fontWeight:
                                                             FontWeight.w500,
                                                       ),
                                                     ),
-                                                    const SizedBox(width: 10),
-                                                    Text(
-                                                      'متاح: ${chickenType['stock']}',
-                                                      style: TextStyle(
-                                                        color: Colors.grey[600],
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            )
-                                            .toList(),
-                                        onChanged: (value) {
-                                          setState(() {
-                                            selectedChickenTypeId = value;
-                                          });
-                                        },
-                                        validator: (value) {
-                                          if (value == null) {
-                                            return 'يرجى اختيار نوع الدجاج';
-                                          }
-                                          return null;
-                                        },
+                                                  ),
+                                                )
+                                                .toList(),
+                                            onChanged: (value) {
+                                              setState(() {
+                                                selectedChickenTypeId = value;
+                                              });
+                                            },
+                                            validator: (value) {
+                                              if (value == null) {
+                                                return 'يرجى اختيار نوع الدجاج';
+                                              }
+                                              return null;
+                                            },
+                                          ),
+                                        ],
                                       ),
                                     ),
                                     const SizedBox(height: 16),
@@ -734,30 +474,29 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                                           FontWeight.w600,
                                                     ),
                                                   ),
+                                                  const SizedBox(width: 6),
                                                   Text(
-                                                    chickenTypes.firstWhere(
-                                                      (type) =>
-                                                          type['_id'] ==
-                                                          selectedChickenTypeId,
-                                                    )['name'],
+                                                    predefinedChickenTypes
+                                                            .firstWhere(
+                                                              (c) =>
+                                                                  c['id'] ==
+                                                                  selectedChickenTypeId,
+                                                              orElse: () => {
+                                                                'name':
+                                                                    'غير معروف',
+                                                              },
+                                                            )['name'] ??
+                                                        'غير معروف',
                                                     style: TextStyle(
-                                                      color: Colors.blue[700],
+                                                      color: Colors.blue[900],
                                                       fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  const Spacer(),
-                                                  Text(
-                                                    'المتاح: ${_getAvailableStock()}',
-                                                    style: TextStyle(
-                                                      color: Colors.blue[600],
-                                                      fontWeight:
-                                                          FontWeight.w600,
+                                                          FontWeight.w700,
                                                     ),
                                                   ),
                                                 ],
                                               ),
                                             ),
+                                          const SizedBox(height: 8),
                                           const SizedBox(height: 16),
 
                                           // Input Fields - Vertical Layout
@@ -775,14 +514,6 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                               if (quantity == null ||
                                                   quantity <= 0) {
                                                 return 'يرجى إدخال عدد صحيح';
-                                              }
-                                              final available =
-                                                  _getAvailableStock()
-                                                      .toDouble();
-                                              if (selectedChickenTypeId !=
-                                                      null &&
-                                                  quantity > available) {
-                                                return 'العدد يتجاوز المتاح: ${_getAvailableStock()}';
                                               }
                                               return null;
                                             },
@@ -825,6 +556,14 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                               }
                                               return null;
                                             },
+                                          ),
+                                          const SizedBox(height: 12),
+
+                                          _NumField(
+                                            label:
+                                                'الوزن الفارغ (يحسب تلقائياً)',
+                                            controller: _emptyWeightController,
+                                            enabled: false,
                                           ),
                                           const SizedBox(height: 12),
 
@@ -923,50 +662,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
 
                                     const SizedBox(height: 16),
 
-                                    // Generate Invoice Button
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: OutlinedButton.icon(
-                                        onPressed: isOrderSubmitted
-                                            ? _generateInvoice
-                                            : null,
-                                        icon: Icon(
-                                          Icons.receipt,
-                                          color: isOrderSubmitted
-                                              ? Theme.of(
-                                                  context,
-                                                ).colorScheme.primary
-                                              : Colors.grey,
-                                        ),
-                                        label: Text(
-                                          'إنشاء فاتورة التحميل',
-                                          style: TextStyle(
-                                            color: isOrderSubmitted
-                                                ? Theme.of(
-                                                    context,
-                                                  ).colorScheme.primary
-                                                : Colors.grey,
-                                          ),
-                                        ),
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 14,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          side: BorderSide(
-                                            color: isOrderSubmitted
-                                                ? Theme.of(
-                                                    context,
-                                                  ).colorScheme.primary
-                                                : Colors.grey,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
+                                    // Removed PDF generation action button
                                   ],
                                 ),
                               ),
@@ -1209,6 +905,45 @@ class _DropdownField extends StatelessWidget {
       ),
       dropdownColor: Colors.white,
       icon: const Icon(Icons.arrow_drop_down, color: Colors.black),
+    );
+  }
+}
+
+class _TextField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final String? Function(String?)? validator;
+
+  const _TextField({
+    required this.label,
+    required this.controller,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      textDirection: TextDirection.rtl,
+      textAlign: TextAlign.right,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        alignLabelWithHint: true,
+      ),
+      style: const TextStyle(
+        overflow: TextOverflow.ellipsis,
+        color: Colors.black,
+        fontWeight: FontWeight.w500,
+      ),
+      maxLines: 1,
     );
   }
 }

@@ -36,6 +36,11 @@ const loadingSchema = new mongoose.Schema({
   },
   
   // الحقول المحسوبة تلقائياً
+  emptyWeight: {
+    type: Number,
+    required: true,
+    min: 0
+  },
   netWeight: {
     type: Number,
     required: true,
@@ -131,8 +136,11 @@ loadingSchema.virtual('pricePerKg').get(function() {
 
 // Pre-save middleware to calculate fields
 loadingSchema.pre('save', function(next) {
+  // حساب الوزن الفارغ
+  this.emptyWeight = this.quantity * 8;
+  
   // حساب الوزن الصافي
-  this.netWeight = Math.max(0, this.grossWeight - (this.quantity * 8));
+  this.netWeight = Math.max(0, this.grossWeight - this.emptyWeight);
   
   // حساب إجمالي التحميل
   this.totalLoading = this.netWeight * this.loadingPrice;

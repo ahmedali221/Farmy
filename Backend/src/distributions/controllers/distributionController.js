@@ -18,7 +18,8 @@ exports.createDistribution = async (req, res) => {
   try {
     const { customer, quantity, grossWeight, price, distributionDate } = req.body;
 
-    const netWeight = Math.max(0, grossWeight - (quantity * 8));
+    const emptyWeight = quantity * 8;
+    const netWeight = Math.max(0, grossWeight - emptyWeight);
     const totalAmount = netWeight * price;
 
     // ensure customer exists
@@ -30,6 +31,7 @@ exports.createDistribution = async (req, res) => {
       employee: req.user.id,
       quantity,
       grossWeight,
+      emptyWeight,
       netWeight,
       price,
       totalAmount,
@@ -79,6 +81,18 @@ exports.getDailyNetWeight = async (req, res) => {
     res.json(result[0] || { totalNetWeight: 0, count: 0 });
   } catch (err) {
     logger.error(`Error aggregating daily net weight: ${err.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Delete all distributions
+exports.deleteAllDistributions = async (req, res) => {
+  try {
+    const result = await Distribution.deleteMany({});
+    logger.warn(`All distributions deleted. count=${result.deletedCount}`);
+    res.status(200).json({ message: 'All distributions deleted', deleted: result.deletedCount });
+  } catch (err) {
+    logger.error(`Error deleting all distributions: ${err.message}`);
     res.status(500).json({ message: 'Server error' });
   }
 };

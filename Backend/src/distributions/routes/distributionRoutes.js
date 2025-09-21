@@ -5,6 +5,7 @@ const controller = require('../controllers/distributionController');
 router.post('/', controller.createDistribution);
 router.get('/', controller.getAllDistributions);
 router.get('/daily-net-weight', controller.getDailyNetWeight);
+router.delete('/all', controller.deleteAllDistributions);
 
 module.exports = router;
 

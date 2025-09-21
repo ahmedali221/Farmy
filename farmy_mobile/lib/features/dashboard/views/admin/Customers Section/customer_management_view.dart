@@ -231,6 +231,12 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            IconButton(
+                              icon: const Icon(Icons.history, size: 20),
+                              onPressed: () =>
+                                  _navigateToCustomerHistory(context, customer),
+                              tooltip: 'السجل التاريخي',
+                            ),
                             if (_getCustomerLoadingOrdersCount(
                                   customer['_id'],
                                 ) >
@@ -410,6 +416,13 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
       '/customer-loading-orders',
       extra: {'customer': customer, 'loadingOrders': customerLoadingOrders},
     );
+  }
+
+  void _navigateToCustomerHistory(
+    BuildContext context,
+    Map<String, dynamic> customer,
+  ) {
+    context.push('/customer-history', extra: {'customer': customer});
   }
 }
 

@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/payment_api_service.dart';
 import '../../../../core/services/customer_api_service.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/pdf_arabic_utils.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../authentication/cubit/auth_cubit.dart';
 import '../../../authentication/cubit/auth_state.dart';
@@ -84,7 +81,32 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
       _paidAmountController.text = '';
       _discountController.text = '0';
       _remainingController.text = outstanding.toStringAsFixed(2);
+
+      // If customer has no debts, show an alert dialog
+      if (outstanding <= 0) {
+        _showNoDebtDialog(customer['name']?.toString() ?? '');
+      }
     }
+  }
+
+  void _showNoDebtDialog(String customerName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('لا توجد مديونية'),
+        content: Text(
+          customerName.isEmpty
+              ? 'هذا العميل لا توجد عليه أي مديونية.'
+              : 'العميل "$customerName" لا توجد عليه أي مديونية.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('حسناً'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _calculateRemaining() {
@@ -119,8 +141,6 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
       final totalPrice = double.parse(_totalOutstandingController.text);
       final paidAmount = double.parse(_paidAmountController.text);
       final discount = double.tryParse(_discountController.text) ?? 0;
-      final remainingAmount =
-          totalPrice - paidAmount - discount; // for display only
 
       final paymentData = {
         'customer': selectedCustomerId,
@@ -137,6 +157,7 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
           isPaymentSubmitted = true;
         });
         _showSuccessDialog();
+        await _generateAndPrintPdf();
         await _loadCustomers(); // Reload customers to update outstanding
         // Re-apply selection to refresh the displayed totals/remaining
         if (selectedCustomerId != null) {
@@ -154,16 +175,63 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
     }
   }
 
-  void _resetForm() {
-    _formKey.currentState?.reset();
-    selectedCustomerId = null;
-    _totalOutstandingController.clear();
-    _paidAmountController.clear();
-    _discountController.clear();
-    _selectedPaymentMethod = 'cash';
-    setState(() {
-      isPaymentSubmitted = false;
-    });
+  Future<void> _generateAndPrintPdf() async {
+    try {
+      const appName = 'Farmy';
+      final customer = selectedCustomerId != null
+          ? customers.firstWhere(
+              (c) => c['_id'] == selectedCustomerId,
+              orElse: () => {'name': 'غير معروف'},
+            )
+          : {'name': 'غير معروف'};
+      final now = DateTime.now();
+      final total = _totalOutstandingController.text;
+      final discount =
+          (_discountController.text.isEmpty ? '0' : _discountController.text)
+              .toString();
+      final paid = _paidAmountController.text;
+      final remaining = _remainingController.text;
+      final method = _selectedPaymentMethod == 'cash' ? 'نقداً' : 'غير محدد';
+
+      final html =
+          '''
+<div dir="rtl" style="font-family: NotoArabic, sans-serif;">
+  <div style="display:flex;justify-content:space-between;align-items:center;background:#e3f2fd;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+    <div style="font-weight:700;font-size:18px;color:#0d47a1;">$appName</div>
+    <div style="font-size:12px;color:#0d47a1;">${now.day}/${now.month}/${now.year} ${now.hour}:${now.minute.toString().padLeft(2, '0')}</div>
+  </div>
+  <h2 style="margin:6px 0 10px 0;">إيصال دفع</h2>
+  <div style="border:1px solid #e0e0e0;border-radius:8px;padding:10px;margin-bottom:12px;background:#fafafa;">
+    <div><strong>العميل:</strong> ${customer['name']}</div>
+  </div>
+  <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+    <tr>
+      <td style="border:1px solid #e0e0e0;padding:8px;width:40%;">إجمالي الحساب (ج.م)</td>
+      <td style="border:1px solid #e0e0e0;padding:8px;">$total</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #e0e0e0;padding:8px;">الخصم (ج.م)</td>
+      <td style="border:1px solid #e0e0e0;padding:8px;">$discount</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #e0e0e0;padding:8px;font-weight:700;">المبلغ المدفوع (ج.م)</td>
+      <td style="border:1px solid #e0e0e0;padding:8px;font-weight:700;">$paid</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #e0e0e0;padding:8px;font-weight:700;">المتبقي (ج.م)</td>
+      <td style="border:1px solid #e0e0e0;padding:8px;font-weight:700;">$remaining</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #e0e0e0;padding:8px;">طريقة الدفع</td>
+      <td style="border:1px solid #e0e0e0;padding:8px;">$method</td>
+    </tr>
+  </table>
+  <div style="margin-top:14px;text-align:center;color:#555;">شكراً لاستخدامك تطبيق $appName</div>
+</div>
+''';
+
+      await PdfArabicUtils.printArabicHtml(htmlBody: html);
+    } catch (_) {}
   }
 
   void _showSuccessDialog() {
@@ -224,346 +292,6 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
         ),
       ),
     );
-  }
-
-  void _showSuccessDialogWithPath(String title, String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('تم إنشاء الملف بنجاح!'),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('حسناً'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatToday() {
-    final now = DateTime.now();
-    const months = [
-      'يناير',
-      'فبراير',
-      'مارس',
-      'أبريل',
-      'مايو',
-      'يونيو',
-      'يوليو',
-      'أغسطس',
-      'سبتمبر',
-      'أكتوبر',
-      'نوفمبر',
-      'ديسمبر',
-    ];
-    return '${now.day.toString().padLeft(2, '0')} ${months[now.month - 1]} ${now.year}';
-  }
-
-  Future<void> _generateReceipt() async {
-    try {
-      // Check if required data is available
-      if (selectedCustomerId == null) {
-        _showErrorDialog('يرجى اختيار العميل أولاً');
-        return;
-      }
-      final customer = customers.firstWhere(
-        (c) => c['_id'] == selectedCustomerId,
-      );
-      final totalPrice = double.tryParse(_totalOutstandingController.text) ?? 0;
-      final paidAmount = double.tryParse(_paidAmountController.text) ?? 0;
-      final discount = double.tryParse(_discountController.text) ?? 0;
-      final remaining = totalPrice - paidAmount - discount;
-
-      // Get current employee info from auth cubit
-      String employeeName = 'موظف النظام';
-      final authState = context.read<AuthCubit>().state;
-      if (authState is AuthAuthenticated) {
-        employeeName = authState.user.username;
-      }
-
-      final pdf = pw.Document();
-
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                // Header
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          'فارمي',
-                          style: pw.TextStyle(
-                            fontSize: 24,
-                            fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.blue,
-                          ),
-                        ),
-                        pw.Text(
-                          'نظام إدارة المزرعة',
-                          style: pw.TextStyle(
-                            fontSize: 12,
-                            color: PdfColors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.end,
-                      children: [
-                        pw.Text(
-                          'إيصال دفع',
-                          style: pw.TextStyle(
-                            fontSize: 20,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                        pw.Text(
-                          'التاريخ: ${_formatToday()}',
-                          style: pw.TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                pw.SizedBox(height: 30),
-
-                // Customer Information
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey),
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(5),
-                    ),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'معلومات العميل:',
-                        style: pw.TextStyle(
-                          fontSize: 14,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 5),
-                      pw.Text('الاسم: ${customer['name']}'),
-                      pw.Text(
-                        'الهاتف: ${customer['contactInfo']?['phone'] ?? 'غير متوفر'}',
-                      ),
-                      pw.Text(
-                        'العنوان: ${customer['contactInfo']?['address'] ?? 'غير متوفر'}',
-                      ),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
-
-                // Employee Information
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey),
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(5),
-                    ),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'معلومات الموظف:',
-                        style: pw.TextStyle(
-                          fontSize: 14,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 5),
-                      pw.Text('الموظف: $employeeName'),
-                      pw.Text('التاريخ: ${_formatToday()}'),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
-
-                // Balance Details
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey),
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(5),
-                    ),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'تفاصيل الرصيد:',
-                        style: pw.TextStyle(
-                          fontSize: 14,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 5),
-                      pw.Text(
-                        'إجمالي الحساب: ${totalPrice.toStringAsFixed(2)} ج.م',
-                      ),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
-
-                // Payment Details
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey),
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(5),
-                    ),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'تفاصيل الدفع:',
-                        style: pw.TextStyle(
-                          fontSize: 14,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 5),
-                      pw.Text('الخصم: ${discount.toStringAsFixed(2)} ج.م'),
-                      pw.Text(
-                        'المبلغ المدفوع: ${paidAmount.toStringAsFixed(2)} ج.م',
-                      ),
-                      pw.Text('المتبقي: ${remaining.toStringAsFixed(2)} ج.م'),
-                      pw.Text('طريقة الدفع: نقداً'),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
-
-                // Total
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(15),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.grey300,
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(5),
-                    ),
-                  ),
-                  child: pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Text(
-                        'إجمالي المدفوع:',
-                        style: pw.TextStyle(
-                          fontSize: 16,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.Text(
-                        '${paidAmount.toStringAsFixed(2)} ج.م',
-                        style: pw.TextStyle(
-                          fontSize: 18,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.blue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
-
-                // Footer
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey),
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(5),
-                    ),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'ملاحظات:',
-                        style: pw.TextStyle(
-                          fontSize: 12,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 5),
-                      pw.Text(
-                        '• هذا الإيصال صالح لمدة 30 يوم من تاريخ الإصدار',
-                        style: pw.TextStyle(fontSize: 10),
-                      ),
-                      pw.Text(
-                        '• في حالة وجود أي استفسار، يرجى التواصل مع إدارة المزرعة',
-                        style: pw.TextStyle(fontSize: 10),
-                      ),
-                      pw.Text(
-                        '• شكراً لثقتكم في منتجاتنا',
-                        style: pw.TextStyle(fontSize: 10),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      );
-
-      // Save PDF to documents folder with customer name
-      final documentsDir = await getApplicationDocumentsDirectory();
-      final customerName = customer['name']
-          .replaceAll(RegExp(r'[^\w\s-]'), '')
-          .replaceAll(' ', '_');
-      final file = File(
-        '${documentsDir.path}/payment_receipt_${customerName}_${DateTime.now().millisecondsSinceEpoch}.pdf',
-      );
-      await file.writeAsBytes(await pdf.save());
-
-      // Try to open PDF, but handle errors gracefully
-      try {
-        await OpenFile.open(file.path);
-      } catch (openError) {
-        // If opening fails, show success with file path info
-        _showSuccessDialogWithPath(
-          'تم إنشاء الإيصال بنجاح',
-          'تم حفظ الملف في مجلد المستندات: ${file.path}',
-        );
-        return;
-      }
-
-      _showSuccessDialog();
-    } catch (e) {
-      _showErrorDialog('فشل في إنشاء الإيصال: $e');
-    }
   }
 
   @override
@@ -889,50 +617,7 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
 
                                     const SizedBox(height: 16),
 
-                                    // Generate Receipt Button
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: OutlinedButton.icon(
-                                        onPressed: isPaymentSubmitted
-                                            ? _generateReceipt
-                                            : null,
-                                        icon: Icon(
-                                          Icons.receipt,
-                                          color: isPaymentSubmitted
-                                              ? Theme.of(
-                                                  context,
-                                                ).colorScheme.primary
-                                              : Colors.grey,
-                                        ),
-                                        label: Text(
-                                          'إنشاء الإيصال',
-                                          style: TextStyle(
-                                            color: isPaymentSubmitted
-                                                ? Theme.of(
-                                                    context,
-                                                  ).colorScheme.primary
-                                                : Colors.grey,
-                                          ),
-                                        ),
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 14,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          side: BorderSide(
-                                            color: isPaymentSubmitted
-                                                ? Theme.of(
-                                                    context,
-                                                  ).colorScheme.primary
-                                                : Colors.grey,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
+                                    // Removed PDF generation action button
                                   ],
                                 ),
                               ),

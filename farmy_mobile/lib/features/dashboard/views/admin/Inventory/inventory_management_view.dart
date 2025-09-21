@@ -13,7 +13,9 @@ class InventoryManagementView extends StatefulWidget {
 
 class _InventoryManagementViewState extends State<InventoryManagementView> {
   List<Map<String, dynamic>> chickenTypes = [];
+  List<Map<String, dynamic>> allChickenTypes = [];
   bool isLoading = true;
+  DateTime selectedDate = DateTime.now();
 
   @override
   void initState() {
@@ -62,11 +64,18 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
       }
 
       final inventoryService = serviceLocator<InventoryApiService>();
-      final chickenTypesList = await inventoryService.getAllChickenTypes();
+      final dateStr = selectedDate.toIso8601String().split(
+        'T',
+      )[0]; // YYYY-MM-DD format
+      final chickenTypesList = await inventoryService.getAllChickenTypes(
+        date: dateStr,
+      );
 
       if (mounted) {
         setState(() {
-          chickenTypes = chickenTypesList;
+          allChickenTypes = chickenTypesList;
+          chickenTypes =
+              chickenTypesList; // Backend already filters by selected date
           isLoading = false;
         });
       }
@@ -81,7 +90,10 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
   void _showAddChickenTypeDialog() {
     showDialog(
       context: context,
-      builder: (context) => _ChickenTypeFormDialog(onSave: _addChickenType),
+      builder: (context) => _ChickenTypeFormDialog(
+        onSave: _addChickenType,
+        selectedDate: selectedDate,
+      ),
     );
   }
 
@@ -91,6 +103,7 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
       builder: (context) => _ChickenTypeFormDialog(
         chickenType: chickenType,
         onSave: (data) => _updateChickenType(chickenType['_id'], data),
+        selectedDate: selectedDate,
       ),
     );
   }
@@ -103,8 +116,16 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
         );
       }
 
+      // Add the selected date to the chicken type data
+      final dataWithDate = {
+        ...chickenTypeData,
+        'date': selectedDate.toIso8601String().split(
+          'T',
+        )[0], // YYYY-MM-DD format
+      };
+
       final inventoryService = serviceLocator<InventoryApiService>();
-      await inventoryService.createChickenType(chickenTypeData);
+      await inventoryService.createChickenType(dataWithDate);
       _showSuccessDialog('تم إضافة نوع الدجاج بنجاح');
       _loadChickenTypes();
     } catch (e) {
@@ -123,8 +144,16 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
         );
       }
 
+      // Add the selected date to the chicken type data
+      final dataWithDate = {
+        ...chickenTypeData,
+        'date': selectedDate.toIso8601String().split(
+          'T',
+        )[0], // YYYY-MM-DD format
+      };
+
       final inventoryService = serviceLocator<InventoryApiService>();
-      await inventoryService.updateChickenType(id, chickenTypeData);
+      await inventoryService.updateChickenType(id, dataWithDate);
       _showSuccessDialog('تم تحديث المخزون بنجاح');
       _loadChickenTypes();
     } catch (e) {
@@ -239,6 +268,41 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
     return price.toString();
   }
 
+  Future<void> _selectDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: selectedDate,
+      firstDate: DateTime(2024, 1, 1),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+    );
+
+    if (picked != null && picked != selectedDate) {
+      setState(() {
+        selectedDate = picked;
+      });
+      // Reload data for the new date
+      _loadChickenTypes();
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    const months = [
+      'يناير',
+      'فبراير',
+      'مارس',
+      'أبريل',
+      'مايو',
+      'يونيو',
+      'يوليو',
+      'أغسطس',
+      'سبتمبر',
+      'أكتوبر',
+      'نوفمبر',
+      'ديسمبر',
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -267,6 +331,11 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
             ),
             actions: [
               IconButton(
+                icon: const Icon(Icons.calendar_today),
+                onPressed: _selectDate,
+                tooltip: 'اختيار التاريخ',
+              ),
+              IconButton(
                 icon: const Icon(Icons.add),
                 onPressed: _showAddChickenTypeDialog,
               ),
@@ -279,7 +348,7 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
           body: isLoading
               ? const Center(child: CircularProgressIndicator())
               : chickenTypes.isEmpty
-              ? const Center(
+              ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -290,7 +359,7 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
                       ),
                       SizedBox(height: 16),
                       Text(
-                        'لا توجد عناصر في المخزون',
+                        'لا توجد عناصر في المخزون لـ ${_formatDate(selectedDate)}',
                         style: TextStyle(fontSize: 18),
                       ),
                       const SizedBox(height: 8),
@@ -298,75 +367,112 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
                         'أضف أنواع الدجاج مع الأسعار بالجنية المصري لكل كيلو',
                         style: TextStyle(fontSize: 14, color: Colors.grey),
                       ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: _showAddChickenTypeDialog,
+                        icon: const Icon(Icons.add),
+                        label: const Text('إضافة مخزون لهذا اليوم'),
+                      ),
                     ],
                   ),
                 )
-              : Column(
-                  children: [
-                    // Summary Cards
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildSummaryCard(
-                                  'إجمالي العناصر',
-                                  chickenTypes.length.toString(),
-                                  Icons.inventory,
-                                  Colors.blue,
-                                ),
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Column(
+                    children: [
+                      // Date Filter Header
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              color: Theme.of(context).primaryColor,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'تاريخ المخزون: ${_formatDate(selectedDate)}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).primaryColor,
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _buildSummaryCard(
-                                  'إجمالي المخزون',
-                                  chickenTypes
-                                      .fold<int>(
-                                        0,
-                                        (sum, item) =>
-                                            sum + (item['stock'] as int),
-                                      )
-                                      .toString(),
-                                  Icons.storage,
-                                  Colors.green,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _buildSummaryCard(
-                                  'مخزون منخفض',
-                                  chickenTypes
-                                      .where((item) => item['stock'] < 10)
-                                      .length
-                                      .toString(),
-                                  Icons.warning,
-                                  Colors.orange,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildSummaryCard(
-                                  'القيمة الإجمالية',
-                                  '${_calculateTotalValue().toStringAsFixed(0)} ج.م',
-                                  Icons.attach_money,
-                                  Colors.purple,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                            ),
+                            const Spacer(),
+                            TextButton.icon(
+                              onPressed: _selectDate,
+                              icon: const Icon(Icons.edit, size: 16),
+                              label: const Text('تغيير التاريخ'),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    // Inventory List
-                    Expanded(
-                      child: ListView.builder(
+                      // Summary Cards
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildSummaryCard(
+                                    'إجمالي العناصر',
+                                    chickenTypes.length.toString(),
+                                    Icons.inventory,
+                                    Colors.blue,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildSummaryCard(
+                                    'إجمالي المخزون',
+                                    chickenTypes
+                                        .fold<int>(
+                                          0,
+                                          (sum, item) =>
+                                              sum + (item['stock'] as int),
+                                        )
+                                        .toString(),
+                                    Icons.storage,
+                                    Colors.green,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildSummaryCard(
+                                    'مخزون منخفض',
+                                    chickenTypes
+                                        .where((item) => item['stock'] < 10)
+                                        .length
+                                        .toString(),
+                                    Icons.warning,
+                                    Colors.orange,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildSummaryCard(
+                                    'القيمة الإجمالية',
+                                    '${_calculateTotalValue().toStringAsFixed(0)} ج.م',
+                                    Icons.attach_money,
+                                    Colors.purple,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Inventory List
+                      ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
                         itemCount: chickenTypes.length,
                         itemBuilder: (context, index) {
                           final chickenType = chickenTypes[index];
@@ -468,8 +574,8 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
                           );
                         },
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
           floatingActionButton: FloatingActionButton(
             onPressed: _showAddChickenTypeDialog,
@@ -569,8 +675,13 @@ class _InventoryManagementViewState extends State<InventoryManagementView> {
 class _ChickenTypeFormDialog extends StatefulWidget {
   final Map<String, dynamic>? chickenType;
   final Function(Map<String, dynamic>) onSave;
+  final DateTime selectedDate;
 
-  const _ChickenTypeFormDialog({this.chickenType, required this.onSave});
+  const _ChickenTypeFormDialog({
+    this.chickenType,
+    required this.onSave,
+    required this.selectedDate,
+  });
 
   @override
   State<_ChickenTypeFormDialog> createState() => _ChickenTypeFormDialogState();
@@ -586,10 +697,10 @@ class _ChickenTypeFormDialogState extends State<_ChickenTypeFormDialog> {
   final List<String> chickenTypeOptions = [
     'تسمين',
     'بلدي',
-    'أحمر',
+    'احمر',
     'ساسو',
     'بط',
-    'فراخ بيضاء',
+    // Keep only names that backend accepts
   ];
 
   @override
@@ -622,13 +733,33 @@ class _ChickenTypeFormDialogState extends State<_ChickenTypeFormDialog> {
     }
   }
 
+  String _formatDate(DateTime date) {
+    const months = [
+      'يناير',
+      'فبراير',
+      'مارس',
+      'أبريل',
+      'مايو',
+      'يونيو',
+      'يوليو',
+      'أغسطس',
+      'سبتمبر',
+      'أكتوبر',
+      'نوفمبر',
+      'ديسمبر',
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: AlertDialog(
         title: Text(
-          isEditing ? 'تعديل نوع الدجاج' : 'إضافة نوع دجاج (السعر لكل كيلو)',
+          isEditing
+              ? 'تعديل نوع الدجاج'
+              : 'إضافة نوع دجاج لـ ${_formatDate(widget.selectedDate)}',
         ),
         content: Form(
           key: _formKey,

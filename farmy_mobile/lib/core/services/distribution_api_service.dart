@@ -236,6 +236,28 @@ class DistributionApiService {
     }
   }
 
+  /// Delete all distributions
+  Future<void> deleteAllDistributions() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.delete(
+        Uri.parse('$baseUrl/distributions/all'),
+        headers: headers,
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        final errorData = json.decode(response.body);
+        throw ApiException(
+          message: errorData['message'] ?? 'Failed to delete all distributions',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
   /// Get daily net weight for distributions
   Future<Map<String, dynamic>> getDailyNetWeight(DateTime date) async {
     try {
@@ -284,5 +306,3 @@ class DistributionApiService {
     }
   }
 }
-
-

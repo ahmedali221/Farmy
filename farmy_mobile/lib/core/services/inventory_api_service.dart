@@ -21,22 +21,141 @@ class InventoryApiService {
   }
 
   /// Get all chicken types (shared endpoint for both managers and employees)
-  Future<List<Map<String, dynamic>>> getAllChickenTypes() async {
+  /// [date] - optional date filter in YYYY-MM-DD format
+  Future<List<Map<String, dynamic>>> getAllChickenTypes({String? date}) async {
     try {
       final headers = await _getAuthHeaders();
-      final response = await http.get(
-        Uri.parse('$baseUrl/chicken-types'),
-        headers: headers,
-      );
+
+      // Build URL with optional date query parameter
+      String url = '$baseUrl/chicken-types';
+      if (date != null) {
+        url += '?date=$date';
+      }
+
+      final response = await http.get(Uri.parse(url), headers: headers);
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.cast<Map<String, dynamic>>();
       } else {
-        throw ApiException(
-          message: 'Failed to load chicken types',
-          statusCode: response.statusCode,
-        );
+        try {
+          final errorData = json.decode(response.body);
+          throw ApiException(
+            message: errorData['message'] ?? 'Failed to load chicken types',
+            statusCode: response.statusCode,
+          );
+        } catch (_) {
+          throw ApiException(
+            message:
+                'HTTP ${response.statusCode}: ${response.reasonPhrase ?? 'Unexpected response'}',
+            statusCode: response.statusCode,
+          );
+        }
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get daily inventory by date (manager only)
+  Future<Map<String, dynamic>> getDailyInventoryByDate(String date) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final url = '$baseUrl/stocks/by-date?date=$date';
+      final response = await http.get(Uri.parse(url), headers: headers);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        return data;
+      } else {
+        try {
+          final errorData = json.decode(response.body);
+          throw ApiException(
+            message: errorData['message'] ?? 'Failed to load daily inventory',
+            statusCode: response.statusCode,
+          );
+        } catch (_) {
+          throw ApiException(
+            message:
+                'HTTP ${response.statusCode}: ${response.reasonPhrase ?? 'Unexpected response'}',
+            statusCode: response.statusCode,
+          );
+        }
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get daily profit and components
+  Future<Map<String, dynamic>> getDailyProfit(String date) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final url = '$baseUrl/stocks/profit?date=$date';
+      final response = await http.get(Uri.parse(url), headers: headers);
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else {
+        try {
+          final errorData = json.decode(response.body);
+          throw ApiException(
+            message: errorData['message'] ?? 'Failed to load daily profit',
+            statusCode: response.statusCode,
+          );
+        } catch (_) {
+          throw ApiException(
+            message:
+                'HTTP ${response.statusCode}: ${response.reasonPhrase ?? 'Unexpected response'}',
+            statusCode: response.statusCode,
+          );
+        }
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Upsert daily inventory values using admin inputs
+  /// Calculates result using: (netLoadingWeight - netDistributionWeight) - adminAdjustment
+  Future<Map<String, dynamic>> upsertDailyInventory({
+    required String date,
+    required num adminAdjustment,
+    String? notes,
+  }) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final body = {
+        'date': DateTime.parse(date).toIso8601String(),
+        'adminAdjustment': adminAdjustment,
+        if (notes != null) 'notes': notes,
+      };
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/stocks/upsert'),
+        headers: headers,
+        body: json.encode(body),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        try {
+          final errorData = json.decode(response.body);
+          throw ApiException(
+            message: errorData['message'] ?? 'Failed to update daily inventory',
+            statusCode: response.statusCode,
+          );
+        } catch (_) {
+          throw ApiException(
+            message:
+                'HTTP ${response.statusCode}: ${response.reasonPhrase ?? 'Unexpected response'}',
+            statusCode: response.statusCode,
+          );
+        }
       }
     } catch (e) {
       if (e is ApiException) rethrow;
@@ -70,26 +189,46 @@ class InventoryApiService {
   }
 
   /// Create new chicken type (manager only)
-  /// chickenTypeData should include: name, price (EGP per kilo), stock
+  /// chickenTypeData should include: name, price (EGP per kilo), stock, date (optional)
   Future<Map<String, dynamic>> createChickenType(
     Map<String, dynamic> chickenTypeData,
   ) async {
     try {
       final headers = await _getAuthHeaders();
+
+      // Prepare data for API - include date if provided
+      final apiData = Map<String, dynamic>.from(chickenTypeData);
+
+      // If date is provided, format it properly for the backend
+      if (apiData.containsKey('date')) {
+        // Convert date to ISO format that backend expects
+        final dateStr = apiData['date'] as String;
+        final date = DateTime.parse(dateStr);
+        apiData['date'] = date.toIso8601String();
+      }
+
       final response = await http.post(
         Uri.parse('$baseUrl/managers/chicken-types'),
         headers: headers,
-        body: json.encode(chickenTypeData),
+        body: json.encode(apiData),
       );
 
       if (response.statusCode == 201) {
         return json.decode(response.body);
       } else {
-        final errorData = json.decode(response.body);
-        throw ApiException(
-          message: errorData['message'] ?? 'Failed to create chicken type',
-          statusCode: response.statusCode,
-        );
+        try {
+          final errorData = json.decode(response.body);
+          throw ApiException(
+            message: errorData['message'] ?? 'Failed to create chicken type',
+            statusCode: response.statusCode,
+          );
+        } catch (_) {
+          throw ApiException(
+            message:
+                'HTTP ${response.statusCode}: ${response.reasonPhrase ?? 'Unexpected response'}',
+            statusCode: response.statusCode,
+          );
+        }
       }
     } catch (e) {
       if (e is ApiException) rethrow;
@@ -98,27 +237,47 @@ class InventoryApiService {
   }
 
   /// Update chicken type (manager only)
-  /// chickenTypeData should include: name, price (EGP per kilo), stock
+  /// chickenTypeData should include: name, price (EGP per kilo), stock, date (optional)
   Future<Map<String, dynamic>> updateChickenType(
     String id,
     Map<String, dynamic> chickenTypeData,
   ) async {
     try {
       final headers = await _getAuthHeaders();
+
+      // Prepare data for API - include date if provided
+      final apiData = Map<String, dynamic>.from(chickenTypeData);
+
+      // If date is provided, format it properly for the backend
+      if (apiData.containsKey('date')) {
+        // Convert date to ISO format that backend expects
+        final dateStr = apiData['date'] as String;
+        final date = DateTime.parse(dateStr);
+        apiData['date'] = date.toIso8601String();
+      }
+
       final response = await http.put(
         Uri.parse('$baseUrl/managers/chicken-types/$id'),
         headers: headers,
-        body: json.encode(chickenTypeData),
+        body: json.encode(apiData),
       );
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        final errorData = json.decode(response.body);
-        throw ApiException(
-          message: errorData['message'] ?? 'Failed to update chicken type',
-          statusCode: response.statusCode,
-        );
+        try {
+          final errorData = json.decode(response.body);
+          throw ApiException(
+            message: errorData['message'] ?? 'Failed to update chicken type',
+            statusCode: response.statusCode,
+          );
+        } catch (_) {
+          throw ApiException(
+            message:
+                'HTTP ${response.statusCode}: ${response.reasonPhrase ?? 'Unexpected response'}',
+            statusCode: response.statusCode,
+          );
+        }
       }
     } catch (e) {
       if (e is ApiException) rethrow;
@@ -135,12 +294,22 @@ class InventoryApiService {
         headers: headers,
       );
 
-      if (response.statusCode != 200) {
-        final errorData = json.decode(response.body);
-        throw ApiException(
-          message: errorData['message'] ?? 'Failed to delete chicken type',
-          statusCode: response.statusCode,
-        );
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return; // Success
+      } else {
+        try {
+          final errorData = json.decode(response.body);
+          throw ApiException(
+            message: errorData['message'] ?? 'Failed to delete chicken type',
+            statusCode: response.statusCode,
+          );
+        } catch (_) {
+          throw ApiException(
+            message:
+                'HTTP ${response.statusCode}: ${response.reasonPhrase ?? 'Unexpected response'}',
+            statusCode: response.statusCode,
+          );
+        }
       }
     } catch (e) {
       if (e is ApiException) rethrow;

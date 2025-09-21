@@ -9,7 +9,8 @@ const logger = require('../../utils/logger');
 const chickenTypeSchema = Joi.object({
   name: Joi.string().valid('تسمين', 'بلدي', 'احمر', 'ساسو', 'بط').required(),
   price: Joi.number().min(0).required(),
-  stock: Joi.number().min(0).required()
+  stock: Joi.number().min(0).required(),
+  date: Joi.date().optional()
 });
 
 const orderSchema = Joi.object({
@@ -21,8 +22,23 @@ const orderSchema = Joi.object({
 
 exports.getAllChickenTypes = async (req, res) => {
   try {
-    const chickenTypes = await ChickenType.find();
-    logger.info('Fetched all chicken types');
+    const { date } = req.query;
+    let query = {};
+    
+    // If date is provided, filter by that specific date
+    if (date) {
+      const targetDate = new Date(date);
+      const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+      const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
+      
+      query.date = {
+        $gte: startOfDay,
+        $lt: endOfDay
+      };
+    }
+    
+    const chickenTypes = await ChickenType.find(query).sort({ date: -1, name: 1 });
+    logger.info(`Fetched chicken types${date ? ` for date: ${date}` : ''}`);
     res.json(chickenTypes);
   } catch (err) {
     logger.error(`Error fetching chicken types: ${err.message}`);
@@ -35,9 +51,19 @@ exports.createChickenType = async (req, res) => {
   if (error) return res.status(400).json({ message: error.details[0].message });
 
   try {
-    const chickenType = new ChickenType(req.body);
+    // Set date to start of day if provided, otherwise use current date
+    const chickenTypeData = { ...req.body };
+    if (chickenTypeData.date) {
+      const date = new Date(chickenTypeData.date);
+      chickenTypeData.date = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    } else {
+      chickenTypeData.date = new Date();
+      chickenTypeData.date.setHours(0, 0, 0, 0);
+    }
+
+    const chickenType = new ChickenType(chickenTypeData);
     await chickenType.save();
-    logger.info(`Created new chicken type: ${chickenType.name}`);
+    logger.info(`Created new chicken type: ${chickenType.name} for date: ${chickenType.date}`);
     res.status(201).json(chickenType);
   } catch (err) {
     logger.error(`Error creating chicken type: ${err.message}`);
@@ -50,11 +76,33 @@ exports.updateChickenType = async (req, res) => {
   if (error) return res.status(400).json({ message: error.details[0].message });
 
   try {
-    const chickenType = await ChickenType.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    // Set date to start of day if provided
+    const chickenTypeData = { ...req.body };
+    if (chickenTypeData.date) {
+      const date = new Date(chickenTypeData.date);
+      chickenTypeData.date = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    }
+
+    const chickenType = await ChickenType.findByIdAndUpdate(req.params.id, chickenTypeData, { new: true });
     if (!chickenType) return res.status(404).json({ message: 'Chicken type not found' });
+    
+    logger.info(`Updated chicken type: ${chickenType.name} for date: ${chickenType.date}`);
     res.json(chickenType);
   } catch (err) {
-    logger.error(err);
+    logger.error(`Error updating chicken type: ${err.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.deleteChickenType = async (req, res) => {
+  try {
+    const chickenType = await ChickenType.findByIdAndDelete(req.params.id);
+    if (!chickenType) return res.status(404).json({ message: 'Chicken type not found' });
+    
+    logger.info(`Deleted chicken type: ${chickenType.name} for date: ${chickenType.date}`);
+    res.status(200).json({ message: 'Chicken type deleted successfully' });
+  } catch (err) {
+    logger.error(`Error deleting chicken type: ${err.message}`);
     res.status(500).json({ message: 'Server error' });
   }
 };

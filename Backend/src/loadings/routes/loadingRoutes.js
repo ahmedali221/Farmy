@@ -17,6 +17,9 @@ router.get('/customer/:customerId', loadingController.getLoadingsByCustomer);
 // Get loading statistics
 router.get('/stats', loadingController.getLoadingStats);
 
+// Delete all loadings (must be before param routes)
+router.delete('/all', loadingController.deleteAllLoadings);
+
 // Get loading by ID
 router.get('/:id', loadingController.getLoadingById);
 
