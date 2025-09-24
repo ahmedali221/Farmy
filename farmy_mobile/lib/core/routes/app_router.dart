@@ -13,14 +13,18 @@ import '../../features/dashboard/views/admin/order_detail_view.dart';
 import '../../features/dashboard/views/admin/Employees Section/employee_orders_view.dart';
 import '../../features/dashboard/views/admin/Customers Section/customer_loading_orders_view.dart';
 import '../../features/dashboard/views/admin/Customers Section/customer_history_view.dart';
-import '../../features/dashboard/views/employee/daily_report_screen.dart';
 import '../../features/dashboard/views/employee/order_placement_view.dart';
 import '../../features/dashboard/views/employee/payment_collection_view.dart';
 import '../../features/dashboard/views/employee/expense_management_view.dart';
 import '../../features/dashboard/views/employee/distribution_view.dart';
+import '../../features/dashboard/views/employee/employee_financial_view.dart';
+import '../../features/dashboard/views/employee/employee_payment_history_view.dart';
+import '../../features/dashboard/views/employee/employee_expense_history_view.dart';
+import '../../features/dashboard/views/employee/employee_daily_detail_view.dart';
 import '../../features/dashboard/views/admin/loading_history_view.dart';
 import '../../features/dashboard/views/admin/distribution_history_view.dart';
 import '../../features/dashboard/views/admin/payment_history_view.dart';
+import '../../features/dashboard/views/admin/Financial Dashboard/transfer_money_view.dart';
 
 class AppRouter {
   static GoRouter createRouter(AuthCubit authCubit) {
@@ -161,11 +165,6 @@ class AppRouter {
         ),
         // Employee Routes
         GoRoute(
-          path: '/daily-report',
-          name: 'daily-report',
-          builder: (context, state) => const DailyReportScreen(),
-        ),
-        GoRoute(
           path: '/order-placement',
           name: 'order-placement',
           builder: (context, state) => const OrderPlacementView(),
@@ -185,6 +184,35 @@ class AppRouter {
           name: 'expenses',
           builder: (context, state) => const ExpenseManagementView(),
         ),
+        GoRoute(
+          path: '/employee-financial',
+          name: 'employee-financial',
+          builder: (context, state) => const EmployeeFinancialView(),
+        ),
+        GoRoute(
+          path: '/employee-expense-history',
+          name: 'employee-expense-history',
+          builder: (context, state) => const EmployeeExpenseHistoryView(),
+        ),
+        GoRoute(
+          path: '/employee-daily-detail',
+          name: 'employee-daily-detail',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>?;
+            final date = (extra != null ? extra['date'] : null)?.toString();
+            if (date == null || date.isEmpty) {
+              return const Scaffold(
+                body: Center(child: Text('لم يتم تحديد التاريخ')),
+              );
+            }
+            return EmployeeDailyDetailView(date: date);
+          },
+        ),
+        GoRoute(
+          path: '/employee-payment-history',
+          name: 'employee-payment-history',
+          builder: (context, state) => const EmployeePaymentHistoryView(),
+        ),
         // History Routes
         GoRoute(
           path: '/loading-history',
@@ -200,6 +228,22 @@ class AppRouter {
           path: '/payment-history',
           name: 'payment-history',
           builder: (context, state) => const PaymentHistoryView(),
+        ),
+        GoRoute(
+          path: '/transfer-money',
+          name: 'transfer-money',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>?;
+            if (extra == null || extra['fromEmployeeId'] == null) {
+              return const Scaffold(
+                body: Center(child: Text('Employee data not found')),
+              );
+            }
+            return TransferMoneyView(
+              fromEmployeeId: (extra['fromEmployeeId'] ?? '').toString(),
+              fromEmployeeName: (extra['fromEmployeeName'] ?? '')?.toString(),
+            );
+          },
         ),
       ],
       errorPageBuilder: (context, state) => MaterialPage(

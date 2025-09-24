@@ -14,23 +14,18 @@ class CustomerHistoryView extends StatefulWidget {
   State<CustomerHistoryView> createState() => _CustomerHistoryViewState();
 }
 
-class _CustomerHistoryViewState extends State<CustomerHistoryView>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _CustomerHistoryViewState extends State<CustomerHistoryView> {
   late final LoadingApiService _loadingService;
   late final DistributionApiService _distributionService;
   late final PaymentApiService _paymentService;
 
-  List<Map<String, dynamic>> _loadingOrders = [];
-  List<Map<String, dynamic>> _distributions = [];
-  List<Map<String, dynamic>> _payments = [];
+  List<_DailyCustomerHistoryGroup> _dailyGroups = [];
   bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _loadingService = serviceLocator<LoadingApiService>();
     _distributionService = serviceLocator<DistributionApiService>();
     _paymentService = serviceLocator<PaymentApiService>();
@@ -39,7 +34,6 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView>
 
   @override
   void dispose() {
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -79,9 +73,11 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView>
           .toList();
 
       setState(() {
-        _loadingOrders = customerLoadings;
-        _distributions = customerDistributions;
-        _payments = customerPayments;
+        _dailyGroups = _groupHistoryByDay(
+          loadings: customerLoadings,
+          distributions: customerDistributions,
+          payments: customerPayments,
+        );
         _isLoading = false;
       });
     } catch (e) {
@@ -90,6 +86,74 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView>
         _isLoading = false;
       });
     }
+  }
+
+  List<_DailyCustomerHistoryGroup> _groupHistoryByDay({
+    required List<Map<String, dynamic>> loadings,
+    required List<Map<String, dynamic>> distributions,
+    required List<Map<String, dynamic>> payments,
+  }) {
+    String keyFor(String? iso) {
+      try {
+        if (iso == null) return '0000-00-00';
+        final dt = DateTime.parse(iso).toLocal();
+        return '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+      } catch (_) {
+        return '0000-00-00';
+      }
+    }
+
+    final Map<String, _DailyCustomerHistoryGroup> dateToGroup = {};
+
+    void addLoading(Map<String, dynamic> m) {
+      final k = keyFor(m['createdAt']);
+      dateToGroup.putIfAbsent(k, () => _DailyCustomerHistoryGroup(dateKey: k));
+      dateToGroup[k]!.loadings.add(m);
+    }
+
+    void addDistribution(Map<String, dynamic> m) {
+      final k = keyFor(m['createdAt']);
+      dateToGroup.putIfAbsent(k, () => _DailyCustomerHistoryGroup(dateKey: k));
+      dateToGroup[k]!.distributions.add(m);
+    }
+
+    void addPayment(Map<String, dynamic> m) {
+      final k = keyFor(m['createdAt']);
+      dateToGroup.putIfAbsent(k, () => _DailyCustomerHistoryGroup(dateKey: k));
+      dateToGroup[k]!.payments.add(m);
+    }
+
+    for (final m in loadings) {
+      addLoading(m);
+    }
+    for (final m in distributions) {
+      addDistribution(m);
+    }
+    for (final m in payments) {
+      addPayment(m);
+    }
+
+    final groups = dateToGroup.values.toList();
+    groups.sort((a, b) => b.dateKey.compareTo(a.dateKey));
+    // Optional: sort inside-day items newest first
+    for (final g in groups) {
+      g.loadings.sort(
+        (a, b) => (b['createdAt'] ?? '').toString().compareTo(
+          (a['createdAt'] ?? '').toString(),
+        ),
+      );
+      g.distributions.sort(
+        (a, b) => (b['createdAt'] ?? '').toString().compareTo(
+          (a['createdAt'] ?? '').toString(),
+        ),
+      );
+      g.payments.sort(
+        (a, b) => (b['createdAt'] ?? '').toString().compareTo(
+          (a['createdAt'] ?? '').toString(),
+        ),
+      );
+    }
+    return groups;
   }
 
   @override
@@ -124,39 +188,12 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView>
                 onPressed: _loadAllData,
               ),
             ],
-            bottom: TabBar(
-              controller: _tabController,
-              indicatorColor: Colors.white,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white70,
-              tabs: const [
-                Tab(icon: Icon(Icons.local_shipping), text: 'التحميلات'),
-                Tab(icon: Icon(Icons.outbound), text: 'التوزيعات'),
-                Tab(icon: Icon(Icons.payment), text: 'المدفوعات'),
-              ],
-            ),
           ),
           body: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _error != null
               ? _buildErrorWidget()
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _LoadingHistoryTab(
-                      customer: widget.customer,
-                      loadingOrders: _loadingOrders,
-                    ),
-                    _DistributionHistoryTab(
-                      customer: widget.customer,
-                      distributions: _distributions,
-                    ),
-                    _PaymentHistoryTab(
-                      customer: widget.customer,
-                      payments: _payments,
-                    ),
-                  ],
-                ),
+              : _buildUnifiedDailyHistory(),
         ),
       ),
     );
@@ -181,189 +218,249 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView>
   }
 }
 
-class _LoadingHistoryTab extends StatelessWidget {
-  final Map<String, dynamic> customer;
-  final List<Map<String, dynamic>> loadingOrders;
+class _DailyCustomerHistoryGroup {
+  final String dateKey; // yyyy-mm-dd
+  final List<Map<String, dynamic>> loadings = [];
+  final List<Map<String, dynamic>> distributions = [];
+  final List<Map<String, dynamic>> payments = [];
 
-  const _LoadingHistoryTab({
-    required this.customer,
-    required this.loadingOrders,
-  });
+  _DailyCustomerHistoryGroup({required this.dateKey});
+}
 
-  @override
-  Widget build(BuildContext context) {
-    // Calculate totals
-    final double totalWeight = loadingOrders.fold(
-      0.0,
-      (sum, order) => sum + ((order['netWeight'] ?? 0) as num).toDouble(),
-    );
-    final double totalValue = loadingOrders.fold(
-      0.0,
-      (sum, order) => sum + ((order['totalLoading'] ?? 0) as num).toDouble(),
-    );
-    final double totalQuantity = loadingOrders.fold(
-      0.0,
-      (sum, order) => sum + ((order['quantity'] ?? 0) as num).toDouble(),
-    );
+extension on _CustomerHistoryViewState {
+  Widget _buildUnifiedDailyHistory() {
+    if (_dailyGroups.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 12),
+            Text(
+              'لا يوجد سجل لهذا العميل',
+              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
 
     return CustomScrollView(
       slivers: [
-        // Summary Card
-        SliverToBoxAdapter(
-          child: Container(
-            margin: const EdgeInsets.all(16),
+        SliverList(
+          delegate: SliverChildBuilderDelegate((context, index) {
+            final group = _dailyGroups[index];
+            return _buildDayCard(context, group);
+          }, childCount: _dailyGroups.length),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 16)),
+      ],
+    );
+  }
+
+  Widget _buildDayCard(BuildContext context, _DailyCustomerHistoryGroup group) {
+    final dateLabel = _formatDateOnly(group.dateKey);
+    final hasLoadings = group.loadings.isNotEmpty;
+    final hasDistributions = group.distributions.isNotEmpty;
+    final hasPayments = group.payments.isNotEmpty;
+
+    // Day totals (quick summary)
+    final double dayDistributionValue = group.distributions.fold(
+      0.0,
+      (sum, m) => sum + ((m['totalAmount'] ?? 0) as num).toDouble(),
+    );
+    final double dayPayments = group.payments.fold(
+      0.0,
+      (sum, m) =>
+          sum + ((m['amount'] ?? m['paidAmount'] ?? 0) as num).toDouble(),
+    );
+    final double dayTotal =
+        dayDistributionValue; // only distributions contribute to amount
+    final double dayRemaining = (dayTotal - dayPayments) < 0
+        ? 0
+        : (dayTotal - dayPayments);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
-                padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
                 child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Icon(
-                          Icons.local_shipping,
-                          color: Colors.blue,
-                          size: 24,
+                    Icons.calendar_today,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          'ملخص التحميلات',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
+                  Expanded(
+                    child: Text(
+                      dateLabel,
+                      style: const TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: Colors.blue,
-                              ),
+                        fontSize: 16,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _chip(
+                          'التحميلات: ${group.loadings.length}',
+                          Theme.of(context).colorScheme.primary,
+                        ),
+                        _chip(
+                          'التوزيعات: ${group.distributions.length}',
+                          Theme.of(context).colorScheme.primary,
+                        ),
+                        _chip(
+                          'المدفوعات: ${group.payments.length}',
+                          Theme.of(context).colorScheme.primary,
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildSummaryCard(
-                            'إجمالي الطلبات',
-                            loadingOrders.length.toString(),
-                            Icons.inventory,
-                            Colors.purple,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildSummaryCard(
-                            'إجمالي الكمية',
-                            '${totalQuantity.toInt()}',
-                            Icons.scale,
-                            Colors.green,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Row(
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
                       children: [
-                        Expanded(
-                          child: _buildSummaryCard(
-                            'إجمالي الوزن',
-                            '${totalWeight.toStringAsFixed(1)} كجم',
-                            Icons.scale_outlined,
-                            Colors.orange,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildSummaryCard(
-                            'إجمالي القيمة',
-                            'ج.م ${totalValue.toStringAsFixed(2)}',
-                            Icons.attach_money,
-                            Colors.red,
-                          ),
-                        ),
-                      ],
+                  if (dayDistributionValue > 0)
+                    _summaryPill(
+                      'قيمة التوزيعات',
+                      dayDistributionValue,
+                      Theme.of(context).colorScheme.primary,
                     ),
-                  ],
-                ),
+                  if (dayPayments > 0)
+                    _summaryPill(
+                      'المدفوعات',
+                      dayPayments,
+                      Theme.of(context).colorScheme.primary,
+                    ),
+                  if (dayPayments > 0)
+                    _summaryPill(
+                      'المتبقي',
+                      dayRemaining,
+                      dayRemaining > 0 ? Colors.red : Colors.green,
+                    ),
+                ],
               ),
-            ),
-          ),
-        ),
+              const SizedBox(height: 12),
 
-        // Loading Orders List
-        if (loadingOrders.isEmpty)
-          SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.all(32),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.local_shipping_outlined,
-                      size: 64,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'لا توجد تحميلات',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+              if (hasLoadings) ...[
+                _sectionHeader(
+                  'طلبات التحميل',
+                  Icons.local_shipping,
+                  Theme.of(context).colorScheme.primary,
                 ),
+                const SizedBox(height: 8),
+                for (final m in group.loadings)
+                  _buildLoadingOrderItem(context, m),
+                const SizedBox(height: 12),
+              ],
+
+              if (hasDistributions) ...[
+                _sectionHeader(
+                  'طلبات التوزيع',
+                  Icons.outbound,
+                  Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 8),
+                for (final m in group.distributions)
+                  _buildDistributionItem(context, m),
+                const SizedBox(height: 12),
+              ],
+
+              if (hasPayments) ...[
+                _sectionHeader(
+                  'المدفوعات',
+                  Icons.payment,
+                  Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 8),
+                for (final m in group.payments)
+                  _buildPaymentItem(context, m, group),
+              ],
+            ],
               ),
             ),
-          )
-        else
-          SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final loadingOrder = loadingOrders[index];
-              return _buildLoadingOrderCard(context, loadingOrder);
-            }, childCount: loadingOrders.length),
           ),
-      ],
     );
   }
 
-  Widget _buildSummaryCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _chip(String text, Color color) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withOpacity(0.25)),
       ),
-      child: Column(
+      child: Text(
+        text,
+                      style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryPill(String title, double value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
+          Icon(Icons.attach_money, size: 14, color: color),
+          const SizedBox(width: 4),
           Text(
-            value,
+            '$title: ج.م ${value.toStringAsFixed(2)}',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
               color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
             ),
-          ),
-          Text(
-            title,
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildLoadingOrderCard(
+  Widget _sectionHeader(String title, IconData icon, Color color) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(width: 6),
+          Text(
+            title,
+          style: TextStyle(color: color, fontWeight: FontWeight.bold),
+          ),
+        const SizedBox(width: 6),
+        Expanded(child: Divider(color: color.withOpacity(0.2))),
+        ],
+    );
+  }
+
+  Widget _buildLoadingOrderItem(
     BuildContext context,
     Map<String, dynamic> loadingOrder,
   ) {
@@ -371,324 +468,76 @@ class _LoadingHistoryTab extends StatelessWidget {
         loadingOrder['_id']?.toString().substring(0, 8) ?? 'غير معروف';
     final createdAt = _formatDateTime(loadingOrder['createdAt']);
     final quantity = (loadingOrder['quantity'] ?? 0) as num;
-    final grossWeight = (loadingOrder['grossWeight'] ?? 0) as num;
-    final emptyWeight = (loadingOrder['emptyWeight'] ?? 0) as num;
     final netWeight = (loadingOrder['netWeight'] ?? 0) as num;
-    final totalLoading = (loadingOrder['totalLoading'] ?? 0) as num;
+    // final totalLoading = (loadingOrder['totalLoading'] ?? 0) as num; // hidden per request
     final chickenType = loadingOrder['chickenType'];
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.blue.withOpacity(0.15)),
+      ),
+      child: Directionality(
+        textDirection: TextDirection.rtl,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: Colors.blue.withOpacity(0.1),
-                    child: const Icon(Icons.local_shipping, color: Colors.blue),
+                  radius: 14,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primary.withOpacity(0.1),
+                  child: const Icon(
+                    Icons.local_shipping,
+                    size: 16,
+                    color: Colors.blue,
                   ),
-                  const SizedBox(width: 12),
+                ),
+                const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
+                  child: Text(
                           'طلب تحميل #$orderId',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                         Text(
                           createdAt,
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Details
-              _buildDetailRow(
+            const SizedBox(height: 6),
+            _kvTile(
                 'الكمية',
                 '${quantity.toInt()} وحدة',
                 Icons.inventory,
                 Colors.purple,
               ),
-              _buildDetailRow(
-                'الوزن القائم',
-                '${grossWeight.toDouble().toStringAsFixed(1)} كجم',
-                Icons.scale,
-                Colors.red,
-              ),
-              _buildDetailRow(
-                'الوزن الفارغ',
-                '${emptyWeight.toDouble().toStringAsFixed(1)} كجم',
-                Icons.scale_outlined,
-                Colors.orange,
-              ),
-              _buildDetailRow(
+            _kvTile(
                 'الوزن الصافي',
                 '${netWeight.toDouble().toStringAsFixed(1)} كجم',
                 Icons.scale_outlined,
                 Colors.green,
               ),
-              _buildDetailRow(
-                'إجمالي التحميل',
-                'ج.م ${totalLoading.toDouble().toStringAsFixed(2)}',
-                Icons.attach_money,
-                Colors.red,
-              ),
-
               if (chickenType != null)
-                _buildDetailRow(
+              _kvTile(
                   'نوع الدجاج',
                   chickenType['name'] ?? 'غير معروف',
                   Icons.pets,
                   Colors.brown,
                 ),
             ],
-          ),
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 8),
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDateTime(String? dateTime) {
-    if (dateTime == null) return 'غير معروف';
-    try {
-      final dt = DateTime.parse(dateTime);
-      return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
-      return 'تاريخ غير صحيح';
-    }
-  }
-}
-
-class _DistributionHistoryTab extends StatelessWidget {
-  final Map<String, dynamic> customer;
-  final List<Map<String, dynamic>> distributions;
-
-  const _DistributionHistoryTab({
-    required this.customer,
-    required this.distributions,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // Calculate totals
-    final double totalWeight = distributions.fold(
-      0.0,
-      (sum, dist) => sum + ((dist['netWeight'] ?? 0) as num).toDouble(),
-    );
-    final double totalValue = distributions.fold(
-      0.0,
-      (sum, dist) => sum + ((dist['totalAmount'] ?? 0) as num).toDouble(),
-    );
-    final double totalQuantity = distributions.fold(
-      0.0,
-      (sum, dist) => sum + ((dist['quantity'] ?? 0) as num).toDouble(),
-    );
-
-    return CustomScrollView(
-      slivers: [
-        // Summary Card
-        SliverToBoxAdapter(
-          child: Container(
-            margin: const EdgeInsets.all(16),
-            child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.outbound, color: Colors.orange, size: 24),
-                        const SizedBox(width: 8),
-                        Text(
-                          'ملخص التوزيعات',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.orange,
-                              ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildSummaryCard(
-                            'إجمالي التوزيعات',
-                            distributions.length.toString(),
-                            Icons.inventory,
-                            Colors.purple,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildSummaryCard(
-                            'إجمالي الكمية',
-                            '${totalQuantity.toInt()}',
-                            Icons.scale,
-                            Colors.green,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildSummaryCard(
-                            'إجمالي الوزن',
-                            '${totalWeight.toStringAsFixed(1)} كجم',
-                            Icons.scale_outlined,
-                            Colors.blue,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildSummaryCard(
-                            'إجمالي القيمة',
-                            'ج.م ${totalValue.toStringAsFixed(2)}',
-                            Icons.attach_money,
-                            Colors.red,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-
-        // Distributions List
-        if (distributions.isEmpty)
-          SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.all(32),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.outbound_outlined,
-                      size: 64,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'لا توجد توزيعات',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          )
-        else
-          SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final distribution = distributions[index];
-              return _buildDistributionCard(context, distribution);
-            }, childCount: distributions.length),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildSummaryCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Text(
-            title,
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDistributionCard(
+  Widget _buildDistributionItem(
     BuildContext context,
     Map<String, dynamic> distribution,
   ) {
@@ -696,443 +545,260 @@ class _DistributionHistoryTab extends StatelessWidget {
         distribution['_id']?.toString().substring(0, 8) ?? 'غير معروف';
     final createdAt = _formatDateTime(distribution['createdAt']);
     final quantity = (distribution['quantity'] ?? 0) as num;
-    final grossWeight = (distribution['grossWeight'] ?? 0) as num;
-    final emptyWeight = (distribution['emptyWeight'] ?? 0) as num;
     final netWeight = (distribution['netWeight'] ?? 0) as num;
-    final price = (distribution['price'] ?? 0) as num;
     final totalAmount = (distribution['totalAmount'] ?? 0) as num;
     final employee = distribution['employee'];
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.orange.withOpacity(0.15)),
+      ),
+      child: Directionality(
+        textDirection: TextDirection.rtl,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: Colors.orange.withOpacity(0.1),
-                    child: const Icon(Icons.outbound, color: Colors.orange),
+                  radius: 14,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primary.withOpacity(0.1),
+                  child: const Icon(
+                    Icons.outbound,
+                    size: 16,
+                    color: Colors.orange,
                   ),
-                  const SizedBox(width: 12),
+                ),
+                const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
+                  child: Text(
                           'توزيع #$distId',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                         Text(
                           createdAt,
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Details
-              _buildDetailRow(
+            const SizedBox(height: 6),
+            _kvTile(
                 'الكمية',
                 '${quantity.toInt()} وحدة',
                 Icons.inventory,
                 Colors.purple,
               ),
-              _buildDetailRow(
-                'الوزن القائم',
-                '${grossWeight.toDouble().toStringAsFixed(1)} كجم',
-                Icons.scale,
-                Colors.red,
-              ),
-              _buildDetailRow(
-                'الوزن الفارغ',
-                '${emptyWeight.toDouble().toStringAsFixed(1)} كجم',
-                Icons.scale_outlined,
-                Colors.orange,
-              ),
-              _buildDetailRow(
+            _kvTile(
                 'الوزن الصافي',
                 '${netWeight.toDouble().toStringAsFixed(1)} كجم',
                 Icons.scale_outlined,
                 Colors.green,
               ),
-              _buildDetailRow(
-                'السعر',
-                'ج.م ${price.toDouble().toStringAsFixed(2)}/كجم',
-                Icons.attach_money,
-                Colors.blue,
-              ),
-              _buildDetailRow(
+            _kvTile(
                 'إجمالي المبلغ',
                 'ج.م ${totalAmount.toDouble().toStringAsFixed(2)}',
                 Icons.attach_money,
                 Colors.red,
               ),
-
               if (employee != null)
-                _buildDetailRow(
+              _kvTile(
                   'الموظف',
                   employee['username'] ?? 'غير معروف',
                   Icons.person,
                   Colors.brown,
                 ),
             ],
-          ),
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
+  Widget _buildPaymentItem(
+    BuildContext context,
+    Map<String, dynamic> payment,
+    _DailyCustomerHistoryGroup group,
   ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 8),
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDateTime(String? dateTime) {
-    if (dateTime == null) return 'غير معروف';
-    try {
-      final dt = DateTime.parse(dateTime);
-      return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
-      return 'تاريخ غير صحيح';
-    }
-  }
-}
-
-class _PaymentHistoryTab extends StatelessWidget {
-  final Map<String, dynamic> customer;
-  final List<Map<String, dynamic>> payments;
-
-  const _PaymentHistoryTab({required this.customer, required this.payments});
-
-  @override
-  Widget build(BuildContext context) {
-    // Calculate totals
-    final double totalPaid = payments.fold(
-      0.0,
-      (sum, payment) => sum + ((payment['amount'] ?? 0) as num).toDouble(),
-    );
-
-    return CustomScrollView(
-      slivers: [
-        // Summary Card
-        SliverToBoxAdapter(
-          child: Container(
-            margin: const EdgeInsets.all(16),
-            child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.payment, color: Colors.green, size: 24),
-                        const SizedBox(width: 8),
-                        Text(
-                          'ملخص المدفوعات',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildSummaryCard(
-                            'إجمالي المدفوعات',
-                            payments.length.toString(),
-                            Icons.receipt,
-                            Colors.purple,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildSummaryCard(
-                            'إجمالي المبلغ',
-                            'ج.م ${totalPaid.toStringAsFixed(2)}',
-                            Icons.attach_money,
-                            Colors.green,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-
-        // Payments List
-        if (payments.isEmpty)
-          SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.all(32),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.payment_outlined,
-                      size: 64,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'لا توجد مدفوعات',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          )
-        else
-          SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final payment = payments[index];
-              return _buildPaymentCard(context, payment);
-            }, childCount: payments.length),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildSummaryCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Text(
-            title,
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentCard(BuildContext context, Map<String, dynamic> payment) {
     final paymentId = payment['_id']?.toString().substring(0, 8) ?? 'غير معروف';
     final createdAt = _formatDateTime(payment['createdAt']);
-    final amount = (payment['amount'] ?? 0) as num;
-    final paymentMethod = payment['paymentMethod'] ?? 'غير محدد';
+    final amount = (payment['amount'] ?? payment['paidAmount'] ?? 0) as num;
+    final method = (payment['paymentMethod'] ?? '').toString();
     final notes = payment['notes']?.toString();
     final employee = payment['employee'];
 
+    // Compute remaining before/after this payment within the same day
+    final double dayDistributionValue = group.distributions.fold(
+      0.0,
+      (sum, m) => sum + ((m['totalAmount'] ?? 0) as num).toDouble(),
+    );
+    // sum of payments before this one (by createdAt ascending within group)
+    double sumEarlierPayments = 0.0;
+    for (final p in group.payments) {
+      if (p == payment) break;
+      sumEarlierPayments += ((p['amount'] ?? p['paidAmount'] ?? 0) as num)
+          .toDouble();
+    }
+    final double remainingBefore = (dayDistributionValue - sumEarlierPayments)
+        .clamp(0, double.infinity);
+    final double remainingAfter = (remainingBefore - amount.toDouble()).clamp(
+      0,
+      double.infinity,
+    );
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.green.withOpacity(0.15)),
+      ),
+      child: Directionality(
+        textDirection: TextDirection.rtl,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: Colors.green.withOpacity(0.1),
-                    child: const Icon(Icons.payment, color: Colors.green),
+                  radius: 14,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primary.withOpacity(0.1),
+                  child: const Icon(
+                    Icons.payment,
+                    size: 16,
+                    color: Colors.green,
                   ),
-                  const SizedBox(width: 12),
+                ),
+                const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
+                  child: Text(
                           'دفعة #$paymentId',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                         Text(
                           createdAt,
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
 
-              // Details
-              _buildDetailRow(
+            _kvTile(
+              'المتبقي قبل الدفع',
+              'ج.م ${remainingBefore.toStringAsFixed(2)}',
+              Icons.pending_actions,
+              Colors.orange,
+            ),
+            const SizedBox(height: 6),
+            _kvTile(
                 'المبلغ',
                 'ج.م ${amount.toDouble().toStringAsFixed(2)}',
                 Icons.attach_money,
                 Colors.green,
               ),
-              _buildDetailRow(
+
+            _kvTile(
+              'المتبقي بعد الدفع',
+              'ج.م ${remainingAfter.toStringAsFixed(2)}',
+              Icons.check_circle,
+              remainingAfter > 0 ? Colors.red : Colors.green,
+            ),
+            if (method.isNotEmpty)
+              _kvTile(
                 'طريقة الدفع',
-                _getPaymentMethodText(paymentMethod),
+                _getPaymentMethodText(method),
                 Icons.payment,
                 Colors.blue,
               ),
-
               if (employee != null)
-                _buildDetailRow(
+              _kvTile(
                   'الموظف',
                   employee['username'] ?? 'غير معروف',
                   Icons.person,
                   Colors.brown,
                 ),
-
               if (notes != null && notes.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.note, size: 16, color: Colors.grey[600]),
-                          const SizedBox(width: 8),
+              const SizedBox(height: 6),
                           Text(
-                            'ملاحظات',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[700],
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        notes,
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                'ملاحظات: $notes',
+                style: TextStyle(color: Colors.grey[700], fontSize: 12),
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _kvTile(String label, String value, IconData icon, Color color) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
         color: color.withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withOpacity(0.2)),
       ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 8),
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          const Spacer(),
-          Text(
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        title: Text(
             value,
             style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
               color: color,
-            ),
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
           ),
-        ],
+          textDirection: TextDirection.rtl,
+        ),
+        subtitle: Text(
+          label,
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          textDirection: TextDirection.rtl,
+        ),
+        dense: true,
       ),
     );
+  }
+
+  // Deprecated: replaced by _kvTile
+
+  String _formatDateOnly(String dateKey) {
+    try {
+      final parts = dateKey.split('-');
+      if (parts.length != 3) return dateKey;
+      final y = int.parse(parts[0]);
+      final m = int.parse(parts[1]);
+      final d = int.parse(parts[2]);
+      return '$d/$m/$y';
+    } catch (_) {
+      return dateKey;
+    }
+  }
+
+  String _formatDateTime(String? dateTime) {
+    if (dateTime == null) return 'غير معروف';
+    try {
+      final dt = DateTime.parse(dateTime).toLocal();
+      final two = (int v) => v.toString().padLeft(2, '0');
+      return '${dt.day}/${dt.month}/${dt.year} ${two(dt.hour)}:${two(dt.minute)}';
+    } catch (_) {
+      return 'تاريخ غير صحيح';
+    }
   }
 
   String _getPaymentMethodText(String method) {
@@ -1145,16 +811,6 @@ class _PaymentHistoryTab extends StatelessWidget {
         return 'آجل';
       default:
         return method;
-    }
-  }
-
-  String _formatDateTime(String? dateTime) {
-    if (dateTime == null) return 'غير معروف';
-    try {
-      final dt = DateTime.parse(dateTime);
-      return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
-      return 'تاريخ غير صحيح';
     }
   }
 }

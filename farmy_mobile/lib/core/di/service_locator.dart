@@ -11,6 +11,7 @@ import '../services/expense_api_service.dart';
 import '../services/loading_api_service.dart';
 import '../services/distribution_api_service.dart';
 import '../services/employee_expense_api_service.dart';
+import '../services/transfer_api_service.dart';
 
 final GetIt serviceLocator = GetIt.instance;
 
@@ -47,6 +48,9 @@ class ServiceLocator {
     );
     serviceLocator.registerSingleton<DistributionApiService>(
       DistributionApiService(tokenService: serviceLocator<TokenService>()),
+    );
+    serviceLocator.registerSingleton<TransferApiService>(
+      TransferApiService(tokenService: serviceLocator<TokenService>()),
     );
 
     // Register cubits that depend on services

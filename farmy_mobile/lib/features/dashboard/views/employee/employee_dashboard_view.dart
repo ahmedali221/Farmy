@@ -124,13 +124,6 @@ class EmployeeDashboardView extends StatelessWidget {
                     children: [
                       _buildActionCard(
                         context,
-                        'التقرير اليومي',
-                        Icons.assessment,
-                        Theme.of(context).colorScheme.primary,
-                        () => context.push('/daily-report'),
-                      ),
-                      _buildActionCard(
-                        context,
                         'التحميل',
                         Icons.add_shopping_cart,
                         Theme.of(context).colorScheme.secondary,
@@ -147,8 +140,7 @@ class EmployeeDashboardView extends StatelessWidget {
                         context,
                         'تحصيل الدفع',
                         Icons.payment,
-                        Theme.of(context).colorScheme.tertiary ??
-                            Theme.of(context).colorScheme.primary,
+                        Theme.of(context).colorScheme.primary,
                         () => context.push('/payment-collection'),
                       ),
                       _buildActionCard(
@@ -157,6 +149,13 @@ class EmployeeDashboardView extends StatelessWidget {
                         Icons.money_off,
                         Theme.of(context).colorScheme.error,
                         () => context.push('/expenses'),
+                      ),
+                      _buildActionCard(
+                        context,
+                        'البيانات المالية',
+                        Icons.account_balance_wallet,
+                        Colors.purple,
+                        () => context.push('/employee-financial'),
                       ),
                     ],
                   ),
@@ -202,85 +201,6 @@ class EmployeeDashboardView extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  IconData _getActivityIcon(int index) {
-    switch (index) {
-      case 0:
-        return Icons.add_shopping_cart;
-      case 1:
-        return Icons.local_shipping;
-      case 2:
-        return Icons.person_add;
-      case 3:
-        return Icons.edit;
-      default:
-        return Icons.info;
-    }
-  }
-
-  String _getActivityTitle(int index) {
-    switch (index) {
-      case 0:
-        return 'تم إنشاء طلب جديد';
-      case 1:
-        return 'تم إكمال التسليم';
-      case 2:
-        return 'تم إضافة عميل';
-      case 3:
-        return 'تم تحديث الملف الشخصي';
-      default:
-        return 'إشعار النظام';
-    }
-  }
-
-  String _getActivitySubtitle(int index) {
-    switch (index) {
-      case 0:
-        return 'طلب رقم #1234 لـ أحمد محمد';
-      case 1:
-        return 'تسليم إلى الشارع الرئيسي';
-      case 2:
-        return 'تم إضافة فاطمة علي للنظام';
-      case 3:
-        return 'تم تحديث معلومات الاتصال';
-      default:
-        return 'تحديث عام للنظام';
-    }
-  }
-
-  String _getActivityTime(int index) {
-    switch (index) {
-      case 0:
-        return 'منذ ساعتين';
-      case 1:
-        return 'منذ 4 ساعات';
-      case 2:
-        return 'منذ يوم واحد';
-      case 3:
-        return 'منذ يومين';
-      default:
-        return 'منذ 3 أيام';
-    }
-  }
-
-  void _showFeatureDialog(BuildContext context, String feature) {
-    showDialog(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: Text(feature),
-          content: Text('سيتم تنفيذ ميزة $feature في التحديثات القادمة.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('حسناً'),
-            ),
-          ],
         ),
       ),
     );

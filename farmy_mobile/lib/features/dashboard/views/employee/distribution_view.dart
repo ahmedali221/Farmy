@@ -193,7 +193,7 @@ class _DistributionViewState extends State<DistributionView> {
                             pw.Padding(
                               padding: const pw.EdgeInsets.all(8),
                               child: pw.Text(
-                                'البيان',
+                                'القيمة',
                                 style: pw.TextStyle(
                                   font: ttf,
                                   fontWeight: pw.FontWeight.bold,
@@ -204,7 +204,7 @@ class _DistributionViewState extends State<DistributionView> {
                             pw.Padding(
                               padding: const pw.EdgeInsets.all(8),
                               child: pw.Text(
-                                'القيمة',
+                                'البيان',
                                 style: pw.TextStyle(
                                   font: ttf,
                                   fontWeight: pw.FontWeight.bold,
@@ -287,7 +287,7 @@ class _DistributionViewState extends State<DistributionView> {
         pw.Padding(
           padding: const pw.EdgeInsets.all(8),
           child: pw.Text(
-            label,
+            value,
             style: pw.TextStyle(
               font: font,
               fontSize: 12,
@@ -298,7 +298,7 @@ class _DistributionViewState extends State<DistributionView> {
         pw.Padding(
           padding: const pw.EdgeInsets.all(8),
           child: pw.Text(
-            value,
+            label,
             style: pw.TextStyle(
               font: font,
               fontSize: 12,
@@ -367,7 +367,6 @@ class _DistributionViewState extends State<DistributionView> {
         'customer': customerId,
         'quantity': int.tryParse(_quantityCtrl.text) ?? 0,
         'grossWeight': double.tryParse(_grossWeightCtrl.text) ?? 0.0,
-        'emptyWeight': double.tryParse(_emptyWeightCtrl.text) ?? 0.0,
         'price': double.tryParse(_priceCtrl.text) ?? 0.0,
         // Hint backend to set distributionDate explicitly to today (matches stock window)
         'distributionDate': DateTime.now().toIso8601String(),
@@ -739,23 +738,13 @@ class _DistributionViewState extends State<DistributionView> {
                                 SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      if (_formKey.currentState?.validate() ??
-                                          false) {
-                                        _recalculate();
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'تم حساب التوزيع: ${_totalAccount.toStringAsFixed(2)} ج.م',
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(Icons.calculate),
-                                    label: const Text('حساب'),
+                                    onPressed: _posting ? null : _submitBoth,
+                                    icon: const Icon(Icons.check_circle),
+                                    label: Text(
+                                      _posting
+                                          ? 'جارٍ الإرسال...'
+                                          : 'تسجيل التوزيع',
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 12),

@@ -13,6 +13,9 @@ router.get('/', paymentController.getAllPayments);
 router.get('/summary/employee', paymentController.getEmployeeCollectionSummary);
 router.get('/summary/:orderId', paymentController.getPaymentSummary);
 
+// Payments by employee (raw or grouped by day via ?groupBy=day)
+router.get('/employee/:employeeId', paymentController.getPaymentsByEmployee);
+
 // Fetch by relations and id
 router.get('/order/:orderId', paymentController.getPaymentsByOrder);
 router.get('/:id', paymentController.getPaymentById);

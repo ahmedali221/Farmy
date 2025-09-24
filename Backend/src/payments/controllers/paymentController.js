@@ -3,6 +3,9 @@ const Customer = require('../../customers/models/Customer');
 const Order = require('../../orders/models/Order');
 const Joi = require('joi');
 const logger = require('../../utils/logger');
+const mongoose = require('mongoose');
+const Transfer = require('../../transfers/models/Transfer');
+const EmployeeExpense = require('../../employeeExpenses/models/EmployeeExpense');
 
 // Validation schemas
 const paymentSchema = Joi.object({
@@ -164,29 +167,111 @@ exports.getPaymentSummary = async (req, res) => {
   }
 };
 
-// Summary of total collected per employee
+// List payments collected by a specific employee, optionally grouped by day
+exports.getPaymentsByEmployee = async (req, res) => {
+  try {
+    const employeeId = req.params.employeeId || req.user?.id;
+    if (!employeeId || !mongoose.Types.ObjectId.isValid(employeeId)) {
+      return res.status(400).json({ message: 'Invalid employee id' });
+    }
+
+    const groupBy = (req.query.groupBy || '').toLowerCase();
+
+    // Group in Mongo to minimize payload when requested
+    if (groupBy === 'day' || groupBy === 'date') {
+      const pipeline = [
+        { $match: { employee: new mongoose.Types.ObjectId(employeeId) } },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
+            },
+            totalPaid: { $sum: { $ifNull: ['$paidAmount', 0] } },
+            count: { $sum: 1 },
+            payments: {
+              $push: {
+                _id: '$_id',
+                customer: '$customer',
+                order: '$order',
+                totalPrice: '$totalPrice',
+                paidAmount: '$paidAmount',
+                discount: '$discount',
+                remainingAmount: '$remainingAmount',
+                paymentMethod: '$paymentMethod',
+                status: '$status',
+                createdAt: '$createdAt'
+              }
+            }
+          }
+        },
+        { $sort: { _id: -1 } }
+      ];
+
+      const grouped = await Payment.aggregate(pipeline);
+      return res.json(
+        grouped.map(g => ({ date: g._id, totalPaid: g.totalPaid, count: g.count, payments: g.payments }))
+      );
+    }
+
+    // Otherwise return raw list populated and sorted
+    const payments = await Payment.find({ employee: employeeId })
+      .populate('customer', 'name contactInfo')
+      .populate('employee', 'username')
+      .sort({ createdAt: -1 });
+
+    return res.json(payments);
+  } catch (err) {
+    logger.error(`Error fetching payments by employee: ${err.message}`);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Summary of total collected per employee including transfers in/out and net
 exports.getEmployeeCollectionSummary = async (req, res) => {
   try {
-    const summary = await Payment.aggregate([
-      {
-        $group: {
-          _id: '$employee',
-          totalCollected: { $sum: { $ifNull: ['$paidAmount', 0] } },
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          employeeId: '$_id',
-          totalCollected: 1,
-          count: 1
-        }
-      },
-      { $sort: { totalCollected: -1 } }
+    const collected = await Payment.aggregate([
+      { $group: { _id: '$employee', totalCollected: { $sum: { $ifNull: ['$paidAmount', 0] } }, count: { $sum: 1 } } }
     ]);
 
-    res.json(summary);
+    const transfersIn = await Transfer.aggregate([
+      { $group: { _id: '$toEmployee', totalIn: { $sum: { $ifNull: ['$amount', 0] } } } }
+    ]);
+
+    const transfersOut = await Transfer.aggregate([
+      { $group: { _id: '$fromEmployee', totalOut: { $sum: { $ifNull: ['$amount', 0] } } } }
+    ]);
+
+    const toMap = (arr, key) => arr.reduce((m, r) => { m[String(r._id)] = r[key]; return m; }, {});
+    const inMap = toMap(transfersIn, 'totalIn');
+    const outMap = toMap(transfersOut, 'totalOut');
+
+    // Employee expenses by employee
+    const expenses = await EmployeeExpense.aggregate([
+      { $group: { _id: '$employee', totalExpenses: { $sum: { $ifNull: ['$value', 0] } } } }
+    ]);
+
+    const expMap = toMap(expenses, 'totalExpenses');
+
+    const result = collected.map(row => {
+      const id = String(row._id);
+      const totalIn = inMap[id] || 0;
+      const totalOut = outMap[id] || 0;
+      const totalExpenses = expMap[id] || 0;
+      const net = (row.totalCollected || 0) + totalIn - totalOut;
+      const netAfterExpenses = net - totalExpenses;
+      return {
+        employeeId: row._id,
+        totalCollected: row.totalCollected || 0,
+        transfersIn: totalIn,
+        transfersOut: totalOut,
+        totalExpenses,
+        netAvailable: net,
+        netAfterExpenses,
+        count: row.count || 0
+      };
+    }).sort((a, b) => b.netAvailable - a.netAvailable);
+
+    res.json(result);
   } catch (err) {
     logger.error(`Error fetching employee collection summary: ${err.message}`);
     res.status(500).json({ message: 'Server error' });

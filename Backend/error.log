@@ -35,3 +35,10 @@
 {"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-13T12:19:33.950Z"}
 {"level":"error","message":"Error fetching orders: Order is not defined","timestamp":"2025-09-13T12:19:51.964Z"}
 {"level":"error","message":"Error deleting loading: Cast to ObjectId failed for value \"all\" (type string) at path \"_id\" for model \"Loading\"","timestamp":"2025-09-18T10:02:21.879Z"}
+{"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-21T21:12:43.673Z"}
+{"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-21T21:14:15.816Z"}
+{"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-21T21:14:18.185Z"}
+{"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-21T21:14:53.566Z"}
+{"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-21T21:16:43.300Z"}
+{"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-21T21:16:57.689Z"}
+{"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-21T21:19:13.746Z"}

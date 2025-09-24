@@ -20,6 +20,59 @@ class PaymentApiService {
     };
   }
 
+  /// Get payments collected by an employee (raw list)
+  Future<List<Map<String, dynamic>>> getPaymentsByEmployee(
+    String employeeId,
+  ) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/payments/employee/$employeeId'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load employee payments',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get daily grouped payments for an employee
+  /// Returns: [{ date: 'YYYY-MM-DD', totalPaid: number, count: number, payments: [ ... ] }]
+  Future<List<Map<String, dynamic>>> getEmployeeDailyCollections(
+    String employeeId,
+  ) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/payments/employee/$employeeId?groupBy=day'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load employee daily collections',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
   /// Create new payment
   Future<Map<String, dynamic>> createPayment(
     Map<String, dynamic> paymentData,

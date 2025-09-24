@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../../../core/di/service_locator.dart';
 import '../../../../../../core/services/payment_api_service.dart';
 import '../../../../../../core/services/employee_api_service.dart';
@@ -133,8 +134,17 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
                         _employeeIdToName[employeeId] ?? employeeId;
                     final double collected =
                         ((item['totalCollected'] ?? 0) as num).toDouble();
+                    final double transfersIn =
+                        ((item['transfersIn'] ?? 0) as num).toDouble();
+                    final double transfersOut =
+                        ((item['transfersOut'] ?? 0) as num).toDouble();
+                    final double netAvailable =
+                        ((item['netAvailable'] ??
+                                    (collected + transfersIn - transfersOut))
+                                as num)
+                            .toDouble();
                     final double extra = _sumEmployeeExpenses(employeeId);
-                    final double net = collected - extra;
+                    final double net = netAvailable - extra;
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: Card(
@@ -179,6 +189,12 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
                                         ),
                                       ),
                                       Text(
+                                        'تحويلات: +${transfersIn.toStringAsFixed(2)} / -${transfersOut.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          color: Colors.purple,
+                                        ),
+                                      ),
+                                      Text(
                                         'مصروفات: ${extra.toStringAsFixed(2)}',
                                         style: const TextStyle(
                                           color: Colors.orange,
@@ -197,11 +213,39 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
                               const SizedBox(height: 10),
                               Align(
                                 alignment: Alignment.centerRight,
-                                child: OutlinedButton.icon(
-                                  icon: const Icon(Icons.add, size: 16),
-                                  label: const Text('إضافة مصروف'),
-                                  onPressed: () =>
-                                      _showAddExpenseDialog(employeeId),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      icon: const Icon(Icons.add, size: 16),
+                                      label: const Text('إضافة مصروف'),
+                                      onPressed: () =>
+                                          _showAddExpenseDialog(employeeId),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton.icon(
+                                      icon: const Icon(
+                                        Icons.swap_horiz,
+                                        size: 16,
+                                      ),
+                                      label: const Text('تحويل أموال'),
+                                      onPressed: () async {
+                                        final name =
+                                            _employeeIdToName[employeeId] ??
+                                            employeeId;
+                                        final result = await context.pushNamed(
+                                          'transfer-money',
+                                          extra: {
+                                            'fromEmployeeId': employeeId,
+                                            'fromEmployeeName': name,
+                                          },
+                                        );
+                                        if (result == true) {
+                                          _loadData();
+                                        }
+                                      },
+                                    ),
+                                  ],
                                 ),
                               ),
                               if ((_otherExpensesByEmployee[employeeId] ?? [])

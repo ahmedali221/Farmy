@@ -184,7 +184,6 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
         'customer': selectedCustomerId,
         'quantity': double.parse(_quantityController.text),
         'grossWeight': double.tryParse(_grossWeightController.text) ?? 0,
-        'emptyWeight': double.tryParse(_emptyWeightController.text) ?? 0,
         'loadingPrice': double.tryParse(_loadingPriceController.text) ?? 0,
         // Hint backend to set loadingDate explicitly to today (matches stock window)
         'loadingDate': DateTime.now().toIso8601String(),
@@ -385,16 +384,121 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                     // Customer Selection (text input)
                                     _SectionCard(
                                       title: 'المكان',
-                                      child: _TextField(
-                                        label: 'اكتب اسم المكان',
-                                        controller: _customerNameController,
-                                        validator: (value) {
-                                          if (value == null ||
-                                              value.trim().isEmpty) {
-                                            return 'يرجى إدخال اسم العميل';
-                                          }
-                                          return null;
-                                        },
+                                      child: Directionality(
+                                        textDirection: TextDirection.rtl,
+                                        child: Autocomplete<String>(
+                                          optionsBuilder:
+                                              (TextEditingValue value) {
+                                                final query = value.text
+                                                    .trim()
+                                                    .toLowerCase();
+                                                if (query.isEmpty) {
+                                                  return const Iterable<
+                                                    String
+                                                  >.empty();
+                                                }
+                                                return customers
+                                                    .map(
+                                                      (c) =>
+                                                          c['name']
+                                                              ?.toString() ??
+                                                          '',
+                                                    )
+                                                    .where(
+                                                      (name) => name
+                                                          .toLowerCase()
+                                                          .contains(query),
+                                                    )
+                                                    .take(10);
+                                              },
+                                          onSelected: (String selection) {
+                                            _customerNameController.text =
+                                                selection;
+                                            _onQuantityChanged();
+                                          },
+                                          fieldViewBuilder:
+                                              (
+                                                context,
+                                                textEditingController,
+                                                focusNode,
+                                                onFieldSubmitted,
+                                              ) {
+                                                textEditingController.text =
+                                                    _customerNameController
+                                                        .text;
+                                                textEditingController
+                                                        .selection =
+                                                    TextSelection.fromPosition(
+                                                      TextPosition(
+                                                        offset:
+                                                            textEditingController
+                                                                .text
+                                                                .length,
+                                                      ),
+                                                    );
+                                                return TextFormField(
+                                                  controller:
+                                                      _customerNameController,
+                                                  focusNode: focusNode,
+                                                  decoration:
+                                                      const InputDecoration(
+                                                        labelText: 'اسم العميل',
+                                                        border:
+                                                            OutlineInputBorder(),
+                                                      ),
+                                                  onChanged: (v) {
+                                                    // keep same behavior as before
+                                                    _onQuantityChanged();
+                                                  },
+                                                  validator: (value) {
+                                                    if (value == null ||
+                                                        value.trim().isEmpty) {
+                                                      return 'يرجى إدخال اسم العميل';
+                                                    }
+                                                    return null;
+                                                  },
+                                                );
+                                              },
+                                          optionsViewBuilder:
+                                              (context, onSelected, options) {
+                                                return Align(
+                                                  alignment: Alignment.topRight,
+                                                  child: Material(
+                                                    elevation: 4,
+                                                    child: SizedBox(
+                                                      width:
+                                                          MediaQuery.of(
+                                                            context,
+                                                          ).size.width -
+                                                          32,
+                                                      child: ListView.builder(
+                                                        padding:
+                                                            EdgeInsets.zero,
+                                                        itemCount:
+                                                            options.length,
+                                                        itemBuilder:
+                                                            (context, index) {
+                                                              final option =
+                                                                  options
+                                                                      .elementAt(
+                                                                        index,
+                                                                      );
+                                                              return ListTile(
+                                                                title: Text(
+                                                                  option,
+                                                                ),
+                                                                onTap: () =>
+                                                                    onSelected(
+                                                                      option,
+                                                                    ),
+                                                              );
+                                                            },
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(height: 16),
@@ -909,44 +1013,7 @@ class _DropdownField extends StatelessWidget {
   }
 }
 
-class _TextField extends StatelessWidget {
-  final String label;
-  final TextEditingController controller;
-  final String? Function(String?)? validator;
-
-  const _TextField({
-    required this.label,
-    required this.controller,
-    this.validator,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      textDirection: TextDirection.rtl,
-      textAlign: TextAlign.right,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        alignLabelWithHint: true,
-      ),
-      style: const TextStyle(
-        overflow: TextOverflow.ellipsis,
-        color: Colors.black,
-        fontWeight: FontWeight.w500,
-      ),
-      maxLines: 1,
-    );
-  }
-}
+// Removed legacy _TextField widget; replaced by Autocomplete-based field above
 
 class _LoadingHistoryDialog extends StatefulWidget {
   @override

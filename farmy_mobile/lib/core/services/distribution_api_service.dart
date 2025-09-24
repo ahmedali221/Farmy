@@ -24,14 +24,16 @@ class DistributionApiService {
   ///
   /// Required fields:
   /// - customer: ID of the customer (العميل)
-  /// - employee: ID of the employee (الموظف)
   /// - quantity: Number of units (الكمية)
   /// - grossWeight: Gross weight in kg (الوزن القائم)
-  /// - netWeight: Net weight in kg (الوزن الصافي)
   /// - price: Price per kg (سعر الكيلو)
-  /// - totalAmount: Total amount (المبلغ الإجمالي)
   /// - distributionDate: Distribution date (تاريخ التوزيع)
   /// - notes: Optional notes (ملاحظات)
+  ///
+  /// Auto-calculated by backend (do NOT send from frontend):
+  /// - emptyWeight = quantity * 8
+  /// - netWeight = max(0, grossWeight - emptyWeight)
+  /// - totalAmount = netWeight * price
   Future<Map<String, dynamic>> createDistribution(
     Map<String, dynamic> distributionData,
   ) async {

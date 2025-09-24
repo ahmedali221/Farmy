@@ -209,19 +209,6 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
                                           ? Colors.red
                                           : Colors.green,
                                     ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      remaining > 0
-                                          ? 'مدين: ج.م ${remaining.toStringAsFixed(2)}'
-                                          : 'مُسدد بالكامل',
-                                      style: TextStyle(
-                                        color: remaining > 0
-                                            ? Colors.red
-                                            : Colors.green,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
-                                    ),
                                   ],
                                 );
                               },
@@ -237,19 +224,7 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
                                   _navigateToCustomerHistory(context, customer),
                               tooltip: 'السجل التاريخي',
                             ),
-                            if (_getCustomerLoadingOrdersCount(
-                                  customer['_id'],
-                                ) >
-                                0)
-                              IconButton(
-                                icon: const Icon(Icons.visibility, size: 20),
-                                onPressed: () =>
-                                    _navigateToCustomerLoadingOrders(
-                                      context,
-                                      customer,
-                                    ),
-                                tooltip: 'عرض طلبات التحميل',
-                              ),
+                            // Removed eye icon that leads to loading orders page per request
                             PopupMenuButton(
                               itemBuilder: (context) => [
                                 const PopupMenuItem(
@@ -403,20 +378,7 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
     };
   }
 
-  void _navigateToCustomerLoadingOrders(
-    BuildContext context,
-    Map<String, dynamic> customer,
-  ) {
-    // Get loading orders for this specific customer
-    final List<dynamic> customerLoadingOrders = loadingOrders
-        .where((order) => order['customer']?['_id'] == customer['_id'])
-        .toList();
-
-    context.push(
-      '/customer-loading-orders',
-      extra: {'customer': customer, 'loadingOrders': customerLoadingOrders},
-    );
-  }
+  // Removed navigate to loading orders per request
 
   void _navigateToCustomerHistory(
     BuildContext context,
