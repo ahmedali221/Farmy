@@ -282,27 +282,27 @@ extension on _CustomerHistoryViewState {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Card(
+      child: Card(
         elevation: 3,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Padding(
+        child: Padding(
           padding: const EdgeInsets.all(16),
-                child: Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
+            children: [
+              Row(
+                children: [
+                  Icon(
                     Icons.calendar_today,
                     size: 18,
                     color: Theme.of(context).colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       dateLabel,
                       style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -328,15 +328,15 @@ extension on _CustomerHistoryViewState {
                           Theme.of(context).colorScheme.primary,
                         ),
                       ],
-                          ),
-                        ),
-                      ],
                     ),
-                    const SizedBox(height: 8),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                      children: [
+                children: [
                   if (dayDistributionValue > 0)
                     _summaryPill(
                       'قيمة التوزيعات',
@@ -394,9 +394,9 @@ extension on _CustomerHistoryViewState {
                   _buildPaymentItem(context, m, group),
               ],
             ],
-              ),
-            ),
           ),
+        ),
+      ),
     );
   }
 
@@ -410,7 +410,7 @@ extension on _CustomerHistoryViewState {
       ),
       child: Text(
         text,
-                      style: TextStyle(
+        style: TextStyle(
           color: color,
           fontWeight: FontWeight.bold,
           fontSize: 11,
@@ -450,13 +450,13 @@ extension on _CustomerHistoryViewState {
       children: [
         Icon(icon, color: color, size: 18),
         const SizedBox(width: 6),
-          Text(
-            title,
+        Text(
+          title,
           style: TextStyle(color: color, fontWeight: FontWeight.bold),
-          ),
+        ),
         const SizedBox(width: 6),
         Expanded(child: Divider(color: color.withOpacity(0.2))),
-        ],
+      ],
     );
   }
 
@@ -482,12 +482,12 @@ extension on _CustomerHistoryViewState {
       ),
       child: Directionality(
         textDirection: TextDirection.rtl,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
                   radius: 14,
                   backgroundColor: Theme.of(
                     context,
@@ -499,39 +499,39 @@ extension on _CustomerHistoryViewState {
                   ),
                 ),
                 const SizedBox(width: 8),
-                  Expanded(
+                Expanded(
                   child: Text(
-                          'طلب تحميل #$orderId',
+                    'طلب تحميل #$orderId',
                     style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        Text(
-                          createdAt,
+                  ),
+                ),
+                Text(
+                  createdAt,
                   style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        ),
-                      ],
-                    ),
+                ),
+              ],
+            ),
             const SizedBox(height: 6),
             _kvTile(
-                'الكمية',
-                '${quantity.toInt()} وحدة',
-                Icons.inventory,
-                Colors.purple,
-              ),
+              'الكمية',
+              '${quantity.toInt()} وحدة',
+              Icons.inventory,
+              Colors.purple,
+            ),
             _kvTile(
-                'الوزن الصافي',
-                '${netWeight.toDouble().toStringAsFixed(1)} كجم',
-                Icons.scale_outlined,
-                Colors.green,
-              ),
-              if (chickenType != null)
+              'الوزن الصافي',
+              '${netWeight.toDouble().toStringAsFixed(1)} كجم',
+              Icons.scale_outlined,
+              Colors.green,
+            ),
+            if (chickenType != null)
               _kvTile(
-                  'نوع الدجاج',
-                  chickenType['name'] ?? 'غير معروف',
-                  Icons.pets,
-                  Colors.brown,
-                ),
-            ],
+                'نوع الدجاج',
+                chickenType['name'] ?? 'غير معروف',
+                Icons.pets,
+                Colors.brown,
+              ),
+          ],
         ),
       ),
     );
@@ -559,12 +559,12 @@ extension on _CustomerHistoryViewState {
       ),
       child: Directionality(
         textDirection: TextDirection.rtl,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
                   radius: 14,
                   backgroundColor: Theme.of(
                     context,
@@ -576,45 +576,45 @@ extension on _CustomerHistoryViewState {
                   ),
                 ),
                 const SizedBox(width: 8),
-                  Expanded(
+                Expanded(
                   child: Text(
-                          'توزيع #$distId',
+                    'توزيع #$distId',
                     style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        Text(
-                          createdAt,
+                  ),
+                ),
+                Text(
+                  createdAt,
                   style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        ),
-                      ],
-                    ),
+                ),
+              ],
+            ),
             const SizedBox(height: 6),
             _kvTile(
-                'الكمية',
-                '${quantity.toInt()} وحدة',
-                Icons.inventory,
-                Colors.purple,
-              ),
+              'الكمية',
+              '${quantity.toInt()} وحدة',
+              Icons.inventory,
+              Colors.purple,
+            ),
             _kvTile(
-                'الوزن الصافي',
-                '${netWeight.toDouble().toStringAsFixed(1)} كجم',
-                Icons.scale_outlined,
-                Colors.green,
-              ),
+              'الوزن الصافي',
+              '${netWeight.toDouble().toStringAsFixed(1)} كجم',
+              Icons.scale_outlined,
+              Colors.green,
+            ),
             _kvTile(
-                'إجمالي المبلغ',
-                'ج.م ${totalAmount.toDouble().toStringAsFixed(2)}',
-                Icons.attach_money,
-                Colors.red,
-              ),
-              if (employee != null)
+              'إجمالي المبلغ',
+              'ج.م ${totalAmount.toDouble().toStringAsFixed(2)}',
+              Icons.attach_money,
+              Colors.red,
+            ),
+            if (employee != null)
               _kvTile(
-                  'الموظف',
-                  employee['username'] ?? 'غير معروف',
-                  Icons.person,
-                  Colors.brown,
-                ),
-            ],
+                'الموظف',
+                employee['username'] ?? 'غير معروف',
+                Icons.person,
+                Colors.brown,
+              ),
+          ],
         ),
       ),
     );
@@ -627,29 +627,18 @@ extension on _CustomerHistoryViewState {
   ) {
     final paymentId = payment['_id']?.toString().substring(0, 8) ?? 'غير معروف';
     final createdAt = _formatDateTime(payment['createdAt']);
-    final amount = (payment['amount'] ?? payment['paidAmount'] ?? 0) as num;
+    final totalPrice = ((payment['totalPrice'] ?? 0) as num).toDouble();
+    final discount = ((payment['discount'] ?? 0) as num).toDouble();
+    final paidAmount =
+        ((payment['paidAmount'] ?? payment['amount'] ?? 0) as num).toDouble();
+    final remainingAfter =
+        ((payment['remainingAmount'] ?? (totalPrice - paidAmount - discount))
+                as num)
+            .toDouble()
+            .clamp(0, double.infinity);
     final method = (payment['paymentMethod'] ?? '').toString();
     final notes = payment['notes']?.toString();
     final employee = payment['employee'];
-
-    // Compute remaining before/after this payment within the same day
-    final double dayDistributionValue = group.distributions.fold(
-      0.0,
-      (sum, m) => sum + ((m['totalAmount'] ?? 0) as num).toDouble(),
-    );
-    // sum of payments before this one (by createdAt ascending within group)
-    double sumEarlierPayments = 0.0;
-    for (final p in group.payments) {
-      if (p == payment) break;
-      sumEarlierPayments += ((p['amount'] ?? p['paidAmount'] ?? 0) as num)
-          .toDouble();
-    }
-    final double remainingBefore = (dayDistributionValue - sumEarlierPayments)
-        .clamp(0, double.infinity);
-    final double remainingAfter = (remainingBefore - amount.toDouble()).clamp(
-      0,
-      double.infinity,
-    );
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -661,12 +650,12 @@ extension on _CustomerHistoryViewState {
       ),
       child: Directionality(
         textDirection: TextDirection.rtl,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
                   radius: 14,
                   backgroundColor: Theme.of(
                     context,
@@ -678,33 +667,39 @@ extension on _CustomerHistoryViewState {
                   ),
                 ),
                 const SizedBox(width: 8),
-                  Expanded(
+                Expanded(
                   child: Text(
-                          'دفعة #$paymentId',
+                    'دفعة #$paymentId',
                     style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        Text(
-                          createdAt,
+                  ),
+                ),
+                Text(
+                  createdAt,
                   style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        ),
-                      ],
-                    ),
+                ),
+              ],
+            ),
 
             _kvTile(
-              'المتبقي قبل الدفع',
-              'ج.م ${remainingBefore.toStringAsFixed(2)}',
+              'إجمالي المستحق وقتها',
+              'ج.م ${totalPrice.toStringAsFixed(2)}',
               Icons.pending_actions,
               Colors.orange,
             ),
             const SizedBox(height: 6),
-            _kvTile(
-                'المبلغ',
-                'ج.م ${amount.toDouble().toStringAsFixed(2)}',
-                Icons.attach_money,
-                Colors.green,
+            if (discount > 0)
+              _kvTile(
+                'الخصم',
+                'ج.م ${discount.toStringAsFixed(2)}',
+                Icons.percent,
+                Colors.deepOrange,
               ),
-
+            _kvTile(
+              'المدفوع',
+              'ج.م ${paidAmount.toStringAsFixed(2)}',
+              Icons.attach_money,
+              Colors.green,
+            ),
             _kvTile(
               'المتبقي بعد الدفع',
               'ج.م ${remainingAfter.toStringAsFixed(2)}',
@@ -718,16 +713,16 @@ extension on _CustomerHistoryViewState {
                 Icons.payment,
                 Colors.blue,
               ),
-              if (employee != null)
+            if (employee != null)
               _kvTile(
-                  'الموظف',
-                  employee['username'] ?? 'غير معروف',
-                  Icons.person,
-                  Colors.brown,
-                ),
-              if (notes != null && notes.isNotEmpty) ...[
+                'الموظف',
+                employee['username'] ?? 'غير معروف',
+                Icons.person,
+                Colors.brown,
+              ),
+            if (notes != null && notes.isNotEmpty) ...[
               const SizedBox(height: 6),
-                          Text(
+              Text(
                 'ملاحظات: $notes',
                 style: TextStyle(color: Colors.grey[700], fontSize: 12),
               ),
@@ -757,9 +752,9 @@ extension on _CustomerHistoryViewState {
           child: Icon(icon, color: color, size: 18),
         ),
         title: Text(
-            value,
-            style: TextStyle(
-              color: color,
+          value,
+          style: TextStyle(
+            color: color,
             fontWeight: FontWeight.bold,
             fontSize: 14,
           ),

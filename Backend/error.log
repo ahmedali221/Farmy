@@ -42,3 +42,7 @@
 {"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-21T21:16:43.300Z"}
 {"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-21T21:16:57.689Z"}
 {"level":"error","message":"Error fetching employee orders: Order is not defined","timestamp":"2025-09-21T21:19:13.746Z"}
+{"level":"error","message":"Login error: Operation `users.findOne()` buffering timed out after 10000ms","timestamp":"2025-09-25T07:32:17.864Z"}
+{"level":"error","message":"Login error: Operation `users.findOne()` buffering timed out after 10000ms","timestamp":"2025-09-25T07:33:06.121Z"}
+{"level":"error","message":"Login error: Operation `users.findOne()` buffering timed out after 10000ms","timestamp":"2025-09-25T07:36:07.875Z"}
+{"level":"error","message":"Login error: Operation `users.findOne()` buffering timed out after 10000ms","timestamp":"2025-09-25T07:36:36.808Z"}

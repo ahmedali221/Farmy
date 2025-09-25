@@ -341,10 +341,7 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
   }
 
   Widget _buildContent() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
         child: Column(
@@ -371,7 +368,6 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
         ),
       );
     }
-
     if (_filteredDistributions.isEmpty) {
       return Center(
         child: Column(
@@ -398,14 +394,42 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
       );
     }
 
-    return ListView.builder(
+    return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _filteredDistributions.length,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
-        final distribution = _filteredDistributions[index];
-        return _buildDistributionCard(distribution);
+        final d = _filteredDistributions[index];
+        final String title = d['customer']?['name'] ?? 'عميل غير معروف';
+        final String subtitle = _formatDateTime(
+          d['createdAt'] ?? d['distributionDate'],
+        );
+        final num totalAmount = (d['totalAmount'] ?? 0) as num;
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: Colors.green.withOpacity(0.1),
+            child: const Icon(Icons.outbound, color: Colors.green),
+          ),
+          title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: Text(subtitle),
+          trailing: Text(
+            '${totalAmount.toDouble().toStringAsFixed(0)} ج.م',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          tileColor: Colors.white,
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => _DistributionDetailsPage(distribution: d),
+              ),
+            );
+          },
+        );
       },
     );
   }
@@ -594,6 +618,27 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
             dense: true,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DistributionDetailsPage extends StatelessWidget {
+  final Map<String, dynamic> distribution;
+  const _DistributionDetailsPage({required this.distribution});
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('تفاصيل طلب التوزيع')),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: _DistributionHistoryViewState()._buildDistributionCard(
+            distribution,
+          ),
+        ),
       ),
     );
   }

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/payment_api_service.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../authentication/cubit/auth_cubit.dart';
+import '../../../authentication/cubit/auth_state.dart';
 
 class PaymentHistoryView extends StatefulWidget {
   const PaymentHistoryView({super.key});
@@ -109,19 +112,6 @@ class _PaymentHistoryViewState extends State<PaymentHistoryView> {
       return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return 'تاريخ غير صحيح';
-    }
-  }
-
-  String _getPaymentMethodText(String? method) {
-    switch (method) {
-      case 'cash':
-        return 'نقداً';
-      case 'card':
-        return 'بطاقة';
-      case 'bank_transfer':
-        return 'تحويل بنكي';
-      default:
-        return 'غير محدد';
     }
   }
 
@@ -276,7 +266,7 @@ class _PaymentHistoryViewState extends State<PaymentHistoryView> {
                     ),
                   ],
 
-                  // Payment list
+                  // Payment list (compact → details on tap)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: _isLoading
@@ -313,54 +303,241 @@ class _PaymentHistoryViewState extends State<PaymentHistoryView> {
                               ],
                             ),
                           )
-                        : ListView.builder(
+                        : ListView.separated(
                             padding: const EdgeInsets.all(16),
                             itemCount: _filteredPayments.length,
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 8),
                             itemBuilder: (context, index) {
-                              final payment = _filteredPayments[index];
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: Colors.green[100],
-                                    child: const Icon(
-                                      Icons.payment,
-                                      color: Colors.green,
-                                    ),
+                              final m = _filteredPayments[index];
+                              final String title =
+                                  m['customer']?['name'] ?? 'عميل غير معروف';
+                              final String subtitle = _formatDateTime(
+                                m['createdAt'],
+                              );
+                              final num paid = (m['paidAmount'] ?? 0) as num;
+                              return ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Colors.green.withOpacity(
+                                    0.1,
                                   ),
-                                  title: Text(
-                                    payment['customer']?['name'] ??
-                                        'عميل غير معروف',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                  child: const Icon(
+                                    Icons.payment,
+                                    color: Colors.green,
                                   ),
-                                  subtitle: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'الموظف: ${payment['employee']?['username'] ?? 'غير محدد'}',
-                                      ),
-                                      Text(
-                                        'المبلغ المدفوع: ${payment['paidAmount']} ج.م',
-                                      ),
-                                      Text('الخصم: ${payment['discount']} ج.م'),
-                                      Text(
-                                        'طريقة الدفع: ${_getPaymentMethodText(payment['paymentMethod'])}',
-                                      ),
-                                      Text(
-                                        'التاريخ: ${_formatDateTime(payment['createdAt'])}',
-                                      ),
-                                    ],
-                                  ),
-                                  isThreeLine: true,
                                 ),
+                                title: Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Text(subtitle),
+                                trailing: Text(
+                                  '${paid.toDouble().toStringAsFixed(0)} ج.م',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                tileColor: Colors.white,
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          _PaymentDetailsPage(payment: m),
+                                    ),
+                                  );
+                                },
                               );
                             },
                           ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PaymentDetailsPage extends StatelessWidget {
+  final Map<String, dynamic> payment;
+  const _PaymentDetailsPage({required this.payment});
+
+  String _formatDateTime(String? dateTime) {
+    if (dateTime == null) return 'غير معروف';
+    try {
+      final dt = DateTime.parse(dateTime);
+      return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return 'تاريخ غير صحيح';
+    }
+  }
+
+  String _getPaymentMethodText(String? method) {
+    switch (method) {
+      case 'cash':
+        return 'نقداً';
+      case 'card':
+        return 'بطاقة';
+      case 'bank_transfer':
+        return 'تحويل بنكي';
+      default:
+        return 'غير محدد';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final customer = payment['customer'];
+    final employee = payment['employee'];
+    final total = ((payment['totalPrice'] ?? 0) as num).toDouble();
+    final paid = ((payment['paidAmount'] ?? 0) as num).toDouble();
+    final discount = ((payment['discount'] ?? 0) as num).toDouble();
+    final remaining =
+        ((payment['remainingAmount'] ?? (total - paid - discount)) as num)
+            .toDouble();
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('تفاصيل الدفع')),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Card(
+            elevation: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.green.withOpacity(0.1),
+                      child: const Icon(Icons.payment, color: Colors.green),
+                    ),
+                    title: Text(
+                      customer?['name'] ?? 'عميل غير معروف',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(_formatDateTime(payment['createdAt'])),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.blue.withOpacity(0.1),
+                      child: const Icon(
+                        Icons.person,
+                        color: Colors.blue,
+                        size: 20,
+                      ),
+                    ),
+                    title: const Text('القائم بالتحصيل'),
+                    subtitle: Builder(
+                      builder: (context) {
+                        final name = (employee?['username'] ?? '')
+                            .toString()
+                            .trim();
+                        if (name.isNotEmpty) return Text(name);
+                        try {
+                          final authState = context.read<AuthCubit>().state;
+                          if (authState is AuthAuthenticated &&
+                              authState.user.role != 'employee') {
+                            final adminName = authState.user.username;
+                            final adminId = authState.user.id;
+                            return Text(
+                              adminId.isEmpty
+                                  ? 'المدير: $adminName'
+                                  : 'المدير: $adminName (ID: $adminId)',
+                            );
+                          }
+                        } catch (_) {}
+                        return const Text('غير محدد');
+                      },
+                    ),
+                    dense: true,
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.orange.withOpacity(0.1),
+                      child: const Icon(
+                        Icons.pending_actions,
+                        color: Colors.orange,
+                        size: 20,
+                      ),
+                    ),
+                    title: const Text('إجمالي المستحق وقتها'),
+                    subtitle: Text('ج.م ${total.toStringAsFixed(2)}'),
+                    dense: true,
+                  ),
+                  const Divider(height: 1),
+                  if (discount > 0) ...[
+                    ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.deepOrange.withOpacity(0.1),
+                        child: const Icon(
+                          Icons.percent,
+                          color: Colors.deepOrange,
+                          size: 20,
+                        ),
+                      ),
+                      title: const Text('الخصم'),
+                      subtitle: Text('ج.م ${discount.toStringAsFixed(2)}'),
+                      dense: true,
+                    ),
+                    const Divider(height: 1),
+                  ],
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.green.withOpacity(0.1),
+                      child: const Icon(
+                        Icons.attach_money,
+                        color: Colors.green,
+                        size: 20,
+                      ),
+                    ),
+                    title: const Text('المدفوع'),
+                    subtitle: Text('ج.م ${paid.toStringAsFixed(2)}'),
+                    dense: true,
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.red.withOpacity(0.1),
+                      child: Icon(
+                        remaining > 0
+                            ? Icons.error_outline
+                            : Icons.check_circle,
+                        color: remaining > 0 ? Colors.red : Colors.green,
+                        size: 20,
+                      ),
+                    ),
+                    title: const Text('المتبقي بعد الدفع'),
+                    subtitle: Text('ج.م ${remaining.toStringAsFixed(2)}'),
+                    dense: true,
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.purple.withOpacity(0.1),
+                      child: const Icon(
+                        Icons.receipt_long,
+                        color: Colors.purple,
+                        size: 20,
+                      ),
+                    ),
+                    title: const Text('طريقة الدفع'),
+                    subtitle: Text(
+                      _getPaymentMethodText(payment['paymentMethod']),
+                    ),
+                    dense: true,
                   ),
                 ],
               ),

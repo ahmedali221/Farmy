@@ -5,15 +5,16 @@ class ApiConstants {
   // Use localhost for web/desktop development
   // Use actual IP for physical device testing
   static const String baseUrl =
-      'https://farmy-czkpamkc2-ahmed-alis-projects-588ffe47.vercel.app/api';
-  // 'http://172.10.60.62:3000/api';
+      // 'https://farmy-c9hb-git-main-ahmed-alis-projects-588ffe47.vercel.app/api';
+      'http://172.10.60.62:3000/api';
   // 'http://192.168.1.3:3000/api';
+  // "http://127.0.0.1:3000/api";
 
   // Alternative URLs for different environments
   static const String localhostUrl = 'http://localhost:3000/api';
   static const String networkUrl = 'http://192.168.1.5:3000/api';
   static const String vercelUrl =
-      'https://farmy-c9hb-dn1170e5q-ahmed-alis-projects-588ffe47.vercel.app/api';
+      'https://farmy-c9hb-git-main-ahmed-alis-projects-588ffe47.vercel.app/api';
 
   // HTTP timeout configuration
   static const Duration connectTimeout = Duration(seconds: 30);

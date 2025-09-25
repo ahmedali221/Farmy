@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/payment_api_service.dart';
 import '../../../../core/services/employee_expense_api_service.dart';
+import '../../../../core/services/customer_api_service.dart';
 import '../../../authentication/cubit/auth_cubit.dart';
 
 class EmployeeDailyDetailView extends StatefulWidget {
@@ -17,6 +18,7 @@ class EmployeeDailyDetailView extends StatefulWidget {
 class _EmployeeDailyDetailViewState extends State<EmployeeDailyDetailView> {
   late final PaymentApiService _paymentService;
   late final EmployeeExpenseApiService _expenseService;
+  final Map<String, String> _customerNameCache = {};
 
   bool _loading = true;
   String? _error;
@@ -83,6 +85,35 @@ class _EmployeeDailyDetailViewState extends State<EmployeeDailyDetailView> {
         _loading = false;
       });
     }
+  }
+
+  Future<String> _resolveCustomerName(dynamic customerField) async {
+    try {
+      if (customerField is Map<String, dynamic>) {
+        final name = customerField['name']?.toString();
+        if (name != null && name.isNotEmpty) return name;
+        final id = customerField['_id']?.toString();
+        if (id != null && id.isNotEmpty) {
+          if (_customerNameCache.containsKey(id))
+            return _customerNameCache[id]!;
+          final svc = serviceLocator<CustomerApiService>();
+          final data = await svc.getCustomerById(id);
+          final fetched = data?['name']?.toString() ?? 'عميل';
+          _customerNameCache[id] = fetched;
+          return fetched;
+        }
+      } else if (customerField is String && customerField.isNotEmpty) {
+        if (_customerNameCache.containsKey(customerField)) {
+          return _customerNameCache[customerField]!;
+        }
+        final svc = serviceLocator<CustomerApiService>();
+        final data = await svc.getCustomerById(customerField);
+        final fetched = data?['name']?.toString() ?? 'عميل';
+        _customerNameCache[customerField] = fetched;
+        return fetched;
+      }
+    } catch (_) {}
+    return 'عميل غير معروف';
   }
 
   @override
@@ -240,6 +271,7 @@ class _EmployeeDailyDetailViewState extends State<EmployeeDailyDetailView> {
     final double paidAmount = ((p['paidAmount'] ?? 0) as num).toDouble();
     final double discount = ((p['discount'] ?? 0) as num).toDouble();
     final String createdAt = (p['createdAt'] ?? '').toString();
+    final dynamic customerField = p['customer'];
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: Colors.blue.withOpacity(0.1),
@@ -252,6 +284,16 @@ class _EmployeeDailyDetailViewState extends State<EmployeeDailyDetailView> {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          FutureBuilder<String>(
+            future: _resolveCustomerName(customerField),
+            builder: (context, snap) {
+              final name = snap.data ?? '...';
+              return Text(
+                'العميل: $name',
+                style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+              );
+            },
+          ),
           if (discount > 0)
             Text(
               'خصم: ج.م ${discount.toStringAsFixed(2)}',

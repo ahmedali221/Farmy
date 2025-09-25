@@ -6,9 +6,14 @@ const mongoose = require('mongoose');
 const errorHandler = require('./src/middleware/error');
 
 dotenv.config();
-mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB connection error:', err));
+
+// Ensure a single MongoDB connection across serverless invocations
+if (!global._mongooseConnection) {
+  global._mongooseConnection = mongoose
+    .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => console.error('MongoDB connection error:', err));
+}
 
 const app = express();
 
@@ -37,6 +42,11 @@ const employeeExpenseRoutes = require('./src/employeeExpenses/routes/employeeExp
 const transferRoutes = require('./src/transfers/routes/transferRoutes');
 const distributionRoutes = require('./src/distributions/routes/distributionRoutes');
 const dailyStockController = require('./src/stocks/controllers/dailyStockController');
+
+// Healthcheck (public)
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
 
 // Public routes
 app.post('/api/login', authController.login);
@@ -70,9 +80,15 @@ app.get('/api/stocks/profit', auth(['manager']), dailyStockController.getDailyPr
 
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://0.0.0.0:${PORT}`);
-  console.log(`Accessible from: http://127.0.0.1:${PORT} (localhost)`);
-  console.log(`Accessible from: http://[YOUR_IP]:${PORT} (network)`);
-});
+// Export the app for serverless (Vercel)
+if (process.env.VERCEL) {
+  module.exports = app;
+} else {
+  // Local development server
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
+    console.log(`Accessible from: http://127.0.0.1:${PORT} (localhost)`);
+    console.log(`Accessible from: http://[YOUR_IP]:${PORT} (network)`);
+  });
+}

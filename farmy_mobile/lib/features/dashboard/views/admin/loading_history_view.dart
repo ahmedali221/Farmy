@@ -356,9 +356,7 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
   }
 
   Widget _buildContent() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
 
     if (_error != null) {
       return Center(
@@ -417,14 +415,40 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
       );
     }
 
-    return ListView.builder(
+    return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _filteredLoadings.length,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
-        final loading = _filteredLoadings[index];
-        return _buildLoadingCard(loading);
+        final m = _filteredLoadings[index];
+        final String title = m['customer']?['name'] ?? 'عميل غير معروف';
+        final String subtitle = _formatDateTime(m['createdAt']);
+        final num totalLoading = (m['totalLoading'] ?? 0) as num;
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: Colors.blue.withOpacity(0.1),
+            child: const Icon(Icons.local_shipping, color: Colors.blue),
+          ),
+          title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: Text(subtitle),
+          trailing: Text(
+            '${totalLoading.toDouble().toStringAsFixed(0)} ج.م',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          tileColor: Colors.white,
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => _LoadingDetailsPage(loading: m),
+              ),
+            );
+          },
+        );
       },
     );
   }
@@ -627,6 +651,25 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _LoadingDetailsPage extends StatelessWidget {
+  final Map<String, dynamic> loading;
+  const _LoadingDetailsPage({required this.loading});
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('تفاصيل طلب التحميل')),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: _LoadingHistoryViewState()._buildLoadingCard(loading),
+        ),
       ),
     );
   }

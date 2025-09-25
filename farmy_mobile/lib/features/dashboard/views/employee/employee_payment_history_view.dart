@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/payment_api_service.dart';
+import '../../../../core/services/customer_api_service.dart';
 import '../../../authentication/cubit/auth_cubit.dart';
 
 class EmployeePaymentHistoryView extends StatefulWidget {
@@ -15,6 +16,7 @@ class EmployeePaymentHistoryView extends StatefulWidget {
 class _EmployeePaymentHistoryViewState
     extends State<EmployeePaymentHistoryView> {
   late final PaymentApiService _paymentService;
+  final Map<String, String> _customerNameCache = {};
 
   bool _loading = true;
   String? _error;
@@ -51,6 +53,35 @@ class _EmployeePaymentHistoryViewState
         _loading = false;
       });
     }
+  }
+
+  Future<String> _resolveCustomerName(dynamic customerField) async {
+    try {
+      if (customerField is Map<String, dynamic>) {
+        final name = customerField['name']?.toString();
+        if (name != null && name.isNotEmpty) return name;
+        final id = customerField['_id']?.toString();
+        if (id != null && id.isNotEmpty) {
+          if (_customerNameCache.containsKey(id))
+            return _customerNameCache[id]!;
+          final svc = serviceLocator<CustomerApiService>();
+          final data = await svc.getCustomerById(id);
+          final fetched = data?['name']?.toString() ?? 'عميل';
+          _customerNameCache[id] = fetched;
+          return fetched;
+        }
+      } else if (customerField is String && customerField.isNotEmpty) {
+        if (_customerNameCache.containsKey(customerField)) {
+          return _customerNameCache[customerField]!;
+        }
+        final svc = serviceLocator<CustomerApiService>();
+        final data = await svc.getCustomerById(customerField);
+        final fetched = data?['name']?.toString() ?? 'عميل';
+        _customerNameCache[customerField] = fetched;
+        return fetched;
+      }
+    } catch (_) {}
+    return 'عميل غير معروف';
   }
 
   @override
@@ -151,6 +182,7 @@ class _EmployeePaymentHistoryViewState
                   .toDouble();
               final double discount = ((p['discount'] ?? 0) as num).toDouble();
               final String createdAt = (p['createdAt'] ?? '').toString();
+              final dynamic customerField = p['customer'];
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
@@ -164,6 +196,19 @@ class _EmployeePaymentHistoryViewState
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    FutureBuilder<String>(
+                      future: _resolveCustomerName(customerField),
+                      builder: (context, snap) {
+                        final name = snap.data ?? '...';
+                        return Text(
+                          'العميل: $name',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue[700],
+                          ),
+                        );
+                      },
+                    ),
                     if (discount > 0)
                       Text(
                         'خصم: ج.م ${discount.toStringAsFixed(2)}',

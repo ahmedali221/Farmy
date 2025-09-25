@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'dart:ui' as ui show TextDirection;
 import '../../../../../../core/di/service_locator.dart';
 import '../../../../../../core/services/inventory_api_service.dart';
+import '../../../../../../core/services/payment_api_service.dart';
 
 class InventoryTab extends StatefulWidget {
   const InventoryTab({super.key});
@@ -14,10 +15,12 @@ class InventoryTab extends StatefulWidget {
 class _InventoryTabState extends State<InventoryTab> {
   final InventoryApiService _inventoryApi =
       serviceLocator<InventoryApiService>();
+  final PaymentApiService _paymentApi = serviceLocator<PaymentApiService>();
 
   DateTime _selectedDate = DateTime.now();
   bool _loading = false;
   Map<String, dynamic>? _data;
+  num _discountsTotal = 0;
 
   final TextEditingController _adjController = TextEditingController();
 
@@ -54,6 +57,28 @@ class _InventoryTabState extends State<InventoryTab> {
       final String dateStr = _formatDate(_selectedDate);
       final data = await _inventoryApi.getDailyInventoryByDate(dateStr);
       final profit = await _inventoryApi.getDailyProfit(dateStr);
+      // Compute total discounts for payments on selected date
+      num discountsTotal = 0;
+      try {
+        final payments = await _paymentApi.getAllPayments();
+        for (final p in payments) {
+          final createdAt = (p['createdAt'] ?? p['paymentDate'] ?? '')
+              .toString();
+          if (createdAt.isEmpty) continue;
+          DateTime dt;
+          try {
+            dt = DateTime.parse(createdAt);
+          } catch (_) {
+            continue;
+          }
+          if (dt.year == _selectedDate.year &&
+              dt.month == _selectedDate.month &&
+              dt.day == _selectedDate.day) {
+            final d = (p['discount'] ?? 0) as num;
+            discountsTotal += d;
+          }
+        }
+      } catch (_) {}
       debugPrint(
         '[InventoryTab] fetched for date=${_formatDate(_selectedDate)}',
       );
@@ -71,6 +96,7 @@ class _InventoryTabState extends State<InventoryTab> {
           'expensesTotal': profit['expensesTotal'],
           'loadingPricesSum': profit['loadingPricesSum'],
         };
+        _discountsTotal = discountsTotal;
         // If backend has a saved adjustment, reflect it; otherwise start from 0
         final num backendAdj = (data['adminAdjustment'] ?? 0) as num;
         _adjController.text = backendAdj.toString();
@@ -312,84 +338,27 @@ class _InventoryTabState extends State<InventoryTab> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      _MetricTile(
-                        label:
-                            'الربح = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل - إجمالي المصروفات - مصروفات التحميل',
-                        value: profit,
-                        color: Colors.teal,
-                      ),
-                      const SizedBox(height: 8),
-                      Card(
-                        elevation: 0,
-                        color: Colors.teal.withOpacity(0.02),
-                        child: Column(
-                          children: [
-                            ListTile(
-                              dense: true,
-                              leading: const Icon(
-                                Icons.receipt_long,
-                                color: Colors.teal,
-                              ),
-                              title: const Text('مبلغ إجمالي الوجبات'),
-                              trailing: Text(
-                                NumberFormat(
-                                  '#,##0.###',
-                                ).format(distributionsTotal),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                      InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => _DailyProfitDetailsPage(
+                                date: _formatDate(_selectedDate),
+                                profit: profit,
+                                distributionsTotal: distributionsTotal,
+                                loadingsTotal: loadingsTotal,
+                                expensesTotal: expensesTotal,
+                                loadingPricesSum: loadingPricesSum,
+                                discountsTotal: _discountsTotal,
                               ),
                             ),
-                            const Divider(height: 1),
-                            ListTile(
-                              dense: true,
-                              leading: const Icon(
-                                Icons.local_shipping,
-                                color: Colors.orange,
-                              ),
-                              title: const Text('مبلغ إجمالي التحميل'),
-                              trailing: Text(
-                                NumberFormat('#,##0.###').format(loadingsTotal),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const Divider(height: 1),
-                            ListTile(
-                              dense: true,
-                              leading: const Icon(
-                                Icons.money_off,
-                                color: Colors.redAccent,
-                              ),
-                              title: const Text('إجمالي المصروفات'),
-                              trailing: Text(
-                                NumberFormat('#,##0.###').format(expensesTotal),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const Divider(height: 1),
-                            ListTile(
-                              dense: true,
-                              leading: const Icon(
-                                Icons.price_change,
-                                color: Colors.purple,
-                              ),
-                              title: const Text(
-                                'مصروفات التحميل (مجموع أسعار التحميل)',
-                              ),
-                              trailing: Text(
-                                NumberFormat(
-                                  '#,##0.###',
-                                ).format(loadingPricesSum),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
+                          );
+                        },
+                        child: _MetricTile(
+                          label:
+                              'الربح = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل - إجمالي المصروفات - مصروفات التحميل',
+                          value: profit,
+                          color: Colors.teal,
                         ),
                       ),
                     ],
@@ -433,6 +402,104 @@ class _MetricTile extends StatelessWidget {
             ).textTheme.titleLarge?.copyWith(color: color),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DailyProfitDetailsPage extends StatelessWidget {
+  final String date;
+  final num profit;
+  final num distributionsTotal;
+  final num loadingsTotal;
+  final num expensesTotal;
+  final num loadingPricesSum;
+  final num discountsTotal;
+
+  const _DailyProfitDetailsPage({
+    required this.date,
+    required this.profit,
+    required this.distributionsTotal,
+    required this.loadingsTotal,
+    required this.expensesTotal,
+    required this.loadingPricesSum,
+    required this.discountsTotal,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: ui.TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: Text('تفاصيل الربح - $date')),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _MetricTile(
+              label:
+                  'الربح = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل - إجمالي المصروفات - مصروفات التحميل',
+              value: profit,
+              color: Colors.teal,
+            ),
+            const SizedBox(height: 8),
+            Card(
+              elevation: 0,
+              color: Colors.teal.withOpacity(0.02),
+              child: Column(
+                children: [
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.receipt_long, color: Colors.teal),
+                    title: const Text('مبلغ إجمالي الوجبات'),
+                    trailing: Text(
+                      NumberFormat('#,##0.###').format(distributionsTotal),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.local_shipping,
+                      color: Colors.orange,
+                    ),
+                    title: const Text('مبلغ إجمالي التحميل'),
+                    trailing: Text(
+                      NumberFormat('#,##0.###').format(loadingsTotal),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.money_off,
+                      color: Colors.redAccent,
+                    ),
+                    title: const Text('إجمالي ما تم خصمه'),
+                    trailing: Text(
+                      NumberFormat('#,##0.###').format(discountsTotal),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.price_change,
+                      color: Colors.purple,
+                    ),
+                    title: const Text('مصروفات التحميل (مجموع أسعار التحميل)'),
+                    trailing: Text(
+                      NumberFormat('#,##0.###').format(loadingPricesSum),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

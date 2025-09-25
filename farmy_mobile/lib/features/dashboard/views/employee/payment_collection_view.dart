@@ -32,6 +32,30 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
   final _remainingController = TextEditingController();
   String _selectedPaymentMethod = 'cash';
 
+  // Converts Arabic-Indic digits and comma to western format and parses to double
+  double _parseNumber(String? input) {
+    if (input == null) return 0;
+    String s = input.trim();
+    if (s.isEmpty) return 0;
+    const eastern = '٠١٢٣٤٥٦٧٨٩';
+    const western = '0123456789';
+    final buffer = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      final ch = s[i];
+      final idx = eastern.indexOf(ch);
+      if (idx != -1) {
+        buffer.write(western[idx]);
+      } else if (ch == ',') {
+        buffer.write('.');
+      } else if (RegExp(r'[0-9\.]').hasMatch(ch)) {
+        buffer.write(ch);
+      }
+      // ignore other chars (spaces, currency symbols)
+    }
+    final normalized = buffer.toString();
+    return double.tryParse(normalized) ?? 0;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -127,9 +151,9 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
   }
 
   void _calculateRemaining() {
-    final totalPrice = double.tryParse(_totalOutstandingController.text) ?? 0;
-    final paidAmount = double.tryParse(_paidAmountController.text) ?? 0;
-    final discount = double.tryParse(_discountController.text) ?? 0;
+    final totalPrice = _parseNumber(_totalOutstandingController.text);
+    final paidAmount = _parseNumber(_paidAmountController.text);
+    final discount = _parseNumber(_discountController.text);
     // Clamp values to valid ranges
     final effectiveDiscount = discount.clamp(0, totalPrice);
     final maxPayable = (totalPrice - effectiveDiscount).clamp(0, totalPrice);
@@ -155,9 +179,9 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
 
     try {
       final paymentService = serviceLocator<PaymentApiService>();
-      final totalPrice = double.parse(_totalOutstandingController.text);
-      final paidAmount = double.parse(_paidAmountController.text);
-      final discount = double.tryParse(_discountController.text) ?? 0;
+      final totalPrice = _parseNumber(_totalOutstandingController.text);
+      final paidAmount = _parseNumber(_paidAmountController.text);
+      final discount = _parseNumber(_discountController.text);
 
       final paymentData = {
         'customer': selectedCustomerId,
@@ -596,24 +620,19 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
                                                   value.isEmpty) {
                                                 return 'يرجى إدخال المبلغ المدفوع';
                                               }
-                                              final amount = double.tryParse(
+                                              final amount = _parseNumber(
                                                 value,
                                               );
-                                              if (amount == null ||
-                                                  amount < 0) {
+                                              if (amount < 0) {
                                                 return 'يرجى إدخال مبلغ صحيح';
                                               }
-                                              final total =
-                                                  double.tryParse(
-                                                    _totalOutstandingController
-                                                        .text,
-                                                  ) ??
-                                                  0;
-                                              final discount =
-                                                  double.tryParse(
-                                                    _discountController.text,
-                                                  ) ??
-                                                  0;
+                                              final total = _parseNumber(
+                                                _totalOutstandingController
+                                                    .text,
+                                              );
+                                              final discount = _parseNumber(
+                                                _discountController.text,
+                                              );
                                               final maxPay = (total - discount)
                                                   .clamp(0, total);
                                               if (amount > maxPay) {
