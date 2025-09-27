@@ -6256,3 +6256,9 @@
 {"level":"info","message":"Fetched customer with ID: 68d7c9fb179ae1a03a875d2b","timestamp":"2025-09-27T17:53:12.352Z"}
 {"level":"info","message":"Fetched customer with ID: 68d7c9fb179ae1a03a875d2b","timestamp":"2025-09-27T17:53:16.864Z"}
 {"level":"info","message":"User 68d7a92c8a6ed693ba660226 logged out","timestamp":"2025-09-27T17:53:22.100Z"}
+{"level":"info","message":"User admin logged in successfully","timestamp":"2025-09-27T18:05:37.962Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-27T18:05:38.407Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-27T18:05:38.584Z"}
+{"level":"info","message":"All suppliers fetched - count: 1","timestamp":"2025-09-27T18:05:38.715Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-09-27T18:05:38.855Z"}
+{"level":"info","message":"User 68d3f7bfcdaa488e65909b16 logged out","timestamp":"2025-09-27T18:05:40.993Z"}
