@@ -6,12 +6,14 @@ import '../../features/authentication/views/login_view.dart';
 import '../../features/dashboard/views/employee/employee_dashboard_view.dart';
 import '../../features/dashboard/views/admin/admin_dashboard_view.dart';
 import '../../features/dashboard/views/admin/Customers Section/customer_management_view.dart';
+import '../../features/dashboard/views/admin/Suppliers Section/supplier_management_view.dart';
+import '../../features/dashboard/views/admin/Suppliers Section/supplier_loading_orders_view.dart';
+import '../../features/dashboard/views/admin/Suppliers Section/supplier_loading_details_view.dart';
 import '../../features/dashboard/views/admin/Employees Section/employee_management_view.dart';
 import '../../features/dashboard/views/admin/Financial Dashboard/financial_dashboard_view.dart';
 import '../../features/dashboard/views/admin/Inventory/inventory_management_view.dart';
 import '../../features/dashboard/views/admin/order_detail_view.dart';
 import '../../features/dashboard/views/admin/Employees Section/employee_orders_view.dart';
-import '../../features/dashboard/views/admin/Customers Section/customer_loading_orders_view.dart';
 import '../../features/dashboard/views/admin/Customers Section/customer_history_view.dart';
 import '../../features/dashboard/views/employee/order_placement_view.dart';
 import '../../features/dashboard/views/employee/payment_collection_view.dart';
@@ -85,6 +87,39 @@ class AppRouter {
           builder: (context, state) => const CustomerManagementView(),
         ),
         GoRoute(
+          path: '/supplier-management',
+          name: 'supplier-management',
+          builder: (context, state) => const SupplierManagementView(),
+        ),
+        GoRoute(
+          path: '/supplier-loading-orders',
+          name: 'supplier-loading-orders',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>?;
+            final supplierId = extra?['supplierId'] as String?;
+            if (supplierId == null) {
+              return const Scaffold(
+                body: Center(child: Text('معرف المورد غير متوفر')),
+              );
+            }
+            return SupplierLoadingOrdersView(supplierId: supplierId);
+          },
+        ),
+        GoRoute(
+          path: '/supplier-loading-details',
+          name: 'supplier-loading-details',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>?;
+            final loadingId = extra?['loadingId'] as String?;
+            if (loadingId == null) {
+              return const Scaffold(
+                body: Center(child: Text('معرف طلب التحميل غير متوفر')),
+              );
+            }
+            return SupplierLoadingDetailsView(loadingId: loadingId);
+          },
+        ),
+        GoRoute(
           path: '/employee-management',
           name: 'employee-management',
           builder: (context, state) => const EmployeeManagementView(),
@@ -134,22 +169,6 @@ class AppRouter {
           },
         ),
 
-        GoRoute(
-          path: '/customer-loading-orders',
-          name: 'customer-loading-orders',
-          builder: (context, state) {
-            final extra = state.extra as Map<String, dynamic>?;
-            if (extra == null) {
-              return const Scaffold(
-                body: Center(child: Text('Customer data not found')),
-              );
-            }
-            return CustomerLoadingOrdersView(
-              customer: extra['customer'],
-              loadingOrders: extra['loadingOrders'],
-            );
-          },
-        ),
         GoRoute(
           path: '/customer-history',
           name: 'customer-history',

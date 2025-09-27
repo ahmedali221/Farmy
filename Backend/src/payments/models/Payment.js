@@ -6,9 +6,9 @@ const paymentSchema = new mongoose.Schema({
     ref: 'Customer',
     required: true
   },
-  employee: {
+  user: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Employee',
+    ref: 'User',
     required: true
   },
   totalPrice: {

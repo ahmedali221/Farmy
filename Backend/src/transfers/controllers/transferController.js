@@ -6,8 +6,8 @@ const EmployeeExpense = require('../../employeeExpenses/models/EmployeeExpense')
 const logger = require('../../utils/logger');
 
 const createTransferSchema = Joi.object({
-  fromEmployee: Joi.string().required(),
-  toEmployee: Joi.string().required(),
+  fromUser: Joi.string().required(),
+  toUser: Joi.string().required(),
   amount: Joi.number().min(0.01).required(),
   note: Joi.string().allow('')
 });
@@ -16,39 +16,39 @@ exports.createTransfer = async (req, res) => {
   const { error } = createTransferSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
 
-  const { fromEmployee, toEmployee, amount, note = '' } = req.body;
-  if (fromEmployee === toEmployee) {
-    return res.status(400).json({ message: 'fromEmployee and toEmployee must be different' });
+  const { fromUser, toUser, amount, note = '' } = req.body;
+  if (fromUser === toUser) {
+    return res.status(400).json({ message: 'fromUser and toUser must be different' });
   }
 
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    // Optional: ensure fromEmployee has enough collected amount if enforcing limits
+    // Optional: ensure fromUser has enough collected amount if enforcing limits
     const [fromAgg] = await Payment.aggregate([
-      { $match: { employee: new mongoose.Types.ObjectId(fromEmployee) } },
-      { $group: { _id: '$employee', totalCollected: { $sum: { $ifNull: ['$paidAmount', 0] } } } }
+      { $match: { user: new mongoose.Types.ObjectId(fromUser) } },
+      { $group: { _id: '$user', totalCollected: { $sum: { $ifNull: ['$paidAmount', 0] } } } }
     ]);
     const fromCollected = fromAgg ? fromAgg.totalCollected : 0;
 
-    // Sum of employee expenses for fromEmployee
+    // Sum of user expenses for fromUser
     const [fromExpAgg] = await EmployeeExpense.aggregate([
-      { $match: { employee: new mongoose.Types.ObjectId(fromEmployee) } },
-      { $group: { _id: '$employee', totalExpenses: { $sum: { $ifNull: ['$value', 0] } } } }
+      { $match: { user: new mongoose.Types.ObjectId(fromUser) } },
+      { $group: { _id: '$user', totalExpenses: { $sum: { $ifNull: ['$value', 0] } } } }
     ]);
     const fromExpenses = fromExpAgg ? fromExpAgg.totalExpenses : 0;
 
-    // Sum of transfers already sent by fromEmployee
+    // Sum of transfers already sent by fromUser
     const [fromTransfersOutAgg] = await Transfer.aggregate([
-      { $match: { fromEmployee: new mongoose.Types.ObjectId(fromEmployee) } },
-      { $group: { _id: '$fromEmployee', totalOut: { $sum: { $ifNull: ['$amount', 0] } } } }
+      { $match: { fromUser: new mongoose.Types.ObjectId(fromUser) } },
+      { $group: { _id: '$fromUser', totalOut: { $sum: { $ifNull: ['$amount', 0] } } } }
     ]);
     const totalOutExisting = fromTransfersOutAgg ? fromTransfersOutAgg.totalOut : 0;
 
-    // Sum of transfers already received by fromEmployee
+    // Sum of transfers already received by fromUser
     const [fromTransfersInAgg] = await Transfer.aggregate([
-      { $match: { toEmployee: new mongoose.Types.ObjectId(fromEmployee) } },
-      { $group: { _id: '$toEmployee', totalIn: { $sum: { $ifNull: ['$amount', 0] } } } }
+      { $match: { toUser: new mongoose.Types.ObjectId(fromUser) } },
+      { $group: { _id: '$toUser', totalIn: { $sum: { $ifNull: ['$amount', 0] } } } }
     ]);
     const totalInExisting = fromTransfersInAgg ? fromTransfersInAgg.totalIn : 0;
 
@@ -59,15 +59,15 @@ exports.createTransfer = async (req, res) => {
     }
 
     const transfer = await Transfer.create([{
-      fromEmployee,
-      toEmployee,
+      fromUser,
+      toUser,
       amount,
       note,
       createdBy: req.user.id
     }], { session });
 
     await session.commitTransaction();
-    logger.info(`Transfer created ${transfer[0]._id} from ${fromEmployee} to ${toEmployee} amount ${amount}`);
+    logger.info(`Transfer created ${transfer[0]._id} from ${fromUser} to ${toUser} amount ${amount}`);
     res.status(201).json(transfer[0]);
   } catch (err) {
     await session.abortTransaction();
@@ -80,18 +80,18 @@ exports.createTransfer = async (req, res) => {
 
 exports.listTransfers = async (req, res) => {
   try {
-    const { employeeId } = req.query;
+    const { userId } = req.query;
     const filter = {};
-    if (employeeId) {
+    if (userId) {
       filter.$or = [
-        { fromEmployee: employeeId },
-        { toEmployee: employeeId }
+        { fromUser: userId },
+        { toUser: userId }
       ];
     }
     const transfers = await Transfer.find(filter)
-      .populate('fromEmployee', 'name email')
-      .populate('toEmployee', 'name email')
-      .populate('createdBy', 'name email role')
+      .populate('fromUser', 'username role')
+      .populate('toUser', 'username role')
+      .populate('createdBy', 'username role')
       .sort({ createdAt: -1 });
     res.json(transfers);
   } catch (err) {
@@ -100,19 +100,19 @@ exports.listTransfers = async (req, res) => {
   }
 };
 
-exports.summaryByEmployee = async (req, res) => {
+exports.summaryByUser = async (req, res) => {
   try {
-    const { employeeId } = req.params;
+    const { userId } = req.params;
     const [inAgg] = await Transfer.aggregate([
-      { $match: { toEmployee: new mongoose.Types.ObjectId(employeeId) } },
-      { $group: { _id: '$toEmployee', totalIn: { $sum: '$amount' } } }
+      { $match: { toUser: new mongoose.Types.ObjectId(userId) } },
+      { $group: { _id: '$toUser', totalIn: { $sum: '$amount' } } }
     ]);
     const [outAgg] = await Transfer.aggregate([
-      { $match: { fromEmployee: new mongoose.Types.ObjectId(employeeId) } },
-      { $group: { _id: '$fromEmployee', totalOut: { $sum: '$amount' } } }
+      { $match: { fromUser: new mongoose.Types.ObjectId(userId) } },
+      { $group: { _id: '$fromUser', totalOut: { $sum: '$amount' } } }
     ]);
     res.json({
-      employeeId,
+      userId,
       totalIn: inAgg ? inAgg.totalIn : 0,
       totalOut: outAgg ? outAgg.totalOut : 0
     });

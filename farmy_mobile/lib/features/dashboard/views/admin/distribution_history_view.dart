@@ -104,11 +104,11 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
     return _distributions.where((distribution) {
       final customerName =
           distribution['customer']?['name']?.toString().toLowerCase() ?? '';
-      final employeeName =
-          distribution['employee']?['username']?.toString().toLowerCase() ?? '';
+      final userName =
+          distribution['user']?['username']?.toString().toLowerCase() ?? '';
       final query = _searchQuery.toLowerCase();
 
-      return customerName.contains(query) || employeeName.contains(query);
+      return customerName.contains(query) || userName.contains(query);
     }).toList();
   }
 
@@ -205,6 +205,47 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
                     ),
                   );
                   if (confirm == true) {
+                    // Ask for password before deletion
+                    final pwd = await showDialog<String?>(
+                      context: context,
+                      builder: (ctx) {
+                        final ctrl = TextEditingController();
+                        return AlertDialog(
+                          title: const Text('إدخال كلمة المرور'),
+                          content: TextField(
+                            controller: ctrl,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: 'كلمة المرور',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(null),
+                              child: const Text('إلغاء'),
+                            ),
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.of(ctx).pop(ctrl.text.trim()),
+                              child: const Text('تأكيد'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                    if (pwd == null || pwd.isEmpty) return;
+                    if (pwd != 'delete') {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'كلمة المرور غير صحيحة. استخدم "delete"',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
                     try {
                       await _distributionService.deleteAllDistributions();
                       if (!mounted) return;
@@ -261,7 +302,7 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
                         // Search bar
                         TextField(
                           decoration: InputDecoration(
-                            hintText: 'البحث في العملاء أو الموظفين...',
+                            hintText: 'البحث في العملاء أو المستخدمين...',
                             prefixIcon: const Icon(Icons.search),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -468,7 +509,7 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
       distribution['createdAt'] ?? distribution['distributionDate'],
     );
     final customerName = distribution['customer']?['name'] ?? 'غير معروف';
-    final employeeName = distribution['employee']?['username'] ?? 'غير معروف';
+    final userName = distribution['user']?['username'] ?? 'غير معروف';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -555,10 +596,10 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
           ListTile(
             leading: CircleAvatar(
               backgroundColor: Colors.blue.withOpacity(0.1),
-              child: const Icon(Icons.work, color: Colors.blue, size: 20),
+              child: const Icon(Icons.person, color: Colors.blue, size: 20),
             ),
-            title: const Text('الموظف'),
-            subtitle: Text(employeeName),
+            title: const Text('المستخدم'),
+            subtitle: Text(userName),
             dense: true,
           ),
           const Divider(height: 1),

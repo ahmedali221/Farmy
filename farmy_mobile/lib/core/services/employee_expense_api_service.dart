@@ -31,7 +31,7 @@ class EmployeeExpenseApiService {
         Uri.parse('$baseUrl/employee-expenses'),
         headers: headers,
         body: json.encode({
-          'employee': employeeId,
+          'user': employeeId,
           'name': name,
           'value': value,
           'note': note,
@@ -56,7 +56,7 @@ class EmployeeExpenseApiService {
     try {
       final headers = await _getAuthHeaders();
       final response = await http.get(
-        Uri.parse('$baseUrl/employee-expenses/employee/$employeeId'),
+        Uri.parse('$baseUrl/employee-expenses/user/$employeeId'),
         headers: headers,
       );
       if (response.statusCode == 200) {

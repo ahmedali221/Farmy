@@ -20,8 +20,8 @@ class TransferApiService {
   }
 
   Future<Map<String, dynamic>> createTransfer({
-    required String fromEmployee,
-    required String toEmployee,
+    required String fromUser,
+    required String toUser,
     required double amount,
     String? note,
   }) async {
@@ -31,8 +31,8 @@ class TransferApiService {
         Uri.parse('$baseUrl/transfers'),
         headers: headers,
         body: json.encode({
-          'fromEmployee': fromEmployee,
-          'toEmployee': toEmployee,
+          'fromUser': fromUser,
+          'toUser': toUser,
           'amount': amount,
           if (note != null && note.isNotEmpty) 'note': note,
         }),
@@ -53,11 +53,11 @@ class TransferApiService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> listTransfers({String? employeeId}) async {
+  Future<List<Map<String, dynamic>>> listTransfers({String? userId}) async {
     try {
       final headers = await _getAuthHeaders();
-      final query = employeeId != null && employeeId.isNotEmpty
-          ? '?employeeId=$employeeId'
+      final query = userId != null && userId.isNotEmpty
+          ? '?userId=$userId'
           : '';
       final response = await http.get(
         Uri.parse('$baseUrl/transfers$query'),
@@ -77,14 +77,3 @@ class TransferApiService {
     }
   }
 }
-
-
-
-
-
-
-
-
-
-
-

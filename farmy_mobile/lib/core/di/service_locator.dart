@@ -4,6 +4,7 @@ import '../../features/authentication/services/token_service.dart';
 import '../../features/authentication/cubit/auth_cubit.dart';
 import '../services/employee_api_service.dart';
 import '../services/customer_api_service.dart';
+import '../services/supplier_api_service.dart';
 import '../services/inventory_api_service.dart';
 import '../services/order_api_service.dart';
 import '../services/payment_api_service.dart';
@@ -27,6 +28,9 @@ class ServiceLocator {
     );
     serviceLocator.registerSingleton<CustomerApiService>(
       CustomerApiService(tokenService: serviceLocator<TokenService>()),
+    );
+    serviceLocator.registerSingleton<SupplierApiService>(
+      SupplierApiService(tokenService: serviceLocator<TokenService>()),
     );
     serviceLocator.registerSingleton<InventoryApiService>(
       InventoryApiService(tokenService: serviceLocator<TokenService>()),

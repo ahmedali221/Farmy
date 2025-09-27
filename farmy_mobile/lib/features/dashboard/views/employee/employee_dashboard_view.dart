@@ -145,7 +145,7 @@ class EmployeeDashboardView extends StatelessWidget {
                       ),
                       _buildActionCard(
                         context,
-                        'مصروفات الطلب',
+                        'مصروفات ',
                         Icons.money_off,
                         Theme.of(context).colorScheme.error,
                         () => context.push('/expenses'),
@@ -159,7 +159,6 @@ class EmployeeDashboardView extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
                 ],
               ),
             ),

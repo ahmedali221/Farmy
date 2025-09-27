@@ -14,7 +14,7 @@ exports.createExpense = async (req, res) => {
   try {
     const expense = new Expense({
       ...req.body,
-      employee: req.user.id,
+      user: req.user.id,
     });
     await expense.save();
     res.status(201).json(expense);
@@ -26,7 +26,7 @@ exports.createExpense = async (req, res) => {
 exports.getExpensesByOrder = async (req, res) => {
   try {
     const expenses = await Expense.find({ order: req.params.orderId })
-      .populate('employee', 'username role')
+      .populate('user', 'username role')
       .sort({ createdAt: -1 });
     res.json(expenses);
   } catch (err) {

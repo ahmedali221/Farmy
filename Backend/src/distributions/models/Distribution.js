@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const distributionSchema = new mongoose.Schema({
   customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
-  employee: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   quantity: { type: Number, required: true, min: 1 },
   grossWeight: { type: Number, required: true, min: 0 },
   emptyWeight: { type: Number, required: true, min: 0 },

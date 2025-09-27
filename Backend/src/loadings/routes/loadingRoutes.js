@@ -11,8 +11,8 @@ router.get('/', loadingController.getAllLoadings);
 // Get loadings by current employee
 router.get('/employee', loadingController.getLoadingsByEmployee);
 
-// Get loadings by specific customer
-router.get('/customer/:customerId', loadingController.getLoadingsByCustomer);
+// Get loadings by specific supplier
+router.get('/supplier/:supplierId', loadingController.getLoadingsBySupplier);
 
 // Get loading statistics
 router.get('/stats', loadingController.getLoadingStats);

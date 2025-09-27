@@ -4,6 +4,7 @@ import 'dart:ui' as ui show TextDirection;
 import '../../../../../../core/di/service_locator.dart';
 import '../../../../../../core/services/inventory_api_service.dart';
 import '../../../../../../core/services/payment_api_service.dart';
+import '../../../../../../features/authentication/services/token_service.dart';
 
 class InventoryTab extends StatefulWidget {
   const InventoryTab({super.key});
@@ -16,18 +17,34 @@ class _InventoryTabState extends State<InventoryTab> {
   final InventoryApiService _inventoryApi =
       serviceLocator<InventoryApiService>();
   final PaymentApiService _paymentApi = serviceLocator<PaymentApiService>();
+  final TokenService _tokenService = serviceLocator<TokenService>();
 
   DateTime _selectedDate = DateTime.now();
   bool _loading = false;
   Map<String, dynamic>? _data;
   num _discountsTotal = 0;
+  String? _userRole;
 
   final TextEditingController _adjController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _loadUserRole();
     _fetch();
+  }
+
+  Future<void> _loadUserRole() async {
+    try {
+      final user = await _tokenService.getUser();
+      if (user != null) {
+        setState(() {
+          _userRole = user.role;
+        });
+      }
+    } catch (e) {
+      // Handle error silently
+    }
   }
 
   @override
@@ -224,7 +241,7 @@ class _InventoryTabState extends State<InventoryTab> {
                     icon: const Icon(Icons.date_range),
                     label: const Text('اختيار التاريخ'),
                   ),
-                  const Spacer(),
+
                   IconButton(
                     onPressed: _loading ? null : _fetch,
                     icon: const Icon(Icons.refresh),

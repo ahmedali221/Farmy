@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/loading_api_service.dart';
-import '../../../../core/services/customer_api_service.dart';
+import '../../../../core/services/supplier_api_service.dart';
 import '../../../../core/services/inventory_api_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/pdf_arabic_utils.dart';
@@ -28,7 +28,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     {'id': 'بط', 'name': 'بط'},
   ];
 
-  List<Map<String, dynamic>> customers = [];
+  List<Map<String, dynamic>> suppliers = [];
   bool isLoading = true;
   bool isSubmitting = false;
   bool isOrderSubmitted = false;
@@ -36,8 +36,8 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
   // Form controllers
   final _formKey = GlobalKey<FormState>();
   String? selectedChickenTypeId;
-  String? selectedCustomerId;
-  final _customerNameController = TextEditingController();
+  String? selectedSupplierId;
+  final _supplierNameController = TextEditingController();
   final _quantityController = TextEditingController();
   final _totalPriceController = TextEditingController();
   // التحميل controllers
@@ -59,7 +59,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
 
   @override
   void dispose() {
-    _customerNameController.dispose();
+    _supplierNameController.dispose();
     _quantityController.dispose();
     _totalPriceController.dispose();
     _grossWeightController.dispose();
@@ -110,45 +110,49 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     setState(() => isLoading = true);
 
     try {
-      final customerService = serviceLocator<CustomerApiService>();
-      final customersList = await customerService.getAllCustomers();
+      final supplierService = serviceLocator<SupplierApiService>();
+      final suppliersList = await supplierService.getAllSuppliers();
 
       if (mounted) {
         setState(() {
-          customers = customersList;
+          suppliers = suppliersList;
           isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => isLoading = false);
-        _showErrorDialog('فشل في تحميل العملاء: $e');
+        _showErrorDialog('فشل في تحميل الموردين: $e');
       }
     }
   }
 
   // Removed stock checking logic as per requirements
 
-  // Resolve or create customer by typed name
-  Future<String> _ensureCustomerIdFromName() async {
-    final name = _customerNameController.text.trim();
+  // Resolve or create supplier by typed name
+  Future<String> _ensureSupplierIdFromName() async {
+    final name = _supplierNameController.text.trim();
     if (name.isEmpty) {
-      throw Exception('يرجى إدخال اسم العميل');
+      throw Exception('يرجى إدخال اسم المورد');
     }
 
     // Try local list first (case-insensitive match)
     try {
-      final existing = customers.firstWhere(
-        (c) =>
-            (c['name']?.toString().toLowerCase() ?? '') == name.toLowerCase(),
+      final existing = suppliers.firstWhere(
+        (s) =>
+            (s['name']?.toString().toLowerCase() ?? '') == name.toLowerCase(),
       );
       return existing['_id'] as String;
     } catch (_) {
-      // Not found → create new customer
-      final customerService = serviceLocator<CustomerApiService>();
-      final created = await customerService.createCustomer({'name': name});
+      // Not found → create new supplier
+      final supplierService = serviceLocator<SupplierApiService>();
+      final created = await supplierService.createSupplier({
+        'name': name,
+        'supplierType': 'chicken',
+        'status': 'active',
+      });
       // Update local cache
-      customers = [...customers, created];
+      suppliers = [...suppliers, created];
       return created['_id'] as String;
     }
   }
@@ -176,12 +180,12 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
 
       final loadingService = serviceLocator<LoadingApiService>();
 
-      // Resolve or create customer from typed name
-      selectedCustomerId = await _ensureCustomerIdFromName();
+      // Resolve or create supplier from typed name
+      selectedSupplierId = await _ensureSupplierIdFromName();
 
       final loadingData = {
         'chickenType': selectedChickenTypeId,
-        'customer': selectedCustomerId,
+        'supplier': selectedSupplierId,
         'quantity': double.parse(_quantityController.text),
         'grossWeight': double.tryParse(_grossWeightController.text) ?? 0,
         'loadingPrice': double.tryParse(_loadingPriceController.text) ?? 0,
@@ -220,6 +224,8 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
         // Refresh data
         await _loadData();
         await _generateAndPrintPdf();
+        // Reset form after successful submission
+        _resetOrderForm();
       }
     } catch (e) {
       if (mounted) {
@@ -232,12 +238,28 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     }
   }
 
+  void _resetOrderForm() {
+    setState(() {
+      selectedChickenTypeId = null;
+      selectedSupplierId = null;
+      _supplierNameController.clear();
+      _quantityController.clear();
+      _totalPriceController.clear();
+      _grossWeightController.clear();
+      _emptyWeightController.clear();
+      _netWeightController.clear();
+      _loadingPriceController.clear();
+      _totalLoadingController.clear();
+      isOrderSubmitted = false;
+    });
+  }
+
   Future<void> _generateAndPrintPdf() async {
     try {
       const appName = 'Farmy';
-      final customerName = _customerNameController.text.trim().isEmpty
+      final supplierName = _supplierNameController.text.trim().isEmpty
           ? 'غير معروف'
-          : _customerNameController.text.trim();
+          : _supplierNameController.text.trim();
 
       final now = DateTime.now();
       final qty = _quantityController.text;
@@ -256,7 +278,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
   </div>
   <h2 style="margin:6px 0 10px 0;">إيصال تحميل</h2>
   <div style="border:1px solid #e0e0e0;border-radius:8px;padding:10px;margin-bottom:12px;background:#fafafa;">
-    <div><strong>العميل:</strong> $customerName</div>
+    <div><strong>المورد:</strong> $supplierName</div>
   </div>
   <table style="width:100%;border-collapse:collapse;margin-top:8px;">
     <tr><td style="border:1px solid #e0e0e0;padding:8px;width:40%;">العدد</td><td style="border:1px solid #e0e0e0;padding:8px;">$qty</td></tr>
@@ -381,9 +403,9 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                 key: _formKey,
                                 child: Column(
                                   children: [
-                                    // Customer Selection (text input)
+                                    // Supplier Selection (text input)
                                     _SectionCard(
-                                      title: 'المكان',
+                                      title: 'المورد',
                                       child: Directionality(
                                         textDirection: TextDirection.rtl,
                                         child: Autocomplete<String>(
@@ -397,10 +419,10 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                                     String
                                                   >.empty();
                                                 }
-                                                return customers
+                                                return suppliers
                                                     .map(
-                                                      (c) =>
-                                                          c['name']
+                                                      (s) =>
+                                                          s['name']
                                                               ?.toString() ??
                                                           '',
                                                     )
@@ -412,7 +434,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                                     .take(10);
                                               },
                                           onSelected: (String selection) {
-                                            _customerNameController.text =
+                                            _supplierNameController.text =
                                                 selection;
                                             _onQuantityChanged();
                                           },
@@ -424,7 +446,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                                 onFieldSubmitted,
                                               ) {
                                                 textEditingController.text =
-                                                    _customerNameController
+                                                    _supplierNameController
                                                         .text;
                                                 textEditingController
                                                         .selection =
@@ -438,11 +460,11 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                                     );
                                                 return TextFormField(
                                                   controller:
-                                                      _customerNameController,
+                                                      _supplierNameController,
                                                   focusNode: focusNode,
                                                   decoration:
                                                       const InputDecoration(
-                                                        labelText: 'اسم العميل',
+                                                        labelText: 'اسم المورد',
                                                         border:
                                                             OutlineInputBorder(),
                                                       ),
@@ -453,7 +475,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                                   validator: (value) {
                                                     if (value == null ||
                                                         value.trim().isEmpty) {
-                                                      return 'يرجى إدخال اسم العميل';
+                                                      return 'يرجى إدخال اسم المورد';
                                                     }
                                                     return null;
                                                   },
@@ -1084,13 +1106,13 @@ class _LoadingHistoryDialogState extends State<_LoadingHistoryDialog> {
     if (_searchQuery.isEmpty) return _loadings;
 
     return _loadings.where((loading) {
-      final customerName =
-          loading['customer']?['name']?.toString().toLowerCase() ?? '';
+      final supplierName =
+          loading['supplier']?['name']?.toString().toLowerCase() ?? '';
       final chickenType =
           loading['chickenType']?['name']?.toString().toLowerCase() ?? '';
       final query = _searchQuery.toLowerCase();
 
-      return customerName.contains(query) || chickenType.contains(query);
+      return supplierName.contains(query) || chickenType.contains(query);
     }).toList();
   }
 
@@ -1169,7 +1191,7 @@ class _LoadingHistoryDialogState extends State<_LoadingHistoryDialog> {
                 // Search bar
                 TextField(
                   decoration: InputDecoration(
-                    hintText: 'البحث في العملاء أو نوع الدجاج...',
+                    hintText: 'البحث في الموردين أو نوع الدجاج...',
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -1298,7 +1320,7 @@ class _LoadingHistoryDialogState extends State<_LoadingHistoryDialog> {
                             ),
                           ),
                           title: Text(
-                            loading['customer']?['name'] ?? 'عميل غير معروف',
+                            loading['supplier']?['name'] ?? 'مورد غير معروف',
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           subtitle: Column(

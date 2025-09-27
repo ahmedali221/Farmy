@@ -45,10 +45,10 @@ class _TransferMoneyViewState extends State<TransferMoneyView> {
     setState(() => _loading = true);
     try {
       final users = await _employeeService.getAllEmployeeUsers();
-      final summary = await _paymentService.getEmployeeCollectionsSummary();
+      final summary = await _paymentService.getUserCollectionsSummary();
       double? available;
       for (final it in summary) {
-        final String id = (it['employeeId'] ?? '').toString();
+        final String id = (it['userId'] ?? '').toString();
         if (id == widget.fromEmployeeId) {
           // Prefer netAfterExpenses if provided; otherwise compute fallback
           if (it.containsKey('netAfterExpenses')) {
@@ -106,8 +106,8 @@ class _TransferMoneyViewState extends State<TransferMoneyView> {
     setState(() => _submitting = true);
     try {
       await _transferService.createTransfer(
-        fromEmployee: widget.fromEmployeeId,
-        toEmployee: _toEmployeeId!,
+        fromUser: widget.fromEmployeeId,
+        toUser: _toEmployeeId!,
         amount: double.parse(_amountController.text),
         note: _noteController.text.trim(),
       );

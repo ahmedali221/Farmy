@@ -1,6 +1,7 @@
 const Payment = require('../models/Payment');
 const Customer = require('../../customers/models/Customer');
 const Order = require('../../orders/models/Order');
+const User = require('../../managers/models/User');
 const Joi = require('joi');
 const logger = require('../../utils/logger');
 const mongoose = require('mongoose');
@@ -29,7 +30,7 @@ exports.createPayment = async (req, res) => {
 
     const paymentData = {
       ...req.body,
-      employee: req.user.id, // Current logged-in employee
+      user: req.user.id,
       remainingAmount: remaining,
       status
     };
@@ -56,7 +57,7 @@ exports.getAllPayments = async (req, res) => {
   try {
     const payments = await Payment.find()
       .populate('customer', 'name contactInfo')
-      .populate('employee', 'username')
+      .populate('user', 'username role')
       .sort({ createdAt: -1 });
 
     res.json(payments);
@@ -71,7 +72,7 @@ exports.getPaymentById = async (req, res) => {
     const payment = await Payment.findById(req.params.id)
       .populate('order')
       .populate('customer')
-      .populate('employee');
+      .populate('user', 'username role');
     
     if (!payment) {
       return res.status(404).json({ message: 'Payment not found' });
@@ -90,7 +91,7 @@ exports.getPaymentsByOrder = async (req, res) => {
     const payments = await Payment.find({ order: req.params.orderId })
       .populate('order')
       .populate('customer')
-      .populate('employee');
+      .populate('user', 'username role');
     
     logger.info(`Payments fetched for order: ${req.params.orderId}`);
     res.json(payments);
@@ -114,7 +115,7 @@ exports.updatePayment = async (req, res) => {
       req.params.id,
       req.body,
       { new: true }
-    ).populate('customer employee');
+    ).populate('customer user', 'username role');
 
     if (!payment) {
       return res.status(404).json({ message: 'Payment not found' });
@@ -167,12 +168,12 @@ exports.getPaymentSummary = async (req, res) => {
   }
 };
 
-// List payments collected by a specific employee, optionally grouped by day
-exports.getPaymentsByEmployee = async (req, res) => {
+// List payments collected by a specific user, optionally grouped by day
+exports.getPaymentsByUser = async (req, res) => {
   try {
-    const employeeId = req.params.employeeId || req.user?.id;
-    if (!employeeId || !mongoose.Types.ObjectId.isValid(employeeId)) {
-      return res.status(400).json({ message: 'Invalid employee id' });
+    const userId = req.params.userId || req.user?.id;
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user id' });
     }
 
     const groupBy = (req.query.groupBy || '').toLowerCase();
@@ -180,7 +181,7 @@ exports.getPaymentsByEmployee = async (req, res) => {
     // Group in Mongo to minimize payload when requested
     if (groupBy === 'day' || groupBy === 'date') {
       const pipeline = [
-        { $match: { employee: new mongoose.Types.ObjectId(employeeId) } },
+        { $match: { user: new mongoose.Types.ObjectId(userId) } },
         {
           $group: {
             _id: {
@@ -214,40 +215,40 @@ exports.getPaymentsByEmployee = async (req, res) => {
     }
 
     // Otherwise return raw list populated and sorted
-    const payments = await Payment.find({ employee: employeeId })
+    const payments = await Payment.find({ user: userId })
       .populate('customer', 'name contactInfo')
-      .populate('employee', 'username')
+      .populate('user', 'username role')
       .sort({ createdAt: -1 });
 
     return res.json(payments);
   } catch (err) {
-    logger.error(`Error fetching payments by employee: ${err.message}`);
+    logger.error(`Error fetching payments by user: ${err.message}`);
     return res.status(500).json({ message: 'Server error' });
   }
 };
 
-// Summary of total collected per employee including transfers in/out and net
-exports.getEmployeeCollectionSummary = async (req, res) => {
+// Summary of total collected per user including transfers in/out and net
+exports.getUserCollectionSummary = async (req, res) => {
   try {
     const collected = await Payment.aggregate([
-      { $group: { _id: '$employee', totalCollected: { $sum: { $ifNull: ['$paidAmount', 0] } }, count: { $sum: 1 } } }
+      { $group: { _id: '$user', totalCollected: { $sum: { $ifNull: ['$paidAmount', 0] } }, count: { $sum: 1 } } }
     ]);
 
     const transfersIn = await Transfer.aggregate([
-      { $group: { _id: '$toEmployee', totalIn: { $sum: { $ifNull: ['$amount', 0] } } } }
+      { $group: { _id: '$toUser', totalIn: { $sum: { $ifNull: ['$amount', 0] } } } }
     ]);
 
     const transfersOut = await Transfer.aggregate([
-      { $group: { _id: '$fromEmployee', totalOut: { $sum: { $ifNull: ['$amount', 0] } } } }
+      { $group: { _id: '$fromUser', totalOut: { $sum: { $ifNull: ['$amount', 0] } } } }
     ]);
 
     const toMap = (arr, key) => arr.reduce((m, r) => { m[String(r._id)] = r[key]; return m; }, {});
     const inMap = toMap(transfersIn, 'totalIn');
     const outMap = toMap(transfersOut, 'totalOut');
 
-    // Employee expenses by employee
+    // User expenses by user
     const expenses = await EmployeeExpense.aggregate([
-      { $group: { _id: '$employee', totalExpenses: { $sum: { $ifNull: ['$value', 0] } } } }
+      { $group: { _id: '$user', totalExpenses: { $sum: { $ifNull: ['$value', 0] } } } }
     ]);
 
     const expMap = toMap(expenses, 'totalExpenses');
@@ -260,7 +261,7 @@ exports.getEmployeeCollectionSummary = async (req, res) => {
       const net = (row.totalCollected || 0) + totalIn - totalOut;
       const netAfterExpenses = net - totalExpenses;
       return {
-        employeeId: row._id,
+        userId: row._id,
         totalCollected: row.totalCollected || 0,
         transfersIn: totalIn,
         transfersOut: totalOut,
@@ -273,7 +274,7 @@ exports.getEmployeeCollectionSummary = async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    logger.error(`Error fetching employee collection summary: ${err.message}`);
+    logger.error(`Error fetching user collection summary: ${err.message}`);
     res.status(500).json({ message: 'Server error' });
   }
 };

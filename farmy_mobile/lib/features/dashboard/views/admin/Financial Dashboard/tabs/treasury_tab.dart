@@ -44,7 +44,7 @@ class _TreasuryTabState extends State<TreasuryTab> {
     try {
       // Load all data in parallel
       final results = await Future.wait([
-        _paymentService.getEmployeeCollectionsSummary(),
+        _paymentService.getUserCollectionsSummary(),
         _loadingService.getAllLoadings(),
       ]);
 
@@ -69,7 +69,7 @@ class _TreasuryTabState extends State<TreasuryTab> {
 
       final Map<String, List<Map<String, dynamic>>> serverExpenses = {};
       for (final it in list) {
-        final String empId = (it['employeeId'] ?? '').toString();
+        final String empId = (it['userId'] ?? '').toString();
         if (empId.isEmpty) continue;
         try {
           final items = await _employeeExpenseService.listByEmployee(empId);
@@ -236,7 +236,7 @@ class _TreasuryTabState extends State<TreasuryTab> {
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
                         final item = _employeeCollections[index];
-                        final String employeeId = (item['employeeId'] ?? '')
+                        final String employeeId = (item['userId'] ?? '')
                             .toString();
                         final double amount =
                             ((item['totalCollected'] ?? 0) as num).toDouble();

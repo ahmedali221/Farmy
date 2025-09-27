@@ -117,13 +117,13 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
     if (_searchQuery.isEmpty) return _loadings;
 
     return _loadings.where((loading) {
-      final customerName =
-          loading['customer']?['name']?.toString().toLowerCase() ?? '';
+      final supplierName =
+          loading['supplier']?['name']?.toString().toLowerCase() ?? '';
       final chickenType =
           loading['chickenType']?['name']?.toString().toLowerCase() ?? '';
       final query = _searchQuery.toLowerCase();
 
-      return customerName.contains(query) || chickenType.contains(query);
+      return supplierName.contains(query) || chickenType.contains(query);
     }).toList();
   }
 
@@ -152,16 +152,6 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
       return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return 'تاريخ غير صحيح';
-    }
-  }
-
-  void _navigateToCustomerHistory(
-    BuildContext context,
-    Map<String, dynamic> loading,
-  ) {
-    final customer = loading['customer'];
-    if (customer != null) {
-      context.push('/customer-history', extra: {'customer': customer});
     }
   }
 
@@ -220,6 +210,48 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
                     ),
                   );
                   if (confirm == true) {
+                    // Ask for password before deletion
+                    final pwd = await showDialog<String?>(
+                      context: context,
+                      builder: (ctx) {
+                        final ctrl = TextEditingController();
+                        return AlertDialog(
+                          title: const Text('إدخال كلمة المرور'),
+                          content: TextField(
+                            controller: ctrl,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: 'كلمة المرور',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(null),
+                              child: const Text('إلغاء'),
+                            ),
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.of(ctx).pop(ctrl.text.trim()),
+                              child: const Text('تأكيد'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                    if (pwd == null || pwd.isEmpty) return;
+                    // Simple check: require 'delete' password for safety
+                    if (pwd != 'delete') {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'كلمة المرور غير صحيحة. استخدم "delete"',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
                     try {
                       await _loadingService.deleteAllLoadings();
                       if (!mounted) return;
@@ -276,7 +308,7 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
                         // Search bar
                         TextField(
                           decoration: InputDecoration(
-                            hintText: 'البحث في العملاء أو نوع الدجاج...',
+                            hintText: 'البحث في الموردين أو نوع الدجاج...',
                             prefixIcon: const Icon(Icons.search),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -423,7 +455,7 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final m = _filteredLoadings[index];
-        final String title = m['customer']?['name'] ?? 'عميل غير معروف';
+        final String title = m['supplier']?['name'] ?? 'مورد غير معروف';
         final String subtitle = _formatDateTime(m['createdAt']);
         final num totalLoading = (m['totalLoading'] ?? 0) as num;
         return ListTile(
@@ -484,7 +516,7 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
     final orderId = loading['_id']?.toString().substring(0, 8) ?? 'غير معروف';
     final createdAt = _formatDateTime(loading['createdAt']);
     final chickenType = loading['chickenType']?['name'] ?? 'غير معروف';
-    final customerName = loading['customer']?['name'] ?? 'غير معروف';
+    final supplierName = loading['supplier']?['name'] ?? 'غير معروف';
     final notes = loading['notes']?.toString();
 
     return Card(
@@ -560,23 +592,17 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
           ),
           const Divider(height: 1),
 
-          GestureDetector(
-            onTap: () => _navigateToCustomerHistory(context, loading),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.orange.withOpacity(0.1),
-                child: const Icon(Icons.person, color: Colors.orange, size: 20),
-              ),
-              title: const Text('العميل'),
-              subtitle: Text(
-                customerName,
-                style: const TextStyle(
-                  color: Colors.blue,
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-              dense: true,
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.orange.withOpacity(0.1),
+              child: const Icon(Icons.business, color: Colors.orange, size: 20),
             ),
+            title: const Text('المورد'),
+            subtitle: Text(
+              supplierName,
+              style: const TextStyle(color: Colors.blue),
+            ),
+            dense: true,
           ),
           const Divider(height: 1),
 

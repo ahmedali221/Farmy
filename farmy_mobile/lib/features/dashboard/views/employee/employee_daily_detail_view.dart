@@ -47,7 +47,7 @@ class _EmployeeDailyDetailViewState extends State<EmployeeDailyDetailView> {
       if (currentUser == null) throw Exception('User not authenticated');
 
       // Load all and filter client-side by date since backend grouping endpoints differ
-      final paymentsGrouped = await _paymentService.getEmployeeDailyCollections(
+      final paymentsGrouped = await _paymentService.getUserDailyCollections(
         currentUser.id,
       );
       final today = paymentsGrouped.firstWhere(

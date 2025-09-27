@@ -8,10 +8,13 @@ router.post('/', transferController.createTransfer);
 // List transfers (optionally by employee)
 router.get('/', transferController.listTransfers);
 
-// Summary for single employee
-router.get('/summary/:employeeId', transferController.summaryByEmployee);
+// Summary for single user
+router.get('/summary/:userId', transferController.summaryByUser);
 
 module.exports = router;
+
+
+
 
 
 

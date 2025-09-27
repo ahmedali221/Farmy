@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../core/services/customer_api_service.dart';
-import '../../../../../core/services/loading_api_service.dart';
+import '../../../../../core/services/distribution_api_service.dart';
+import '../../../../../core/services/payment_api_service.dart';
 
 class CustomerManagementView extends StatefulWidget {
   const CustomerManagementView({super.key});
@@ -13,14 +14,13 @@ class CustomerManagementView extends StatefulWidget {
 
 class _CustomerManagementViewState extends State<CustomerManagementView> {
   List<Map<String, dynamic>> customers = [];
-  List<Map<String, dynamic>> loadingOrders = [];
+  List<Map<String, dynamic>> distributions = [];
+  List<Map<String, dynamic>> payments = [];
   bool isLoading = true;
-  late final LoadingApiService _loadingService;
 
   @override
   void initState() {
     super.initState();
-    _loadingService = serviceLocator<LoadingApiService>();
     _loadData();
   }
 
@@ -28,12 +28,20 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
     setState(() => isLoading = true);
     try {
       final customerService = serviceLocator<CustomerApiService>();
-      final customersList = await customerService.getAllCustomers();
-      final loadingOrdersList = await _loadingService.getAllLoadings();
+      final distributionService = serviceLocator<DistributionApiService>();
+      final paymentService = serviceLocator<PaymentApiService>();
+
+      // Load all data in parallel
+      final results = await Future.wait([
+        customerService.getAllCustomers(),
+        distributionService.getAllDistributions(),
+        paymentService.getAllPayments(),
+      ]);
 
       setState(() {
-        customers = customersList;
-        loadingOrders = loadingOrdersList;
+        customers = results[0];
+        distributions = results[1];
+        payments = results[2];
       });
 
       setState(() => isLoading = false);
@@ -167,8 +175,9 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
                         leading: CircleAvatar(
                           backgroundColor: Colors.green,
                           child: Text(
-                            customer['name']?.substring(0, 1).toUpperCase() ??
-                                'ع',
+                            (customer['name']?.toString() ?? 'ع')
+                                .substring(0, 1)
+                                .toUpperCase(),
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -176,38 +185,101 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
                           ),
                         ),
                         title: Text(
-                          customer['name'] ?? 'غير معروف',
+                          customer['name']?.toString() ?? 'غير معروف',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'الهاتف: ${customer['contactInfo']?['phone'] ?? 'غير متوفر'}',
+                              'الهاتف: ${customer['contactInfo']?['phone']?.toString() ?? 'غير متوفر'}',
                             ),
                             Text(
-                              'العنوان: ${customer['contactInfo']?['address'] ?? 'غير متوفر'}',
-                            ),
-                            Text(
-                              'طلبات التحميل: ${_getCustomerLoadingOrdersCount(customer['_id'])}',
+                              'العنوان: ${customer['contactInfo']?['address']?.toString() ?? 'غير متوفر'}',
                             ),
                             Builder(
                               builder: (context) {
-                                final paymentTotals = _getCustomerPaymentTotals(
+                                final customerStats = _getCustomerStats(
                                   customer['_id'],
                                 );
                                 final remaining =
-                                    paymentTotals['remaining'] ?? 0.0;
-                                return Row(
+                                    customerStats['remaining'] ?? 0.0;
+                                final totalDistributions =
+                                    customerStats['totalDistributions'] ?? 0;
+                                final totalPayments =
+                                    customerStats['totalPayments'] ?? 0;
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(
-                                      remaining > 0
-                                          ? Icons.pending_actions
-                                          : Icons.check_circle,
-                                      size: 16,
-                                      color: remaining > 0
-                                          ? Colors.red
-                                          : Colors.green,
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          remaining > 0
+                                              ? Icons.pending_actions
+                                              : Icons.check_circle,
+                                          size: 16,
+                                          color: remaining > 0
+                                              ? Colors.red
+                                              : Colors.green,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          remaining > 0
+                                              ? 'متبقي: ج.م ${remaining.toStringAsFixed(2)}'
+                                              : 'مدفوع بالكامل',
+                                          style: TextStyle(
+                                            color: remaining > 0
+                                                ? Colors.red
+                                                : Colors.green,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 4,
+                                      children: [
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.outbound,
+                                              size: 14,
+                                              color: Colors.orange,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'توزيعات: $totalDistributions',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.orange,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.payment,
+                                              size: 14,
+                                              color: Colors.green,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'مدفوعات: $totalPayments',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.green,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 );
@@ -222,9 +294,8 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
                               icon: const Icon(Icons.history, size: 20),
                               onPressed: () =>
                                   _navigateToCustomerHistory(context, customer),
-                              tooltip: 'السجل التاريخي',
+                              tooltip: 'السجل التاريخي الكامل',
                             ),
-                            // Removed eye icon that leads to loading orders page per request
                             PopupMenuButton(
                               itemBuilder: (context) => [
                                 const PopupMenuItem(
@@ -261,7 +332,7 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
                                 } else if (value == 'delete') {
                                   _deleteCustomer(
                                     customer['_id'],
-                                    customer['name'],
+                                    customer['name']?.toString() ?? 'غير معروف',
                                   );
                                 }
                               },
@@ -344,37 +415,56 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
     );
   }
 
-  int _getCustomerLoadingOrdersCount(String? customerId) {
-    if (customerId == null) return 0;
-    return loadingOrders
-        .where((order) => order['customer']?['_id'] == customerId)
-        .length;
-  }
+  Map<String, dynamic> _getCustomerStats(String? customerId) {
+    if (customerId == null) {
+      return {
+        'totalValue': 0.0,
+        'totalPaid': 0.0,
+        'remaining': 0.0,
+        'totalDistributions': 0,
+        'totalPayments': 0,
+      };
+    }
 
-  Map<String, double> _getCustomerPaymentTotals(String? customerId) {
-    if (customerId == null)
-      return {'totalValue': 0.0, 'totalPaid': 0.0, 'remaining': 0.0};
-
-    final customerLoadingOrders = loadingOrders
-        .where((order) => order['customer']?['_id'] == customerId)
+    // Get customer distributions
+    final customerDistributions = distributions
+        .where((dist) => dist['customer']?['_id'] == customerId)
         .toList();
 
-    final double totalValue = customerLoadingOrders.fold(
-      0.0,
-      (sum, order) => sum + ((order['totalLoading'] ?? 0) as num).toDouble(),
-    );
+    // Get customer payments
+    final customerPayments = payments
+        .where((payment) => payment['customer']?['_id'] == customerId)
+        .toList();
 
-    final double totalPaid = customerLoadingOrders.fold(
-      0.0,
-      (sum, order) => sum + ((order['paidAmount'] ?? 0) as num).toDouble(),
-    );
+    // Calculate totals
+    final totalValue = customerDistributions.fold(0.0, (sum, dist) {
+      final amount = dist['totalAmount'];
+      if (amount is num) {
+        return sum + amount.toDouble();
+      } else if (amount is String) {
+        return sum + (double.tryParse(amount) ?? 0.0);
+      }
+      return sum;
+    });
 
-    final double remaining = totalValue - totalPaid;
+    final totalPaid = customerPayments.fold(0.0, (sum, payment) {
+      final paidAmount = payment['paidAmount'] ?? payment['amount'] ?? 0;
+      if (paidAmount is num) {
+        return sum + paidAmount.toDouble();
+      } else if (paidAmount is String) {
+        return sum + (double.tryParse(paidAmount) ?? 0.0);
+      }
+      return sum;
+    });
+
+    final remaining = (totalValue - totalPaid).clamp(0.0, double.infinity);
 
     return {
       'totalValue': totalValue,
       'totalPaid': totalPaid,
       'remaining': remaining,
+      'totalDistributions': customerDistributions.length,
+      'totalPayments': customerPayments.length,
     };
   }
 

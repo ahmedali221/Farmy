@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 
 const employeeExpenseSchema = new mongoose.Schema({
-  employee: {
+  user: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Employee',
+    ref: 'User',
     required: true
   },
   name: {

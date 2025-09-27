@@ -5,6 +5,7 @@ import '../../../authentication/cubit/auth_cubit.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/employee_api_service.dart';
 import '../../../../core/services/customer_api_service.dart';
+import '../../../../core/services/supplier_api_service.dart';
 import '../../../../core/services/inventory_api_service.dart';
 import 'distribution_history_view.dart';
 import 'loading_history_view.dart';
@@ -24,6 +25,7 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
   Map<String, dynamic> dashboardData = {
     'employees': 0,
     'customers': 0,
+    'suppliers': 0,
     'inventoryItems': 0,
     'totalInventoryValue': 0.0,
   };
@@ -47,6 +49,10 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
       final customerService = serviceLocator<CustomerApiService>();
       final customers = await customerService.getAllCustomers();
 
+      // Load supplier count
+      final supplierService = serviceLocator<SupplierApiService>();
+      final suppliers = await supplierService.getAllSuppliers();
+
       // Load inventory data
       final inventoryService = serviceLocator<InventoryApiService>();
       final inventoryItems = await inventoryService.getAllChickenTypes();
@@ -66,6 +72,7 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
           dashboardData = {
             'employees': employees.length,
             'customers': customers.length,
+            'suppliers': suppliers.length,
             'inventoryItems': inventoryItems.length,
             'totalInventoryValue': totalValue,
           };
@@ -197,6 +204,57 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
               ),
               const SizedBox(height: 24),
 
+              // Statistics Section
+              Text(
+                'إحصائيات النظام',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                children: [
+                  _buildStatCard(
+                    context,
+                    'الموظفين',
+                    dashboardData['employees'].toString(),
+                    Icons.group,
+                    Colors.blue,
+                    '',
+                  ),
+                  _buildStatCard(
+                    context,
+                    'العملاء',
+                    dashboardData['customers'].toString(),
+                    Icons.person,
+                    Colors.green,
+                    '',
+                  ),
+                  _buildStatCard(
+                    context,
+                    'الموردين',
+                    dashboardData['suppliers'].toString(),
+                    Icons.business,
+                    Colors.orange,
+                    '',
+                  ),
+                  _buildStatCard(
+                    context,
+                    'أصناف المخزون',
+                    dashboardData['inventoryItems'].toString(),
+                    Icons.inventory,
+                    Colors.purple,
+                    '',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
               // History Section
               Text(
                 'السجلات والتقارير',
@@ -313,6 +371,13 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
                     Icons.person,
                     Colors.teal,
                     () => context.go('/customer-management'),
+                  ),
+                  _buildActionCard(
+                    context,
+                    'إدارة الموردين',
+                    Icons.business,
+                    Colors.indigo,
+                    () => context.go('/supplier-management'),
                   ),
                 ],
               ),

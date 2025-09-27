@@ -24,7 +24,7 @@ class LoadingApiService {
   ///
   /// Required fields:
   /// - chickenType: ID of the chicken type (النوع)
-  /// - customer: ID of the customer (المكان)
+  /// - supplier: ID of the supplier (المورد)
   /// - quantity: Number of units (العدد)
   /// - grossWeight: Gross weight in kg (الوزن القائم)
   /// - loadingPrice: Price per kg entered by user (سعر التحميل)
@@ -107,14 +107,14 @@ class LoadingApiService {
     }
   }
 
-  /// Get loadings by specific customer
-  Future<List<Map<String, dynamic>>> getLoadingsByCustomer(
-    String customerId,
+  /// Get loadings by specific supplier
+  Future<List<Map<String, dynamic>>> getLoadingsBySupplier(
+    String supplierId,
   ) async {
     try {
       final headers = await _getAuthHeaders();
       final response = await http.get(
-        Uri.parse('$baseUrl/loadings/customer/$customerId'),
+        Uri.parse('$baseUrl/loadings/supplier/$supplierId'),
         headers: headers,
       );
 
@@ -123,7 +123,7 @@ class LoadingApiService {
         return data.cast<Map<String, dynamic>>();
       } else {
         throw ApiException(
-          message: 'Failed to load customer loadings',
+          message: 'Failed to load supplier loadings',
           statusCode: response.statusCode,
         );
       }

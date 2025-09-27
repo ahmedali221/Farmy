@@ -51,21 +51,20 @@ class _EmployeeFinancialViewState extends State<EmployeeFinancialView> {
 
       final employeeId = currentUser.id;
 
-      // Get employee collections summary (overall totals)
+      // Get user collections summary (overall totals)
       final collectionsSummary = await _paymentService
-          .getEmployeeCollectionsSummary();
+          .getUserCollectionsSummary();
 
-      // Find current employee's data
-      final employeeData = collectionsSummary.firstWhere(
-        (item) => (item['employeeId'] ?? '').toString() == employeeId,
+      // Find current user's data
+      final userData = collectionsSummary.firstWhere(
+        (item) => (item['userId'] ?? '').toString() == employeeId,
         orElse: () => {'totalCollected': 0},
       );
 
-      _totalCollected = ((employeeData['totalCollected'] ?? 0) as num)
-          .toDouble();
+      _totalCollected = ((userData['totalCollected'] ?? 0) as num).toDouble();
 
-      // Get employee daily grouped collections (history)
-      _dailyCollections = await _paymentService.getEmployeeDailyCollections(
+      // Get user daily grouped collections (history)
+      _dailyCollections = await _paymentService.getUserDailyCollections(
         employeeId,
       );
 

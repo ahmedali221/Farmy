@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/payment_api_service.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../authentication/cubit/auth_cubit.dart';
-import '../../../authentication/cubit/auth_state.dart';
 
 class PaymentHistoryView extends StatefulWidget {
   const PaymentHistoryView({super.key});
@@ -15,6 +12,7 @@ class PaymentHistoryView extends StatefulWidget {
 
 class _PaymentHistoryViewState extends State<PaymentHistoryView> {
   late final PaymentApiService _paymentService;
+
   List<Map<String, dynamic>> _payments = [];
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
@@ -79,11 +77,11 @@ class _PaymentHistoryViewState extends State<PaymentHistoryView> {
     return _payments.where((payment) {
       final customerName =
           payment['customer']?['name']?.toString().toLowerCase() ?? '';
-      final employeeName =
-          payment['employee']?['username']?.toString().toLowerCase() ?? '';
+      final userName =
+          payment['user']?['username']?.toString().toLowerCase() ?? '';
       final query = _searchQuery.toLowerCase();
 
-      return customerName.contains(query) || employeeName.contains(query);
+      return customerName.contains(query) || userName.contains(query);
     }).toList();
   }
 
@@ -146,6 +144,82 @@ class _PaymentHistoryViewState extends State<PaymentHistoryView> {
                 icon: const Icon(Icons.refresh),
                 onPressed: () => _loadPaymentsForDate(_selectedDate),
               ),
+              IconButton(
+                icon: const Icon(Icons.delete_forever),
+                tooltip: 'حذف كل سجلات المدفوعات',
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('تأكيد الحذف'),
+                      content: const Text(
+                        'هل أنت متأكد من حذف جميع سجلات المدفوعات؟ لا يمكن التراجع.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('إلغاء'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: const Text('حذف'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    final pwd = await showDialog<String?>(
+                      context: context,
+                      builder: (ctx) {
+                        final ctrl = TextEditingController();
+                        return AlertDialog(
+                          title: const Text('إدخال كلمة المرور'),
+                          content: TextField(
+                            controller: ctrl,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: 'كلمة المرور',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(null),
+                              child: const Text('إلغاء'),
+                            ),
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.of(ctx).pop(ctrl.text.trim()),
+                              child: const Text('تأكيد'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                    if (pwd == null || pwd.isEmpty) return;
+                    if (pwd != 'delete') {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'كلمة المرور غير صحيحة. استخدم "delete"',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+                    // NOTE: Payment deletion endpoint not present here; implement when backend supports
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'ميزة حذف جميع المدفوعات غير مفعلة حالياً',
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
             ],
           ),
           body: RefreshIndicator(
@@ -184,7 +258,7 @@ class _PaymentHistoryViewState extends State<PaymentHistoryView> {
                         // Search bar
                         TextField(
                           decoration: InputDecoration(
-                            hintText: 'البحث في العملاء أو الموظفين...',
+                            hintText: 'البحث في العملاء أو المستخدمين...',
                             prefixIcon: const Icon(Icons.search),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -396,7 +470,16 @@ class _PaymentDetailsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final customer = payment['customer'];
-    final employee = payment['employee'];
+    final dynamic user = payment['user'];
+    String collectorName = '';
+    if (user is Map<String, dynamic>) {
+      collectorName = (user['username'] ?? user['name'] ?? '')
+          .toString()
+          .trim();
+    } else if (user is String) {
+      // Older records may only have an ID string; show as ID for now
+      collectorName = '';
+    }
     final total = ((payment['totalPrice'] ?? 0) as num).toDouble();
     final paid = ((payment['paidAmount'] ?? 0) as num).toDouble();
     final discount = ((payment['discount'] ?? 0) as num).toDouble();
@@ -439,27 +522,8 @@ class _PaymentDetailsPage extends StatelessWidget {
                       ),
                     ),
                     title: const Text('القائم بالتحصيل'),
-                    subtitle: Builder(
-                      builder: (context) {
-                        final name = (employee?['username'] ?? '')
-                            .toString()
-                            .trim();
-                        if (name.isNotEmpty) return Text(name);
-                        try {
-                          final authState = context.read<AuthCubit>().state;
-                          if (authState is AuthAuthenticated &&
-                              authState.user.role != 'employee') {
-                            final adminName = authState.user.username;
-                            final adminId = authState.user.id;
-                            return Text(
-                              adminId.isEmpty
-                                  ? 'المدير: $adminName'
-                                  : 'المدير: $adminName (ID: $adminId)',
-                            );
-                          }
-                        } catch (_) {}
-                        return const Text('غير محدد');
-                      },
+                    subtitle: Text(
+                      collectorName.isNotEmpty ? collectorName : 'غير محدد',
                     ),
                     dense: true,
                   ),

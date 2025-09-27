@@ -1,14 +1,14 @@
 const mongoose = require('mongoose');
 
 const transferSchema = new mongoose.Schema({
-  fromEmployee: {
+  fromUser: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Employee',
+    ref: 'User',
     required: true
   },
-  toEmployee: {
+  toUser: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Employee',
+    ref: 'User',
     required: true
   },
   amount: {
@@ -28,6 +28,9 @@ const transferSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 module.exports = mongoose.model('Transfer', transferSchema);
+
+
+
 
 
 

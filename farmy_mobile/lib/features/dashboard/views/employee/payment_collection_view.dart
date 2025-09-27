@@ -25,36 +25,11 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
   // Form controllers
   final _formKey = GlobalKey<FormState>();
   String? selectedCustomerId;
-  final _customerNameController = TextEditingController();
   final _totalOutstandingController = TextEditingController();
   final _paidAmountController = TextEditingController();
   final _discountController = TextEditingController();
   final _remainingController = TextEditingController();
   String _selectedPaymentMethod = 'cash';
-
-  // Converts Arabic-Indic digits and comma to western format and parses to double
-  double _parseNumber(String? input) {
-    if (input == null) return 0;
-    String s = input.trim();
-    if (s.isEmpty) return 0;
-    const eastern = '٠١٢٣٤٥٦٧٨٩';
-    const western = '0123456789';
-    final buffer = StringBuffer();
-    for (int i = 0; i < s.length; i++) {
-      final ch = s[i];
-      final idx = eastern.indexOf(ch);
-      if (idx != -1) {
-        buffer.write(western[idx]);
-      } else if (ch == ',') {
-        buffer.write('.');
-      } else if (RegExp(r'[0-9\.]').hasMatch(ch)) {
-        buffer.write(ch);
-      }
-      // ignore other chars (spaces, currency symbols)
-    }
-    final normalized = buffer.toString();
-    return double.tryParse(normalized) ?? 0;
-  }
 
   @override
   void initState() {
@@ -67,7 +42,6 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
 
   @override
   void dispose() {
-    _customerNameController.dispose();
     _totalOutstandingController.dispose();
     _paidAmountController.dispose();
     _discountController.dispose();
@@ -115,21 +89,6 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
     }
   }
 
-  void _onCustomerNameChanged(String value) {
-    try {
-      final match = customers.firstWhere(
-        (c) =>
-            (c['name']?.toString().toLowerCase() ?? '') ==
-            value.trim().toLowerCase(),
-      );
-      _onCustomerSelected(match['_id'] as String);
-    } catch (_) {
-      _onCustomerSelected(null);
-      _totalOutstandingController.clear();
-      _remainingController.clear();
-    }
-  }
-
   void _showNoDebtDialog(String customerName) {
     showDialog(
       context: context,
@@ -151,9 +110,9 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
   }
 
   void _calculateRemaining() {
-    final totalPrice = _parseNumber(_totalOutstandingController.text);
-    final paidAmount = _parseNumber(_paidAmountController.text);
-    final discount = _parseNumber(_discountController.text);
+    final totalPrice = double.tryParse(_totalOutstandingController.text) ?? 0;
+    final paidAmount = double.tryParse(_paidAmountController.text) ?? 0;
+    final discount = double.tryParse(_discountController.text) ?? 0;
     // Clamp values to valid ranges
     final effectiveDiscount = discount.clamp(0, totalPrice);
     final maxPayable = (totalPrice - effectiveDiscount).clamp(0, totalPrice);
@@ -179,9 +138,9 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
 
     try {
       final paymentService = serviceLocator<PaymentApiService>();
-      final totalPrice = _parseNumber(_totalOutstandingController.text);
-      final paidAmount = _parseNumber(_paidAmountController.text);
-      final discount = _parseNumber(_discountController.text);
+      final totalPrice = double.parse(_totalOutstandingController.text);
+      final paidAmount = double.parse(_paidAmountController.text);
+      final discount = double.tryParse(_discountController.text) ?? 0;
 
       final paymentData = {
         'customer': selectedCustomerId,
@@ -204,6 +163,8 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
         if (selectedCustomerId != null) {
           _onCustomerSelected(selectedCustomerId);
         }
+        // Reset form after successful submission
+        _resetForm();
       }
     } catch (e) {
       if (mounted) {
@@ -214,6 +175,18 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
         setState(() => isSubmitting = false);
       }
     }
+  }
+
+  void _resetForm() {
+    setState(() {
+      selectedCustomerId = null;
+      _totalOutstandingController.clear();
+      _paidAmountController.clear();
+      _discountController.text = '0';
+      _remainingController.clear();
+      _selectedPaymentMethod = 'cash';
+      isPaymentSubmitted = false;
+    });
   }
 
   Future<void> _generateAndPrintPdf() async {
@@ -411,123 +384,28 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
                                     // Customer Selection
                                     _SectionCard(
                                       title: 'اختيار العميل',
-                                      child: Directionality(
-                                        textDirection: TextDirection.rtl,
-                                        child: Autocomplete<String>(
-                                          optionsBuilder:
-                                              (TextEditingValue value) {
-                                                final query = value.text
-                                                    .trim()
-                                                    .toLowerCase();
-                                                if (query.isEmpty) {
-                                                  return const Iterable<
-                                                    String
-                                                  >.empty();
-                                                }
-                                                return customers
-                                                    .map(
-                                                      (c) =>
-                                                          c['name']
-                                                              ?.toString() ??
-                                                          '',
-                                                    )
-                                                    .where(
-                                                      (name) => name
-                                                          .toLowerCase()
-                                                          .contains(query),
-                                                    )
-                                                    .take(10);
-                                              },
-                                          onSelected: (String selection) {
-                                            _customerNameController.text =
-                                                selection;
-                                            _onCustomerNameChanged(selection);
-                                          },
-                                          fieldViewBuilder:
-                                              (
-                                                context,
-                                                textEditingController,
-                                                focusNode,
-                                                onFieldSubmitted,
-                                              ) {
-                                                textEditingController.text =
-                                                    _customerNameController
-                                                        .text;
-                                                textEditingController
-                                                        .selection =
-                                                    TextSelection.fromPosition(
-                                                      TextPosition(
-                                                        offset:
-                                                            textEditingController
-                                                                .text
-                                                                .length,
-                                                      ),
-                                                    );
-                                                return TextFormField(
-                                                  controller:
-                                                      _customerNameController,
-                                                  focusNode: focusNode,
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        labelText: 'اسم العميل',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                      ),
-                                                  onChanged:
-                                                      _onCustomerNameChanged,
-                                                  validator: (v) {
-                                                    if (v == null ||
-                                                        v.trim().isEmpty) {
-                                                      return 'يرجى إدخال اسم العميل';
-                                                    }
-                                                    if (selectedCustomerId ==
-                                                        null) {
-                                                      return 'يرجى اختيار عميل من القائمة';
-                                                    }
-                                                    return null;
-                                                  },
-                                                );
-                                              },
-                                          optionsViewBuilder:
-                                              (context, onSelected, options) {
-                                                return Align(
-                                                  alignment: Alignment.topRight,
-                                                  child: Material(
-                                                    elevation: 4,
-                                                    child: SizedBox(
-                                                      width:
-                                                          MediaQuery.of(
-                                                            context,
-                                                          ).size.width -
-                                                          32,
-                                                      child: ListView.builder(
-                                                        padding:
-                                                            EdgeInsets.zero,
-                                                        itemCount:
-                                                            options.length,
-                                                        itemBuilder:
-                                                            (context, index) {
-                                                              final option =
-                                                                  options
-                                                                      .elementAt(
-                                                                        index,
-                                                                      );
-                                                              return ListTile(
-                                                                title: Text(
-                                                                  option,
-                                                                ),
-                                                                onTap: () =>
-                                                                    onSelected(
-                                                                      option,
-                                                                    ),
-                                                              );
-                                                            },
-                                                      ),
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                        ),
+                                      child: _DropdownField(
+                                        label: 'العميل',
+                                        value: selectedCustomerId,
+                                        items: customers.map((c) {
+                                          return DropdownMenuItem<String>(
+                                            value: c['_id'],
+                                            child: Text(
+                                              c['name'] ?? '',
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: Colors.black,
+                                              ),
+                                            ),
+                                          );
+                                        }).toList(),
+                                        onChanged: _onCustomerSelected,
+                                        validator: (value) {
+                                          if (value == null) {
+                                            return 'يرجى اختيار العميل';
+                                          }
+                                          return null;
+                                        },
                                       ),
                                     ),
                                     const SizedBox(height: 16),
@@ -620,19 +498,24 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
                                                   value.isEmpty) {
                                                 return 'يرجى إدخال المبلغ المدفوع';
                                               }
-                                              final amount = _parseNumber(
+                                              final amount = double.tryParse(
                                                 value,
                                               );
-                                              if (amount < 0) {
+                                              if (amount == null ||
+                                                  amount < 0) {
                                                 return 'يرجى إدخال مبلغ صحيح';
                                               }
-                                              final total = _parseNumber(
-                                                _totalOutstandingController
-                                                    .text,
-                                              );
-                                              final discount = _parseNumber(
-                                                _discountController.text,
-                                              );
+                                              final total =
+                                                  double.tryParse(
+                                                    _totalOutstandingController
+                                                        .text,
+                                                  ) ??
+                                                  0;
+                                              final discount =
+                                                  double.tryParse(
+                                                    _discountController.text,
+                                                  ) ??
+                                                  0;
                                               final maxPay = (total - discount)
                                                   .clamp(0, total);
                                               if (amount > maxPay) {
@@ -943,7 +826,53 @@ class _NumField extends StatelessWidget {
   }
 }
 
-// Removed legacy _DropdownField; replaced by Autocomplete-based field above
+class _DropdownField extends StatelessWidget {
+  final String label;
+  final String? value;
+  final List<DropdownMenuItem<String>> items;
+  final ValueChanged<String?> onChanged;
+  final String? Function(String?)? validator;
+
+  const _DropdownField({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      items: items.map((item) {
+        return DropdownMenuItem<String>(
+          value: item.value,
+          child: DefaultTextStyle(
+            style: const TextStyle(overflow: TextOverflow.ellipsis),
+            maxLines: 1,
+            child: item.child,
+          ),
+        );
+      }).toList(),
+      onChanged: onChanged,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        alignLabelWithHint: true,
+      ),
+      dropdownColor: Colors.white,
+      icon: const Icon(Icons.arrow_drop_down),
+    );
+  }
+}
 
 class _PaymentHistoryDialog extends StatefulWidget {
   @override

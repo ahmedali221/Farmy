@@ -433,7 +433,23 @@ class _DistributionViewState extends State<DistributionView> {
         _saving = false;
         _posting = false;
       });
+      // Reset form after successful submission
+      _resetDistributionForm();
     }
+  }
+
+  void _resetDistributionForm() {
+    setState(() {
+      _customerNameCtrl.clear();
+      _selectedCustomer = null;
+      _quantityCtrl.clear();
+      _grossWeightCtrl.clear();
+      _emptyWeightCtrl.clear();
+      _netWeightCtrl.clear();
+      _priceCtrl.clear();
+      _mealAccount = 0;
+      _totalAccount = 0;
+    });
   }
 
   void _showErrorDialog(String message) {

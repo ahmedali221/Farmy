@@ -28,7 +28,7 @@ exports.createDistribution = async (req, res) => {
 
     const distribution = new Distribution({
       customer,
-      employee: req.user.id,
+      user: req.user.id,
       quantity,
       grossWeight,
       emptyWeight,
@@ -43,7 +43,7 @@ exports.createDistribution = async (req, res) => {
     customerDoc.outstandingDebts = Math.max(0, (customerDoc.outstandingDebts || 0) + totalAmount);
     await customerDoc.save();
 
-    logger.info(`Distribution created: ${distribution._id} by employee: ${req.user.id}`);
+    logger.info(`Distribution created: ${distribution._id} by user: ${req.user.id}`);
     res.status(201).json(distribution);
   } catch (err) {
     logger.error(`Error creating distribution: ${err.message}`);
@@ -55,7 +55,7 @@ exports.getAllDistributions = async (req, res) => {
   try {
     const distributions = await Distribution.find()
       .populate('customer', 'name contactInfo')
-      .populate('employee', 'username')
+      .populate('user', 'username role')
       .sort({ distributionDate: -1 });
 
     res.json(distributions);

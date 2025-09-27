@@ -10,11 +10,11 @@ router.put('/:id', paymentController.updatePayment);
 router.get('/', paymentController.getAllPayments);
 
 // Collections & summaries (more specific first to avoid route shadowing)
-router.get('/summary/employee', paymentController.getEmployeeCollectionSummary);
+router.get('/summary/user', paymentController.getUserCollectionSummary);
 router.get('/summary/:orderId', paymentController.getPaymentSummary);
 
-// Payments by employee (raw or grouped by day via ?groupBy=day)
-router.get('/employee/:employeeId', paymentController.getPaymentsByEmployee);
+// Payments by user (raw or grouped by day via ?groupBy=day)
+router.get('/user/:userId', paymentController.getPaymentsByUser);
 
 // Fetch by relations and id
 router.get('/order/:orderId', paymentController.getPaymentsByOrder);

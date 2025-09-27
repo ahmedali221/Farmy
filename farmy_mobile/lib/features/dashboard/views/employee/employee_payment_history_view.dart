@@ -40,7 +40,7 @@ class _EmployeePaymentHistoryViewState
       if (currentUser == null) {
         throw Exception('User not authenticated');
       }
-      final data = await _paymentService.getEmployeeDailyCollections(
+      final data = await _paymentService.getUserDailyCollections(
         currentUser.id,
       );
       setState(() {

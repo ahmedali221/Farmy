@@ -7,9 +7,9 @@ const loadingSchema = new mongoose.Schema({
     ref: 'Employee',
     required: true
   },
-  customer: {
+  supplier: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Customer',
+    ref: 'Supplier',
     required: true
   },
   chickenType: {
@@ -65,10 +65,6 @@ const loadingSchema = new mongoose.Schema({
   
   // بيانات التتبع (اختيارية)
   batchNumber: {
-    type: String,
-    trim: true
-  },
-  supplier: {
     type: String,
     trim: true
   },
@@ -150,7 +146,7 @@ loadingSchema.pre('save', function(next) {
 
 // Indexes for better performance
 loadingSchema.index({ employee: 1, loadingDate: -1 });
-loadingSchema.index({ customer: 1, loadingDate: -1 });
+loadingSchema.index({ supplier: 1, loadingDate: -1 });
 loadingSchema.index({ chickenType: 1, loadingDate: -1 });
 loadingSchema.index({ loadingDate: -1 });
 

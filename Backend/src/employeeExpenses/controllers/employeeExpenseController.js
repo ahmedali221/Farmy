@@ -3,12 +3,12 @@ const logger = require('../../utils/logger');
 
 exports.createExpense = async (req, res) => {
   try {
-    const { employee, name, value, note = '' } = req.body;
-    if (!employee || !name || value == null) {
-      return res.status(400).json({ message: 'employee, name, and value are required' });
+    const { user, name, value, note = '' } = req.body;
+    if (!user || !name || value == null) {
+      return res.status(400).json({ message: 'user, name, and value are required' });
     }
-    const exp = await EmployeeExpense.create({ employee, name, value, note });
-    logger.info(`EmployeeExpense created: ${exp._id} for employee ${employee}`);
+    const exp = await EmployeeExpense.create({ user, name, value, note });
+    logger.info(`EmployeeExpense created: ${exp._id} for user ${user}`);
     res.status(201).json(exp);
   } catch (err) {
     logger.error(`Error creating employee expense: ${err.message}`);
@@ -16,17 +16,17 @@ exports.createExpense = async (req, res) => {
   }
 };
 
-exports.listByEmployee = async (req, res) => {
+exports.listByUser = async (req, res) => {
   try {
-    const { employeeId } = req.params;
+    const { userId } = req.params;
     // If role is employee, restrict to own id
-    if (req.user && req.user.role === 'employee' && req.user.id !== employeeId) {
+    if (req.user && req.user.role === 'employee' && req.user.id !== userId) {
       return res.status(403).json({ message: 'Access denied' });
     }
-    const list = await EmployeeExpense.find({ employee: employeeId }).sort({ createdAt: -1 });
+    const list = await EmployeeExpense.find({ user: userId }).sort({ createdAt: -1 });
     res.json(list);
   } catch (err) {
-    logger.error(`Error listing employee expenses: ${err.message}`);
+    logger.error(`Error listing user expenses: ${err.message}`);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -42,11 +42,11 @@ exports.deleteExpense = async (req, res) => {
   }
 };
 
-exports.summaryByEmployee = async (_req, res) => {
+exports.summaryByUser = async (_req, res) => {
   try {
     const agg = await EmployeeExpense.aggregate([
-      { $group: { _id: '$employee', total: { $sum: { $ifNull: ['$value', 0] } }, count: { $sum: 1 } } },
-      { $project: { _id: 0, employeeId: '$_id', total: '$total', count: '$count' } },
+      { $group: { _id: '$user', total: { $sum: { $ifNull: ['$value', 0] } }, count: { $sum: 1 } } },
+      { $project: { _id: 0, userId: '$_id', total: '$total', count: '$count' } },
       { $sort: { total: -1 } }
     ]);
     res.json(agg);

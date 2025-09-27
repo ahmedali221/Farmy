@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../../core/di/service_locator.dart';
-import '../../../../../core/services/loading_api_service.dart';
-import '../../../../../core/services/distribution_api_service.dart';
 import '../../../../../core/services/payment_api_service.dart';
+import '../../../../../core/services/distribution_api_service.dart';
 
 class CustomerHistoryView extends StatefulWidget {
   final Map<String, dynamic> customer;
@@ -15,20 +14,20 @@ class CustomerHistoryView extends StatefulWidget {
 }
 
 class _CustomerHistoryViewState extends State<CustomerHistoryView> {
-  late final LoadingApiService _loadingService;
-  late final DistributionApiService _distributionService;
   late final PaymentApiService _paymentService;
+  late final DistributionApiService _distributionService;
 
-  List<_DailyCustomerHistoryGroup> _dailyGroups = [];
+  List<Map<String, dynamic>> _payments = [];
+  List<Map<String, dynamic>> _distributions = [];
+  List<_DailyHistoryGroup> _dailyGroups = [];
   bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadingService = serviceLocator<LoadingApiService>();
-    _distributionService = serviceLocator<DistributionApiService>();
     _paymentService = serviceLocator<PaymentApiService>();
+    _distributionService = serviceLocator<DistributionApiService>();
     _loadAllData();
   }
 
@@ -48,35 +47,50 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
 
       // Load all data in parallel
       final results = await Future.wait([
-        _loadingService.getAllLoadings(),
-        _distributionService.getAllDistributions(),
         _paymentService.getAllPayments(),
+        _distributionService.getAllDistributions(),
       ]);
 
-      final allLoadings = results[0];
+      final allPayments = results[0];
       final allDistributions = results[1];
-      final allPayments = results[2];
-
-      // Filter data for this specific customer
-      final customerLoadings = allLoadings
-          .where((loading) => loading['customer']?['_id'] == customerId)
-          .toList();
-
-      final customerDistributions = allDistributions
-          .where(
-            (distribution) => distribution['customer']?['_id'] == customerId,
-          )
-          .toList();
 
       final customerPayments = allPayments
           .where((payment) => payment['customer']?['_id'] == customerId)
           .toList();
 
+      final customerDistributions = allDistributions.where((distribution) {
+        try {
+          return distribution['customer']?['_id'] == customerId;
+        } catch (e) {
+          print('Error filtering distribution: $e');
+          return false;
+        }
+      }).toList();
+
+      // Sort by date (newest first)
+      customerPayments.sort((a, b) {
+        final dateA = a['createdAt'] ?? '';
+        final dateB = b['createdAt'] ?? '';
+        return dateB.toString().compareTo(dateA.toString());
+      });
+
+      customerDistributions.sort((a, b) {
+        try {
+          final dateA = a['createdAt'] ?? '';
+          final dateB = b['createdAt'] ?? '';
+          return dateB.toString().compareTo(dateA.toString());
+        } catch (e) {
+          print('Error sorting distribution: $e');
+          return 0;
+        }
+      });
+
       setState(() {
-        _dailyGroups = _groupHistoryByDay(
-          loadings: customerLoadings,
-          distributions: customerDistributions,
-          payments: customerPayments,
+        _payments = customerPayments;
+        _distributions = customerDistributions;
+        _dailyGroups = _groupHistoryByDate(
+          customerPayments,
+          customerDistributions,
         );
         _isLoading = false;
       });
@@ -88,14 +102,13 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
     }
   }
 
-  List<_DailyCustomerHistoryGroup> _groupHistoryByDay({
-    required List<Map<String, dynamic>> loadings,
-    required List<Map<String, dynamic>> distributions,
-    required List<Map<String, dynamic>> payments,
-  }) {
+  List<_DailyHistoryGroup> _groupHistoryByDate(
+    List<Map<String, dynamic>> payments,
+    List<Map<String, dynamic>> distributions,
+  ) {
     String keyFor(String? iso) {
       try {
-        if (iso == null) return '0000-00-00';
+        if (iso == null || iso.isEmpty) return '0000-00-00';
         final dt = DateTime.parse(iso).toLocal();
         return '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
       } catch (_) {
@@ -103,56 +116,38 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
       }
     }
 
-    final Map<String, _DailyCustomerHistoryGroup> dateToGroup = {};
+    final Map<String, _DailyHistoryGroup> dateToGroup = {};
 
-    void addLoading(Map<String, dynamic> m) {
-      final k = keyFor(m['createdAt']);
-      dateToGroup.putIfAbsent(k, () => _DailyCustomerHistoryGroup(dateKey: k));
-      dateToGroup[k]!.loadings.add(m);
-    }
-
-    void addDistribution(Map<String, dynamic> m) {
-      final k = keyFor(m['createdAt']);
-      dateToGroup.putIfAbsent(k, () => _DailyCustomerHistoryGroup(dateKey: k));
-      dateToGroup[k]!.distributions.add(m);
+    for (final payment in payments) {
+      final k = keyFor(payment['createdAt']);
+      dateToGroup.putIfAbsent(k, () => _DailyHistoryGroup(dateKey: k));
+      dateToGroup[k]!.payments.add(payment);
     }
 
-    void addPayment(Map<String, dynamic> m) {
-      final k = keyFor(m['createdAt']);
-      dateToGroup.putIfAbsent(k, () => _DailyCustomerHistoryGroup(dateKey: k));
-      dateToGroup[k]!.payments.add(m);
-    }
-
-    for (final m in loadings) {
-      addLoading(m);
-    }
-    for (final m in distributions) {
-      addDistribution(m);
-    }
-    for (final m in payments) {
-      addPayment(m);
+    for (final distribution in distributions) {
+      final k = keyFor(distribution['createdAt']);
+      dateToGroup.putIfAbsent(k, () => _DailyHistoryGroup(dateKey: k));
+      dateToGroup[k]!.distributions.add(distribution);
     }
 
     final groups = dateToGroup.values.toList();
-    groups.sort((a, b) => b.dateKey.compareTo(a.dateKey));
-    // Optional: sort inside-day items newest first
-    for (final g in groups) {
-      g.loadings.sort(
-        (a, b) => (b['createdAt'] ?? '').toString().compareTo(
-          (a['createdAt'] ?? '').toString(),
-        ),
-      );
-      g.distributions.sort(
-        (a, b) => (b['createdAt'] ?? '').toString().compareTo(
-          (a['createdAt'] ?? '').toString(),
-        ),
-      );
-      g.payments.sort(
-        (a, b) => (b['createdAt'] ?? '').toString().compareTo(
-          (a['createdAt'] ?? '').toString(),
-        ),
-      );
+    groups.sort((a, b) => (b.dateKey ?? '').compareTo(a.dateKey ?? ''));
+
+    // Sort items within each day (newest first)
+    for (final group in groups) {
+      group.payments.sort((a, b) {
+        final dateA = a['createdAt'] ?? '';
+        final dateB = b['createdAt'] ?? '';
+        return dateB.toString().compareTo(dateA.toString());
+      });
+
+      group.distributions.sort((a, b) {
+        final dateA = a['createdAt'] ?? '';
+        final dateB = b['createdAt'] ?? '';
+        return dateB.toString().compareTo(dateA.toString());
+      });
     }
+
     return groups;
   }
 
@@ -184,6 +179,11 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
             ),
             actions: [
               IconButton(
+                icon: const Icon(Icons.analytics),
+                onPressed: _showSummaryDialog,
+                tooltip: 'ملخص الإحصائيات',
+              ),
+              IconButton(
                 icon: const Icon(Icons.refresh),
                 onPressed: _loadAllData,
               ),
@@ -193,7 +193,7 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
               ? const Center(child: CircularProgressIndicator())
               : _error != null
               ? _buildErrorWidget()
-              : _buildUnifiedDailyHistory(),
+              : _buildGroupedPaymentsList(),
         ),
       ),
     );
@@ -216,25 +216,157 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
       ),
     );
   }
-}
 
-class _DailyCustomerHistoryGroup {
-  final String dateKey; // yyyy-mm-dd
-  final List<Map<String, dynamic>> loadings = [];
-  final List<Map<String, dynamic>> distributions = [];
-  final List<Map<String, dynamic>> payments = [];
+  void _showSummaryDialog() {
+    final totalPayments = _payments.length;
+    final totalDistributions = _distributions.length;
 
-  _DailyCustomerHistoryGroup({required this.dateKey});
-}
+    final totalPaidValue = _payments.fold(0.0, (sum, payment) {
+      final paidAmount = payment['paidAmount'] ?? payment['amount'] ?? 0;
+      if (paidAmount is num) {
+        return sum + paidAmount.toDouble();
+      } else if (paidAmount is String) {
+        return sum + (double.tryParse(paidAmount) ?? 0.0);
+      }
+      return sum;
+    });
 
-extension on _CustomerHistoryViewState {
-  Widget _buildUnifiedDailyHistory() {
+    final totalDistributionValue = _distributions.fold(0.0, (
+      sum,
+      distribution,
+    ) {
+      final amount = distribution['totalAmount'] ?? 0;
+      if (amount is num) {
+        return sum + amount.toDouble();
+      } else if (amount is String) {
+        return sum + (double.tryParse(amount) ?? 0.0);
+      }
+      return sum;
+    });
+
+    final totalDiscount = _payments.fold(0.0, (sum, payment) {
+      final discount = payment['discount'] ?? 0;
+      if (discount is num) {
+        return sum + discount.toDouble();
+      } else if (discount is String) {
+        return sum + (double.tryParse(discount) ?? 0.0);
+      }
+      return sum;
+    });
+
+    final remaining = (totalDistributionValue - totalPaidValue).clamp(
+      0.0,
+      double.infinity,
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text('ملخص إحصائيات ${widget.customer['name']}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildSummaryCard(
+                'إجمالي التوزيعات',
+                'ج.م ${totalDistributionValue.toStringAsFixed(2)}',
+                Icons.outbound,
+                Colors.orange,
+                '$totalDistributions توزيع',
+              ),
+              const SizedBox(height: 12),
+              _buildSummaryCard(
+                'إجمالي المدفوعات',
+                'ج.م ${totalPaidValue.toStringAsFixed(2)}',
+                Icons.payment,
+                Colors.green,
+                '$totalPayments دفعة',
+              ),
+              const SizedBox(height: 12),
+              _buildSummaryCard(
+                'إجمالي الخصومات',
+                'ج.م ${totalDiscount.toStringAsFixed(2)}',
+                Icons.percent,
+                Colors.deepOrange,
+                'خصومات مطبقة',
+              ),
+              const SizedBox(height: 12),
+              _buildSummaryCard(
+                'المتبقي',
+                'ج.م ${remaining.toStringAsFixed(2)}',
+                Icons.pending_actions,
+                remaining > 0 ? Colors.red : Colors.green,
+                remaining > 0 ? 'مطلوب الدفع' : 'مدفوع بالكامل',
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('إغلاق'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+    String subtitle,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 12, color: color.withOpacity(0.8)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGroupedPaymentsList() {
     if (_dailyGroups.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.history, size: 64, color: Colors.grey[400]),
+            Icon(Icons.payment, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 12),
             Text(
               'لا يوجد سجل لهذا العميل',
@@ -245,45 +377,48 @@ extension on _CustomerHistoryViewState {
       );
     }
 
-    return CustomScrollView(
-      slivers: [
-        SliverList(
-          delegate: SliverChildBuilderDelegate((context, index) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _dailyGroups.length,
+      itemBuilder: (context, index) {
             final group = _dailyGroups[index];
-            return _buildDayCard(context, group);
-          }, childCount: _dailyGroups.length),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 16)),
-      ],
+        return _buildDayGroup(group);
+      },
     );
   }
 
-  Widget _buildDayCard(BuildContext context, _DailyCustomerHistoryGroup group) {
-    final dateLabel = _formatDateOnly(group.dateKey);
-    final hasLoadings = group.loadings.isNotEmpty;
-    final hasDistributions = group.distributions.isNotEmpty;
+  Widget _buildDayGroup(_DailyHistoryGroup group) {
+    final dateLabel = _formatDateOnly(group.dateKey ?? '0000-00-00');
     final hasPayments = group.payments.isNotEmpty;
+    final hasDistributions = group.distributions.isNotEmpty;
 
-    // Day totals (quick summary)
-    final double dayDistributionValue = group.distributions.fold(
-      0.0,
-      (sum, m) => sum + ((m['totalAmount'] ?? 0) as num).toDouble(),
-    );
-    final double dayPayments = group.payments.fold(
-      0.0,
-      (sum, m) =>
-          sum + ((m['amount'] ?? m['paidAmount'] ?? 0) as num).toDouble(),
-    );
-    final double dayTotal =
-        dayDistributionValue; // only distributions contribute to amount
-    final double dayRemaining = (dayTotal - dayPayments) < 0
-        ? 0
-        : (dayTotal - dayPayments);
+    // Calculate day totals
+    final dayPaymentTotal = group.payments.fold(0.0, (sum, payment) {
+      final paidAmount = payment['paidAmount'] ?? payment['amount'] ?? 0;
+      if (paidAmount is num) {
+        return sum + paidAmount.toDouble();
+      } else if (paidAmount is String) {
+        return sum + (double.tryParse(paidAmount) ?? 0.0);
+      }
+      return sum;
+    });
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Card(
-        elevation: 3,
+    final dayDistributionTotal = group.distributions.fold(0.0, (
+      sum,
+      distribution,
+    ) {
+      final amount = distribution['totalAmount'] ?? 0;
+      if (amount is num) {
+        return sum + amount.toDouble();
+      } else if (amount is String) {
+        return sum + (double.tryParse(amount) ?? 0.0);
+      }
+      return sum;
+    });
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -305,30 +440,56 @@ extension on _CustomerHistoryViewState {
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Wrap(
-                      alignment: WrapAlignment.end,
+                Wrap(
                       spacing: 6,
-                      runSpacing: 6,
                       children: [
-                        _chip(
-                          'التحميلات: ${group.loadings.length}',
-                          Theme.of(context).colorScheme.primary,
+                    if (hasDistributions)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
                         ),
-                        _chip(
-                          'التوزيعات: ${group.distributions.length}',
-                          Theme.of(context).colorScheme.primary,
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.orange.withOpacity(0.3),
+                          ),
                         ),
-                        _chip(
-                          'المدفوعات: ${group.payments.length}',
-                          Theme.of(context).colorScheme.primary,
+                        child: Text(
+                          '${group.distributions.length} توزيع',
+                          style: const TextStyle(
+                            color: Colors.orange,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    if (hasPayments)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.green.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          '${group.payments.length} دفعة',
+                          style: const TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
                   ),
                 ],
               ),
@@ -337,107 +498,273 @@ extension on _CustomerHistoryViewState {
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  if (dayDistributionValue > 0)
-                    _summaryPill(
-                      'قيمة التوزيعات',
-                      dayDistributionValue,
-                      Theme.of(context).colorScheme.primary,
+                if (dayDistributionTotal > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
                     ),
-                  if (dayPayments > 0)
-                    _summaryPill(
-                      'المدفوعات',
-                      dayPayments,
-                      Theme.of(context).colorScheme.primary,
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
                     ),
-                  if (dayPayments > 0)
-                    _summaryPill(
-                      'المتبقي',
-                      dayRemaining,
-                      dayRemaining > 0 ? Colors.red : Colors.green,
+                    child: Text(
+                      'توزيعات: ج.م ${dayDistributionTotal.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                if (dayPaymentTotal > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      'مدفوعات: ج.م ${dayPaymentTotal.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
                     ),
                 ],
               ),
               const SizedBox(height: 12),
 
-              if (hasLoadings) ...[
-                _sectionHeader(
-                  'طلبات التحميل',
-                  Icons.local_shipping,
-                  Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(height: 8),
-                for (final m in group.loadings)
-                  _buildLoadingOrderItem(context, m),
-                const SizedBox(height: 12),
-              ],
-
+            // Show distributions first
               if (hasDistributions) ...[
-                _sectionHeader(
+              _buildSectionHeader(
                   'طلبات التوزيع',
                   Icons.outbound,
-                  Theme.of(context).colorScheme.primary,
+                Colors.orange,
                 ),
                 const SizedBox(height: 8),
-                for (final m in group.distributions)
-                  _buildDistributionItem(context, m),
+              ...group.distributions.map(
+                (distribution) => _buildDistributionTile(distribution),
+              ),
                 const SizedBox(height: 12),
               ],
 
+            // Then show payments
               if (hasPayments) ...[
-                _sectionHeader(
-                  'المدفوعات',
-                  Icons.payment,
-                  Theme.of(context).colorScheme.primary,
-                ),
+              _buildSectionHeader('المدفوعات', Icons.payment, Colors.green),
                 const SizedBox(height: 8),
-                for (final m in group.payments)
-                  _buildPaymentItem(context, m, group),
+              ...group.payments.map((payment) => _buildPaymentTile(payment)),
               ],
             ],
           ),
         ),
+    );
+  }
+
+  Widget _buildPaymentTile(Map<String, dynamic> payment) {
+    final idStr = payment['_id']?.toString() ?? '';
+    final paymentId = idStr.length >= 8
+        ? idStr.substring(0, 8)
+        : (idStr.isEmpty ? 'غير معروف' : idStr);
+    final createdAt = _formatDateTime(payment['createdAt']);
+    final totalPriceValue = payment['totalPrice'] ?? 0;
+    final paidAmountValue = payment['paidAmount'] ?? payment['amount'] ?? 0;
+
+    final totalPrice = totalPriceValue is num
+        ? totalPriceValue.toDouble()
+        : 0.0;
+    final paidAmount = paidAmountValue is num
+        ? paidAmountValue.toDouble()
+        : 0.0;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 4),
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: ListTile(
+        leading: CircleAvatar(
+          radius: 20,
+          backgroundColor: Colors.green.withOpacity(0.1),
+          child: const Icon(Icons.payment, size: 18, color: Colors.green),
+        ),
+        title: Text(
+          'دفعة #$paymentId',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        subtitle: Text(
+          'المدفوع: ج.م ${paidAmount.toStringAsFixed(2)} • المستحق: ج.م ${totalPrice.toStringAsFixed(2)}',
+          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              createdAt,
+              style: TextStyle(color: Colors.grey[500], fontSize: 10),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 12, color: Colors.grey),
+          ],
+        ),
+        onTap: () => _navigateToPaymentDetails(payment),
       ),
     );
   }
 
-  Widget _chip(String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  Widget _buildPaymentCard(Map<String, dynamic> payment) {
+    final idStr = payment['_id']?.toString() ?? '';
+    final paymentId = idStr.length >= 8
+        ? idStr.substring(0, 8)
+        : (idStr.isEmpty ? 'غير معروف' : idStr);
+    final createdAt = _formatDateTime(payment['createdAt']);
+    final totalPriceValue = payment['totalPrice'] ?? 0;
+    final discountValue = payment['discount'] ?? 0;
+    final paidAmountValue = payment['paidAmount'] ?? payment['amount'] ?? 0;
+
+    final totalPrice = totalPriceValue is num
+        ? totalPriceValue.toDouble()
+        : 0.0;
+    final discount = discountValue is num ? discountValue.toDouble() : 0.0;
+    final paidAmount = paidAmountValue is num
+        ? paidAmountValue.toDouble()
+        : 0.0;
+    final remainingAfter = (totalPrice - paidAmount - discount).clamp(
+      0.0,
+      double.infinity,
+    );
+    final notes = payment['notes']?.toString();
+    final employee = payment['employee'];
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Colors.green.withOpacity(0.1),
+                  child: const Icon(
+                    Icons.payment,
+                    size: 20,
+                    color: Colors.green,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'دفعة #$paymentId',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        createdAt,
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildPaymentDetailRow(
+              'إجمالي المستحق',
+              'ج.م ${totalPrice.toStringAsFixed(2)}',
+              Icons.pending_actions,
+              Colors.orange,
+            ),
+            if (discount > 0)
+              _buildPaymentDetailRow(
+                'الخصم',
+                'ج.م ${discount.toStringAsFixed(2)}',
+                Icons.percent,
+                Colors.deepOrange,
+              ),
+            _buildPaymentDetailRow(
+              'المدفوع',
+              'ج.م ${paidAmount.toStringAsFixed(2)}',
+              Icons.attach_money,
+              Colors.green,
+            ),
+            _buildPaymentDetailRow(
+              'المتبقي',
+              'ج.م ${remainingAfter.toStringAsFixed(2)}',
+              Icons.check_circle,
+              remainingAfter > 0 ? Colors.red : Colors.green,
+            ),
+            if (employee != null)
+              _buildPaymentDetailRow(
+                'جامع المال',
+                employee['username'] ?? employee['name'] ?? 'غير معروف',
+                Icons.person,
+                Colors.brown,
+              ),
+            if (notes != null && notes.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.25)),
-      ),
+                  color: Colors.grey.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.note, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 8),
+                    Expanded(
       child: Text(
-        text,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.bold,
-          fontSize: 11,
+                        'ملاحظات: $notes',
+                        style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 
-  Widget _summaryPill(String title, double value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
+  Widget _buildPaymentDetailRow(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.attach_money, size: 14, color: color),
-          const SizedBox(width: 4),
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+          const Spacer(),
           Text(
-            '$title: ج.م ${value.toStringAsFixed(2)}',
+            value,
             style: TextStyle(
-              color: color,
+              fontSize: 14,
               fontWeight: FontWeight.bold,
-              fontSize: 12,
+              color: color,
             ),
           ),
         ],
@@ -445,7 +772,40 @@ extension on _CustomerHistoryViewState {
     );
   }
 
-  Widget _sectionHeader(String title, IconData icon, Color color) {
+  String _formatDateTime(String? dateTime) {
+    if (dateTime == null) return 'غير معروف';
+    try {
+      final dt = DateTime.parse(dateTime).toLocal();
+      final two = (int v) => v.toString().padLeft(2, '0');
+      return '${dt.day}/${dt.month}/${dt.year} ${two(dt.hour)}:${two(dt.minute)}';
+    } catch (_) {
+      return 'تاريخ غير صحيح';
+    }
+  }
+
+  String _formatDateOnly(String? dateKey) {
+    try {
+      if (dateKey == null || dateKey.isEmpty) return 'غير معروف';
+      final parts = dateKey.split('-');
+      if (parts.length != 3) return dateKey;
+
+      // Safely access array elements
+      final yearStr = parts.length > 0 ? parts[0] : '0';
+      final monthStr = parts.length > 1 ? parts[1] : '0';
+      final dayStr = parts.length > 2 ? parts[2] : '0';
+
+      final y = int.tryParse(yearStr) ?? 0;
+      final m = int.tryParse(monthStr) ?? 0;
+      final d = int.tryParse(dayStr) ?? 0;
+
+      if (y == 0 || m == 0 || d == 0) return dateKey;
+      return '$d/$m/$y';
+    } catch (_) {
+      return dateKey ?? 'غير معروف';
+    }
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon, Color color) {
     return Row(
       children: [
         Icon(icon, color: color, size: 18),
@@ -460,115 +820,97 @@ extension on _CustomerHistoryViewState {
     );
   }
 
-  Widget _buildLoadingOrderItem(
-    BuildContext context,
-    Map<String, dynamic> loadingOrder,
-  ) {
-    final orderId =
-        loadingOrder['_id']?.toString().substring(0, 8) ?? 'غير معروف';
-    final createdAt = _formatDateTime(loadingOrder['createdAt']);
-    final quantity = (loadingOrder['quantity'] ?? 0) as num;
-    final netWeight = (loadingOrder['netWeight'] ?? 0) as num;
-    // final totalLoading = (loadingOrder['totalLoading'] ?? 0) as num; // hidden per request
-    final chickenType = loadingOrder['chickenType'];
+  Widget _buildDistributionTile(Map<String, dynamic> distribution) {
+    final idStr = distribution['_id']?.toString() ?? '';
+    final distId = idStr.length >= 8
+        ? idStr.substring(0, 8)
+        : (idStr.isEmpty ? 'غير معروف' : idStr);
+    final createdAt = _formatDateTime(distribution['createdAt']);
+    final quantityValue = distribution['quantity'] ?? 0;
+    final totalAmountValue = distribution['totalAmount'] ?? 0;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.03),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.blue.withOpacity(0.15)),
-      ),
-      child: Directionality(
-        textDirection: TextDirection.rtl,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final quantity = quantityValue is num
+        ? quantityValue.toInt()
+        : (quantityValue is String ? int.tryParse(quantityValue) ?? 0 : 0);
+    final totalAmount = totalAmountValue is num
+        ? totalAmountValue.toDouble()
+        : (totalAmountValue is String
+              ? double.tryParse(totalAmountValue) ?? 0.0
+              : 0.0);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 4),
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: ListTile(
+        leading: CircleAvatar(
+          radius: 20,
+          backgroundColor: Colors.orange.withOpacity(0.1),
+          child: const Icon(Icons.outbound, size: 18, color: Colors.orange),
+        ),
+        title: Text(
+          'توزيع #$distId',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        subtitle: Text(
+          'الكمية: $quantity وحدة • ج.م ${totalAmount.toStringAsFixed(2)}',
+          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.primary.withOpacity(0.1),
-                  child: const Icon(
-                    Icons.local_shipping,
-                    size: 16,
-                    color: Colors.blue,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'طلب تحميل #$orderId',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Text(
-                  createdAt,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                ),
-              ],
+            Text(
+              createdAt,
+              style: TextStyle(color: Colors.grey[500], fontSize: 10),
             ),
-            const SizedBox(height: 6),
-            _kvTile(
-              'الكمية',
-              '${quantity.toInt()} وحدة',
-              Icons.inventory,
-              Colors.purple,
-            ),
-            _kvTile(
-              'الوزن الصافي',
-              '${netWeight.toDouble().toStringAsFixed(1)} كجم',
-              Icons.scale_outlined,
-              Colors.green,
-            ),
-            if (chickenType != null)
-              _kvTile(
-                'نوع الدجاج',
-                chickenType['name'] ?? 'غير معروف',
-                Icons.pets,
-                Colors.brown,
-              ),
+            const Icon(Icons.arrow_forward_ios, size: 12, color: Colors.grey),
           ],
         ),
+        onTap: () => _navigateToDistributionDetails(distribution),
       ),
     );
   }
 
-  Widget _buildDistributionItem(
-    BuildContext context,
-    Map<String, dynamic> distribution,
-  ) {
-    final distId =
-        distribution['_id']?.toString().substring(0, 8) ?? 'غير معروف';
+  Widget _buildDistributionCard(Map<String, dynamic> distribution) {
+    final idStr = distribution['_id']?.toString() ?? '';
+    final distId = idStr.length >= 8
+        ? idStr.substring(0, 8)
+        : (idStr.isEmpty ? 'غير معروف' : idStr);
     final createdAt = _formatDateTime(distribution['createdAt']);
-    final quantity = (distribution['quantity'] ?? 0) as num;
-    final netWeight = (distribution['netWeight'] ?? 0) as num;
-    final totalAmount = (distribution['totalAmount'] ?? 0) as num;
-    final employee = distribution['employee'];
+    final quantityValue = distribution['quantity'] ?? 0;
+    final netWeightValue = distribution['netWeight'] ?? 0;
+    final totalAmountValue = distribution['totalAmount'] ?? 0;
 
-    return Container(
+    final quantity = quantityValue is num
+        ? quantityValue.toInt()
+        : (quantityValue is String ? int.tryParse(quantityValue) ?? 0 : 0);
+    final netWeight = netWeightValue is num
+        ? netWeightValue.toDouble()
+        : (netWeightValue is String
+              ? double.tryParse(netWeightValue) ?? 0.0
+              : 0.0);
+    final totalAmount = totalAmountValue is num
+        ? totalAmountValue.toDouble()
+        : (totalAmountValue is String
+              ? double.tryParse(totalAmountValue) ?? 0.0
+              : 0.0);
+    final employee = distribution['user'] ?? distribution['employee'];
+
+    return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: Padding(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.orange.withOpacity(0.03),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.orange.withOpacity(0.15)),
-      ),
-      child: Directionality(
-        textDirection: TextDirection.rtl,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 CircleAvatar(
-                  radius: 14,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.primary.withOpacity(0.1),
+                  radius: 16,
+                  backgroundColor: Colors.orange.withOpacity(0.1),
                   child: const Icon(
                     Icons.outbound,
                     size: 16,
@@ -577,40 +919,50 @@ extension on _CustomerHistoryViewState {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
                     'توزيع #$distId',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
                   ),
                 ),
                 Text(
                   createdAt,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        style: TextStyle(color: Colors.grey[600], fontSize: 11),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            _kvTile(
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _buildPaymentDetailRow(
               'الكمية',
-              '${quantity.toInt()} وحدة',
+              '$quantity وحدة',
               Icons.inventory,
               Colors.purple,
             ),
-            _kvTile(
+            _buildPaymentDetailRow(
               'الوزن الصافي',
-              '${netWeight.toDouble().toStringAsFixed(1)} كجم',
+              '${netWeight.toStringAsFixed(1)} كجم',
               Icons.scale_outlined,
               Colors.green,
             ),
-            _kvTile(
+            _buildPaymentDetailRow(
               'إجمالي المبلغ',
-              'ج.م ${totalAmount.toDouble().toStringAsFixed(2)}',
+              'ج.م ${totalAmount.toStringAsFixed(2)}',
               Icons.attach_money,
               Colors.red,
             ),
             if (employee != null)
-              _kvTile(
+              _buildPaymentDetailRow(
                 'الموظف',
-                employee['username'] ?? 'غير معروف',
+                (employee is Map<String, dynamic>
+                    ? (employee['username'] ?? employee['name'] ?? 'غير معروف')
+                    : employee.toString()),
                 Icons.person,
                 Colors.brown,
               ),
@@ -620,180 +972,144 @@ extension on _CustomerHistoryViewState {
     );
   }
 
-  Widget _buildPaymentItem(
-    BuildContext context,
-    Map<String, dynamic> payment,
-    _DailyCustomerHistoryGroup group,
-  ) {
-    final paymentId = payment['_id']?.toString().substring(0, 8) ?? 'غير معروف';
-    final createdAt = _formatDateTime(payment['createdAt']);
-    final totalPrice = ((payment['totalPrice'] ?? 0) as num).toDouble();
-    final discount = ((payment['discount'] ?? 0) as num).toDouble();
-    final paidAmount =
-        ((payment['paidAmount'] ?? payment['amount'] ?? 0) as num).toDouble();
-    final remainingAfter =
-        ((payment['remainingAmount'] ?? (totalPrice - paidAmount - discount))
-                as num)
-            .toDouble()
-            .clamp(0, double.infinity);
-    final method = (payment['paymentMethod'] ?? '').toString();
-    final notes = payment['notes']?.toString();
-    final employee = payment['employee'];
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.03),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.green.withOpacity(0.15)),
-      ),
-      child: Directionality(
+  void _navigateToDistributionDetails(Map<String, dynamic> distribution) {
+    // TODO: Navigate to distribution details page
+    // For now, show a dialog with distribution details
+    showDialog(
+      context: context,
+      builder: (context) => Directionality(
         textDirection: TextDirection.rtl,
-        child: Column(
+        child: AlertDialog(
+          title: Text(
+            'تفاصيل التوزيع #${distribution['_id']?.toString().substring(0, 8) ?? 'غير معروف'}',
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.primary.withOpacity(0.1),
-                  child: const Icon(
-                    Icons.payment,
-                    size: 16,
-                    color: Colors.green,
-                  ),
+              _buildDetailRow(
+                'الكمية',
+                '${distribution['quantity'] ?? 0} وحدة',
+              ),
+              _buildDetailRow(
+                'الوزن القائم',
+                '${distribution['grossWeight'] ?? 0} كجم',
+              ),
+              _buildDetailRow(
+                'الوزن الفارغ',
+                '${distribution['emptyWeight'] ?? 0} كجم',
+              ),
+              _buildDetailRow(
+                'الوزن الصافي',
+                '${distribution['netWeight'] ?? 0} كجم',
+              ),
+              _buildDetailRow(
+                'سعر الكيلو',
+                'ج.م ${distribution['price'] ?? 0}',
+              ),
+              _buildDetailRow(
+                'إجمالي المبلغ',
+                'ج.م ${distribution['totalAmount'] ?? 0}',
+              ),
+              _buildDetailRow(
+                'تاريخ التوزيع',
+                _formatDateTime(
+                  distribution['distributionDate'] ?? distribution['createdAt'],
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'دفعة #$paymentId',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Text(
-                  createdAt,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+              if (distribution['user'] != null)
+                _buildDetailRow(
+                  'الموظف',
+                  distribution['user']['username'] ??
+                      distribution['user']['name'] ??
+                      'غير معروف',
                 ),
               ],
             ),
-
-            _kvTile(
-              'إجمالي المستحق وقتها',
-              'ج.م ${totalPrice.toStringAsFixed(2)}',
-              Icons.pending_actions,
-              Colors.orange,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('إغلاق'),
             ),
-            const SizedBox(height: 6),
-            if (discount > 0)
-              _kvTile(
-                'الخصم',
-                'ج.م ${discount.toStringAsFixed(2)}',
-                Icons.percent,
-                Colors.deepOrange,
-              ),
-            _kvTile(
-              'المدفوع',
-              'ج.م ${paidAmount.toStringAsFixed(2)}',
-              Icons.attach_money,
-              Colors.green,
-            ),
-            _kvTile(
-              'المتبقي بعد الدفع',
-              'ج.م ${remainingAfter.toStringAsFixed(2)}',
-              Icons.check_circle,
-              remainingAfter > 0 ? Colors.red : Colors.green,
-            ),
-            if (method.isNotEmpty)
-              _kvTile(
-                'طريقة الدفع',
-                _getPaymentMethodText(method),
-                Icons.payment,
-                Colors.blue,
-              ),
-            if (employee != null)
-              _kvTile(
-                'الموظف',
-                employee['username'] ?? 'غير معروف',
-                Icons.person,
-                Colors.brown,
-              ),
-            if (notes != null && notes.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                'ملاحظات: $notes',
-                style: TextStyle(color: Colors.grey[700], fontSize: 12),
-              ),
-            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _kvTile(String label, String value, IconData icon, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
+  void _navigateToPaymentDetails(Map<String, dynamic> payment) {
+    // TODO: Navigate to payment details page
+    // For now, show a dialog with payment details
+    showDialog(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text(
+            'تفاصيل الدفعة #${payment['_id']?.toString().substring(0, 8) ?? 'غير معروف'}',
           ),
-          child: Icon(icon, color: color, size: 18),
-        ),
-        title: Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDetailRow(
+                'إجمالي المستحق',
+                'ج.م ${payment['totalPrice'] ?? 0}',
+              ),
+              _buildDetailRow(
+              'المدفوع',
+                'ج.م ${payment['paidAmount'] ?? payment['amount'] ?? 0}',
+              ),
+              _buildDetailRow('الخصم', 'ج.م ${payment['discount'] ?? 0}'),
+              _buildDetailRow(
+                'المتبقي',
+                'ج.م ${((payment['totalPrice'] ?? 0) - (payment['paidAmount'] ?? payment['amount'] ?? 0) - (payment['discount'] ?? 0)).toStringAsFixed(2)}',
+              ),
+              _buildDetailRow(
+                'طريقة الدفع',
+                _getPaymentMethodText(
+                  payment['paymentMethod']?.toString() ?? '',
+                ),
+              ),
+              _buildDetailRow(
+                'تاريخ الدفع',
+                _formatDateTime(payment['createdAt']),
+              ),
+              if (payment['employee'] != null)
+                _buildDetailRow(
+                  'جامع المال',
+                  payment['employee']['username'] ??
+                      payment['employee']['name'] ??
+                      'غير معروف',
+                ),
+              if (payment['notes'] != null &&
+                  payment['notes'].toString().isNotEmpty)
+                _buildDetailRow('ملاحظات', payment['notes'].toString()),
+            ],
           ),
-          textDirection: TextDirection.rtl,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('إغلاق'),
+            ),
+          ],
         ),
-        subtitle: Text(
-          label,
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-          textDirection: TextDirection.rtl,
-        ),
-        dense: true,
       ),
     );
   }
 
-  // Deprecated: replaced by _kvTile
-
-  String _formatDateOnly(String dateKey) {
-    try {
-      final parts = dateKey.split('-');
-      if (parts.length != 3) return dateKey;
-      final y = int.parse(parts[0]);
-      final m = int.parse(parts[1]);
-      final d = int.parse(parts[2]);
-      return '$d/$m/$y';
-    } catch (_) {
-      return dateKey;
-    }
-  }
-
-  String _formatDateTime(String? dateTime) {
-    if (dateTime == null) return 'غير معروف';
-    try {
-      final dt = DateTime.parse(dateTime).toLocal();
-      final two = (int v) => v.toString().padLeft(2, '0');
-      return '${dt.day}/${dt.month}/${dt.year} ${two(dt.hour)}:${two(dt.minute)}';
-    } catch (_) {
-      return 'تاريخ غير صحيح';
-    }
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(
+            child: Text(value, style: TextStyle(color: Colors.grey[700])),
+          ),
+        ],
+      ),
+    );
   }
 
   String _getPaymentMethodText(String method) {
@@ -805,7 +1121,15 @@ extension on _CustomerHistoryViewState {
       case 'credit':
         return 'آجل';
       default:
-        return method;
+        return method.isEmpty ? 'غير محدد' : method;
     }
   }
+}
+
+class _DailyHistoryGroup {
+  final String? dateKey; // yyyy-mm-dd
+  final List<Map<String, dynamic>> payments = [];
+  final List<Map<String, dynamic>> distributions = [];
+
+  _DailyHistoryGroup({required this.dateKey});
 }

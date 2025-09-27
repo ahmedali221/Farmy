@@ -20,14 +20,12 @@ class PaymentApiService {
     };
   }
 
-  /// Get payments collected by an employee (raw list)
-  Future<List<Map<String, dynamic>>> getPaymentsByEmployee(
-    String employeeId,
-  ) async {
+  /// Get payments collected by a user (raw list)
+  Future<List<Map<String, dynamic>>> getPaymentsByUser(String userId) async {
     try {
       final headers = await _getAuthHeaders();
       final response = await http.get(
-        Uri.parse('$baseUrl/payments/employee/$employeeId'),
+        Uri.parse('$baseUrl/payments/user/$userId'),
         headers: headers,
       );
 
@@ -36,7 +34,7 @@ class PaymentApiService {
         return data.cast<Map<String, dynamic>>();
       } else {
         throw ApiException(
-          message: 'Failed to load employee payments',
+          message: 'Failed to load user payments',
           statusCode: response.statusCode,
         );
       }
@@ -46,15 +44,15 @@ class PaymentApiService {
     }
   }
 
-  /// Get daily grouped payments for an employee
+  /// Get daily grouped payments for a user
   /// Returns: [{ date: 'YYYY-MM-DD', totalPaid: number, count: number, payments: [ ... ] }]
-  Future<List<Map<String, dynamic>>> getEmployeeDailyCollections(
-    String employeeId,
+  Future<List<Map<String, dynamic>>> getUserDailyCollections(
+    String userId,
   ) async {
     try {
       final headers = await _getAuthHeaders();
       final response = await http.get(
-        Uri.parse('$baseUrl/payments/employee/$employeeId?groupBy=day'),
+        Uri.parse('$baseUrl/payments/user/$userId?groupBy=day'),
         headers: headers,
       );
 
@@ -63,7 +61,7 @@ class PaymentApiService {
         return data.cast<Map<String, dynamic>>();
       } else {
         throw ApiException(
-          message: 'Failed to load employee daily collections',
+          message: 'Failed to load user daily collections',
           statusCode: response.statusCode,
         );
       }
@@ -197,12 +195,12 @@ class PaymentApiService {
     }
   }
 
-  /// Get employee collections summary
-  Future<List<Map<String, dynamic>>> getEmployeeCollectionsSummary() async {
+  /// Get user collections summary
+  Future<List<Map<String, dynamic>>> getUserCollectionsSummary() async {
     try {
       final headers = await _getAuthHeaders();
       final response = await http.get(
-        Uri.parse('$baseUrl/payments/summary/employee'),
+        Uri.parse('$baseUrl/payments/summary/user'),
         headers: headers,
       );
 
@@ -213,8 +211,8 @@ class PaymentApiService {
         final dynamic errorData = json.decode(response.body);
         throw ApiException(
           message: (errorData is Map<String, dynamic>)
-              ? (errorData['message'] ?? 'Failed to load employee collections')
-              : 'Failed to load employee collections',
+              ? (errorData['message'] ?? 'Failed to load user collections')
+              : 'Failed to load user collections',
           statusCode: response.statusCode,
         );
       }
