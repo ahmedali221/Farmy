@@ -5181,3 +5181,6 @@
 {"level":"info","message":"All loadings fetched","timestamp":"2025-09-25T10:07:21.006Z"}
 {"level":"info","message":"Fetched all employee users","timestamp":"2025-09-25T10:07:21.091Z"}
 {"level":"info","message":"DailyStock read window 2025-09-24T21:00:00.000Z..2025-09-25T21:00:00.000Z loadings=2 netLoading=314","timestamp":"2025-09-25T10:07:21.494Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-09-25T10:07:49.386Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-09-25T10:07:49.473Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-09-25T10:07:49.556Z"}
