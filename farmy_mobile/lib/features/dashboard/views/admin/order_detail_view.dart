@@ -86,6 +86,13 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                 }
               },
             ),
+            actions: [
+              IconButton(
+                tooltip: 'حذف هذا التحميل',
+                icon: const Icon(Icons.delete_forever),
+                onPressed: _confirmAndDeleteOrder,
+              ),
+            ],
           ),
           body: RefreshIndicator(
             onRefresh: _refreshOrderData,
@@ -401,41 +408,6 @@ class _OrderDetailViewState extends State<OrderDetailView> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildFinancialCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-        ],
       ),
     );
   }
@@ -777,5 +749,43 @@ class _OrderDetailViewState extends State<OrderDetailView> {
         ],
       ),
     );
+  }
+}
+
+extension on _OrderDetailViewState {
+  Future<void> _confirmAndDeleteOrder() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تأكيد الحذف'),
+        content: const Text('هل تريد حذف سجل التحميل هذا؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final String id = (order['_id'] ?? '').toString();
+      if (id.isEmpty) throw Exception('معرّف غير صالح');
+      await _orderService.deleteOrder(id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم حذف سجل التحميل')));
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('فشل الحذف: $e')));
+    }
   }
 }

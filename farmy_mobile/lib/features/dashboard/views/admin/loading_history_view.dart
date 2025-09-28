@@ -465,9 +465,20 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
           ),
           title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
           subtitle: Text(subtitle),
-          trailing: Text(
-            '${totalLoading.toDouble().toStringAsFixed(0)} ج.م',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${totalLoading.toDouble().toStringAsFixed(0)} ج.م',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'حذف هذا السجل',
+                icon: const Icon(Icons.delete, color: Colors.redAccent),
+                onPressed: () => _confirmAndDeleteLoading(m),
+              ),
+            ],
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -483,6 +494,44 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
         );
       },
     );
+  }
+
+  Future<void> _confirmAndDeleteLoading(Map<String, dynamic> m) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تأكيد الحذف'),
+        content: const Text('هل تريد حذف سجل التحميل هذا؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final String id = (m['_id'] ?? '').toString();
+      if (id.isEmpty) throw Exception('معرّف غير صالح');
+      await _loadingService.deleteLoading(id);
+      if (!mounted) return;
+      setState(() {
+        _loadings.removeWhere((x) => x['_id'] == id);
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم حذف سجل التحميل')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('فشل الحذف: $e')));
+    }
   }
 
   Widget _buildSummaryTile(

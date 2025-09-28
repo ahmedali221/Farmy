@@ -8,6 +8,8 @@ const financialRecordSchema = Joi.object({
   date: Joi.date().required(),
   type: Joi.string().valid('daily', 'monthly').required(),
   employee: Joi.string(),
+  source: Joi.string().allow('').optional(),
+  notes: Joi.string().allow('').optional(),
   revenue: Joi.number().min(0),
   expenses: Joi.number().min(0),
   netProfit: Joi.number(),

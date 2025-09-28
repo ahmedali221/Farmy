@@ -4,6 +4,7 @@ import '../../../../../../core/services/payment_api_service.dart';
 import '../../../../../../core/services/employee_api_service.dart';
 import '../../../../../../core/services/employee_expense_api_service.dart';
 import '../../../../../../core/services/loading_api_service.dart';
+import '../../../../../../core/services/finance_api_service.dart';
 
 class TreasuryTab extends StatefulWidget {
   const TreasuryTab({super.key});
@@ -17,6 +18,7 @@ class _TreasuryTabState extends State<TreasuryTab> {
   late final EmployeeApiService _employeeService;
   late final EmployeeExpenseApiService _employeeExpenseService;
   late final LoadingApiService _loadingService;
+  late final FinanceApiService _financeService;
 
   bool _loading = true;
   String? _error;
@@ -24,6 +26,8 @@ class _TreasuryTabState extends State<TreasuryTab> {
   final Map<String, String> _employeeIdToName = {};
   final Map<String, List<Map<String, dynamic>>> _otherExpensesByEmployee = {};
   double _totalLoadingAmount = 0.0;
+  double _totalExternalRevenue = 0.0;
+  List<Map<String, dynamic>> _externalRevenueHistory = [];
 
   @override
   void initState() {
@@ -32,6 +36,7 @@ class _TreasuryTabState extends State<TreasuryTab> {
     _employeeService = serviceLocator<EmployeeApiService>();
     _employeeExpenseService = serviceLocator<EmployeeExpenseApiService>();
     _loadingService = serviceLocator<LoadingApiService>();
+    _financeService = serviceLocator<FinanceApiService>();
     _loadData();
   }
 
@@ -46,15 +51,30 @@ class _TreasuryTabState extends State<TreasuryTab> {
       final results = await Future.wait([
         _paymentService.getUserCollectionsSummary(),
         _loadingService.getAllLoadings(),
+        _financeService.getDailyFinancialReports(),
       ]);
 
       final list = results[0];
       final allLoadings = results[1];
+      final financeReports = results[2];
 
       // Calculate total loading amount
       final totalLoading = allLoadings.fold<double>(0.0, (sum, loading) {
         final num totalLoadingAmount = (loading['totalLoading'] ?? 0) as num;
         return sum + totalLoadingAmount.toDouble();
+      });
+
+      // Filter and sum external revenue (no employee, positive revenue)
+      final List<Map<String, dynamic>> externalList = [];
+      final external = financeReports.fold<double>(0.0, (sum, rec) {
+        final hasEmployee =
+            rec['employee'] != null && rec['employee'].toString().isNotEmpty;
+        final num revenue = (rec['revenue'] ?? 0) as num;
+        if (!hasEmployee && revenue > 0) {
+          externalList.add(rec);
+          return sum + revenue.toDouble();
+        }
+        return sum;
       });
 
       try {
@@ -81,6 +101,8 @@ class _TreasuryTabState extends State<TreasuryTab> {
       setState(() {
         _employeeCollections = list;
         _totalLoadingAmount = totalLoading;
+        _totalExternalRevenue = external;
+        _externalRevenueHistory = externalList;
         _otherExpensesByEmployee
           ..clear()
           ..addAll(serverExpenses);
@@ -150,18 +172,96 @@ class _TreasuryTabState extends State<TreasuryTab> {
     }
   }
 
+  Future<void> _showAddExternalRevenueDialog() async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => const _ExternalRevenueDialog(),
+    );
+    if (result != null) {
+      try {
+        final double value = ((result['value'] ?? 0) as num).toDouble();
+        final String? source = (result['source'] as String?)?.trim();
+        final String? notes = (result['notes'] as String?)?.trim();
+        await _financeService.createFinancialRecord(
+          date: DateTime.now(),
+          type: 'daily',
+          revenue: value,
+          source: source?.isEmpty == true ? null : source,
+          notes: notes?.isEmpty == true ? null : notes,
+        );
+        // Refresh or optimistically update
+        setState(() {
+          _totalExternalRevenue += value;
+          _externalRevenueHistory.insert(0, {
+            'date': DateTime.now().toIso8601String(),
+            'revenue': value,
+            if (source != null && source.isNotEmpty) 'source': source,
+            if (notes != null && notes.isNotEmpty) 'notes': notes,
+          });
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم إضافة الإيراد الخارجي')),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل في إضافة الإيراد: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(strokeWidth: 3),
+            SizedBox(height: 16),
+            Text('جاري تحميل البيانات...', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+      );
     }
     if (_error != null) {
-      return Center(child: Text(_error!, textAlign: TextAlign.center));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+              const SizedBox(height: 16),
+              Text(
+                'حدث خطأ في تحميل البيانات',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _loadData,
+                icon: const Icon(Icons.refresh),
+                label: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     final double total = _totalCollected();
     final double totalOther = _sumAllOtherExpenses();
-    final double net = total - _totalLoadingAmount - totalOther;
+    final double net =
+        total + _totalExternalRevenue - _totalLoadingAmount - totalOther;
 
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -169,9 +269,11 @@ class _TreasuryTabState extends State<TreasuryTab> {
         physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
           children: [
+            // Header Card
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -181,79 +283,318 @@ class _TreasuryTabState extends State<TreasuryTab> {
                     Theme.of(context).primaryColor.withOpacity(0.85),
                   ],
                 ),
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
-                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).primaryColor.withOpacity(0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
               child: Column(
                 children: [
                   const Icon(
-                    Icons.account_balance,
+                    Icons.account_balance_wallet,
                     color: Colors.white,
-                    size: 48,
+                    size: 64,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   const Text(
                     'الخزنة المالية',
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  _summaryRow('إجمالي التحصيل', total, Colors.greenAccent),
-                  const SizedBox(height: 6),
-                  _summaryRow(
+                  const SizedBox(height: 24),
+                  _buildSummaryCard(
+                    'إجمالي التحصيل',
+                    total,
+                    Colors.greenAccent,
+                    Icons.money,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSummaryCard(
+                    'إيرادات خارجية',
+                    _totalExternalRevenue,
+                    Colors.purpleAccent,
+                    Icons.account_balance,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSummaryCard(
                     'إجمالي التحميل',
                     _totalLoadingAmount,
                     Colors.blueAccent,
+                    Icons.local_shipping,
                   ),
-                  const SizedBox(height: 6),
-                  _summaryRow(
+                  const SizedBox(height: 12),
+                  _buildSummaryCard(
                     'المصاريف الأخرى',
                     totalOther,
                     Colors.orangeAccent,
+                    Icons.receipt_long,
                   ),
-                  const Divider(color: Colors.white70),
-                  _summaryRow('إجمالي الخزنة', net, Colors.white, bold: true),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withOpacity(0.3)),
+                    ),
+                    child: _summaryRow(
+                      'إجمالي الخزنة',
+                      net,
+                      Colors.white,
+                      bold: true,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.add_circle_outline, size: 24),
+                      label: const Text(
+                        'إضافة إيراد خارجي',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onPressed: _showAddExternalRevenueDialog,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Theme.of(context).primaryColor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 4,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: _employeeCollections.isEmpty
-                  ? _buildEmptyState(
-                      Icons.people_outline,
-                      'لا يوجد تحصيلات',
-                      'لم يتم العثور على أي مبالغ محصلة للموظفين',
-                    )
-                  : ListView.separated(
+            // External Revenue History Section
+            if (_externalRevenueHistory.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.history,
+                          color: Theme.of(context).primaryColor,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'سجل الإيرادات الخارجية',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    ListView.separated(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _employeeCollections.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final item = _employeeCollections[index];
-                        final String employeeId = (item['userId'] ?? '')
+                      itemCount: _externalRevenueHistory.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, i) {
+                        final item = _externalRevenueHistory[i];
+                        final String source = (item['source'] ?? 'غير محدد')
                             .toString();
-                        final double amount =
-                            ((item['totalCollected'] ?? 0) as num).toDouble();
-                        final int count = ((item['count'] ?? 0) as num).toInt();
-                        final displayName =
-                            _employeeIdToName[employeeId] ?? employeeId;
-                        return _employeeCollectionTile(
-                          employeeId,
-                          displayName,
-                          amount,
-                          count,
+                        final String notes = (item['notes'] ?? '').toString();
+                        final num revenueNum = (item['revenue'] ?? 0) as num;
+                        final double revenue = revenueNum.toDouble();
+                        final String dateStr = (item['date'] ?? '').toString();
+                        DateTime? dt;
+                        try {
+                          dt = DateTime.tryParse(dateStr);
+                        } catch (_) {}
+                        return Card(
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.purple.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.attach_money,
+                                    color: Colors.purple,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'EGP ${revenue.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.purple,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'المصدر: $source',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      if (notes.isNotEmpty) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'ملاحظات: $notes',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                      if (dt != null) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         );
                       },
                     ),
+                  ],
+                ),
+              ),
+            // Employee Collections Section
+            Container(
+              margin: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.people,
+                        color: Theme.of(context).primaryColor,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'تحصيلات الموظفين',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _employeeCollections.isEmpty
+                      ? _buildEmptyState(
+                          Icons.people_outline,
+                          'لا يوجد تحصيلات',
+                          'لم يتم العثور على أي مبالغ محصلة للموظفين',
+                        )
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _employeeCollections.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final item = _employeeCollections[index];
+                            final String employeeId = (item['userId'] ?? '')
+                                .toString();
+                            final double amount =
+                                ((item['totalCollected'] ?? 0) as num)
+                                    .toDouble();
+                            final int count = ((item['count'] ?? 0) as num)
+                                .toInt();
+                            final displayName =
+                                _employeeIdToName[employeeId] ?? employeeId;
+                            return _employeeCollectionTile(
+                              employeeId,
+                              displayName,
+                              amount,
+                              count,
+                            );
+                          },
+                        ),
+                ],
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(
+    String title,
+    double value,
+    Color color,
+    IconData icon,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Text(
+            'EGP ${value.toStringAsFixed(2)}',
+            style: TextStyle(
+              color: color,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -282,23 +623,30 @@ class _TreasuryTabState extends State<TreasuryTab> {
 
   Widget _buildEmptyState(IconData icon, String title, String subtitle) {
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(40),
       child: Column(
         children: [
-          Icon(icon, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(50),
+            ),
+            child: Icon(icon, size: 48, color: Colors.grey[400]),
+          ),
+          const SizedBox(height: 24),
           Text(
             title,
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600],
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             subtitle,
-            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            style: TextStyle(fontSize: 16, color: Colors.grey[500]),
             textAlign: TextAlign.center,
           ),
         ],
@@ -315,58 +663,86 @@ class _TreasuryTabState extends State<TreasuryTab> {
     final double expenses = _sumEmployeeExpenses(employeeId);
     final double net = amount - expenses;
     return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  child: const Icon(Icons.person, color: Colors.white),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.person,
+                    color: Theme.of(context).primaryColor,
+                    size: 24,
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'عدد عمليات التحصيل: $count',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
                       ),
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    _amountPill('تحصيل', amount, Colors.green),
-                    const SizedBox(height: 4),
-                    _amountPill('مصروفات', expenses, Colors.orange),
-                    const SizedBox(height: 4),
-                    _amountPill('صافي', net, Colors.blue),
-                  ],
-                ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: _amountPill('تحصيل', amount, Colors.green)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _amountPill('مصروفات', expenses, Colors.orange),
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: _amountPill('صافي', net, Colors.blue)),
+              ],
+            ),
+            const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerRight,
               child: OutlinedButton.icon(
-                icon: const Icon(Icons.add, size: 16),
+                icon: const Icon(Icons.add, size: 18),
                 label: const Text('إضافة مصروف'),
                 onPressed: () => _showAddExpenseDialog(employeeId),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
             ),
-            if ((_otherExpensesByEmployee[employeeId] ?? []).isNotEmpty)
+            if ((_otherExpensesByEmployee[employeeId] ?? []).isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'المصاريف المضافة:',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 6,
@@ -381,11 +757,15 @@ class _TreasuryTabState extends State<TreasuryTab> {
                         ),
                         backgroundColor: Colors.red.withOpacity(0.08),
                         side: BorderSide(color: Colors.red.withOpacity(0.2)),
-                        labelStyle: const TextStyle(color: Colors.red),
+                        labelStyle: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                        ),
                       );
                     })
                     .toList(),
               ),
+            ],
           ],
         ),
       ),
@@ -394,15 +774,32 @@ class _TreasuryTabState extends State<TreasuryTab> {
 
   Widget _amountPill(String label, double value, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
-      child: Text(
-        '$label: ${value.toStringAsFixed(2)}',
-        style: TextStyle(color: color, fontWeight: FontWeight.bold),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'EGP ${value.toStringAsFixed(2)}',
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -482,6 +879,90 @@ class _OtherExpenseDialogState extends State<_OtherExpenseDialog> {
       ],
     );
   }
+}
 
-  // no separate error widget; errors shown inline
+class _ExternalRevenueDialog extends StatefulWidget {
+  const _ExternalRevenueDialog();
+
+  @override
+  State<_ExternalRevenueDialog> createState() => _ExternalRevenueDialogState();
+}
+
+class _ExternalRevenueDialogState extends State<_ExternalRevenueDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _valueController = TextEditingController();
+  final _sourceController = TextEditingController();
+  final _notesController = TextEditingController();
+
+  @override
+  void dispose() {
+    _valueController.dispose();
+    _sourceController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('إضافة إيراد خارجي للخزنة'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _valueController,
+              decoration: const InputDecoration(
+                labelText: 'قيمة الإيراد (EGP)',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'القيمة مطلوبة';
+                final d = double.tryParse(v);
+                if (d == null || d <= 0) return 'أدخل قيمة صحيحة (> 0)';
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _sourceController,
+              decoration: const InputDecoration(
+                labelText: 'من طرف (اختياري)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _notesController,
+              decoration: const InputDecoration(
+                labelText: 'ملاحظات (اختياري)',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_formKey.currentState!.validate()) {
+              Navigator.pop(context, {
+                'value': double.parse(_valueController.text),
+                'source': _sourceController.text,
+                'notes': _notesController.text,
+              });
+            }
+          },
+          child: const Text('إضافة'),
+        ),
+      ],
+    );
+  }
 }

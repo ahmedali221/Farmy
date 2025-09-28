@@ -14,6 +14,15 @@ const financialRecordSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Employee'
   },
+  // Optional fields to describe external income entries
+  source: {
+    type: String,
+    default: ''
+  },
+  notes: {
+    type: String,
+    default: ''
+  },
   revenue: {
     type: Number,
     default: 0

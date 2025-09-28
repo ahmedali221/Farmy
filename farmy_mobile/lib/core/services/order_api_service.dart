@@ -161,4 +161,28 @@ class OrderApiService {
       throw ApiException(message: 'Network error: $e', statusCode: 0);
     }
   }
+
+  /// Delete order by ID (loading record)
+  Future<void> deleteOrder(String id) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.delete(
+        Uri.parse('$baseUrl/orders/$id'),
+        headers: headers,
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        final dynamic errorData = json.decode(response.body);
+        throw ApiException(
+          message: (errorData is Map<String, dynamic>)
+              ? (errorData['message'] ?? 'Failed to delete order')
+              : 'Failed to delete order',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
 }
