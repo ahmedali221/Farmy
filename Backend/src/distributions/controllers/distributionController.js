@@ -85,6 +85,33 @@ exports.getDailyNetWeight = async (req, res) => {
   }
 };
 
+// Delete single distribution by ID
+exports.deleteDistribution = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const distribution = await Distribution.findById(id);
+    if (!distribution) {
+      return res.status(404).json({ message: 'Distribution not found' });
+    }
+
+    // Decrease customer's outstanding debts by totalAmount
+    const customerDoc = await Customer.findById(distribution.customer);
+    if (customerDoc) {
+      const current = Number(customerDoc.outstandingDebts || 0);
+      const delta = Number(distribution.totalAmount || 0);
+      customerDoc.outstandingDebts = Math.max(0, current - delta);
+      await customerDoc.save();
+    }
+
+    await distribution.deleteOne();
+    logger.warn(`Distribution deleted: ${id} by user: ${req.user?.id || 'unknown'}`);
+    return res.status(200).json({ message: 'Distribution deleted', id });
+  } catch (err) {
+    logger.error(`Error deleting distribution: ${err.message}`);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // Delete all distributions
 exports.deleteAllDistributions = async (req, res) => {
   try {

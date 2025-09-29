@@ -237,13 +237,13 @@ class _DistributionViewState extends State<DistributionView> {
                           ttf,
                         ),
                         _buildTableRow(
-                          'القديم (المستحق) (ج.م)',
+                          'المستحق القديم قبل الفاتورة (ج.م)',
                           (_selectedCustomer?['outstandingDebts'] ?? 0)
                               .toString(),
                           ttf,
                         ),
                         _buildTableRow(
-                          'إجمالي الحساب (ج.م)',
+                          'المستحق الجديد بعد الفاتورة (ج.م)',
                           _totalAccount.toStringAsFixed(2),
                           ttf,
                           isBold: true,
@@ -708,9 +708,11 @@ class _DistributionViewState extends State<DistributionView> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
                                       children: [
-                                        const Text('حساب الوجبة'),
+                                        const Text(
+                                          'المستحق القديم قبل الفاتورة',
+                                        ),
                                         Text(
-                                          '${_mealAccount.toStringAsFixed(2)} ج.م',
+                                          '${((_selectedCustomer?['outstandingDebts'] as num?) ?? 0).toString()} ج.م',
                                         ),
                                       ],
                                     ),
@@ -719,9 +721,9 @@ class _DistributionViewState extends State<DistributionView> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
                                       children: [
-                                        const Text('القديم (المستحق)'),
+                                        const Text('حساب الوجبة'),
                                         Text(
-                                          '${((_selectedCustomer?['outstandingDebts'] as num?) ?? 0).toString()} ج.م',
+                                          '${_mealAccount.toStringAsFixed(2)} ج.م',
                                         ),
                                       ],
                                     ),
@@ -731,7 +733,7 @@ class _DistributionViewState extends State<DistributionView> {
                                           MainAxisAlignment.spaceBetween,
                                       children: [
                                         const Text(
-                                          'إجمالي الحساب',
+                                          'المستحق الجديد بعد الفاتورة',
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                           ),

@@ -147,8 +147,6 @@ class _SupplierLoadingDetailsViewState
           _buildSupplierCard(),
           const SizedBox(height: 16),
           _buildChickenTypeCard(),
-          const SizedBox(height: 16),
-          _buildEmployeeCard(),
         ],
       ),
     );
@@ -179,6 +177,11 @@ class _SupplierLoadingDetailsViewState
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'بواسطة: ${(((loading?['user'] ?? const {})['username']) ?? ((loading?['user'] ?? const {})['name']) ?? 'غير معروف')}',
+                        style: TextStyle(color: Colors.grey[700], fontSize: 14),
                       ),
                       Text(
                         _formatDateTime(loading?['createdAt']),
@@ -317,42 +320,6 @@ class _SupplierLoadingDetailsViewState
                 ),
             ] else
               const Text('نوع الدجاج غير محدد'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmployeeCard() {
-    final employee = loading?['employee'];
-    return Card(
-      elevation: 3,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'الموظف المسؤول',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            if (employee != null) ...[
-              _buildDetailRow(
-                'اسم الموظف',
-                employee['username'] ?? 'غير معروف',
-                Icons.person,
-                Colors.blue,
-              ),
-              if (employee['role'] != null)
-                _buildDetailRow(
-                  'الدور',
-                  employee['role'],
-                  Icons.work,
-                  Colors.purple,
-                ),
-            ] else
-              const Text('معلومات الموظف غير متوفرة'),
           ],
         ),
       ),

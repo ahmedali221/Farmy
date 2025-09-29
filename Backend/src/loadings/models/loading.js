@@ -2,9 +2,9 @@ const mongoose = require('mongoose');
 
 const loadingSchema = new mongoose.Schema({
   // معرفات أساسية
-  employee: {
+  user: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Employee',
+    ref: 'User',
     required: true
   },
   supplier: {
@@ -145,7 +145,7 @@ loadingSchema.pre('save', function(next) {
 });
 
 // Indexes for better performance
-loadingSchema.index({ employee: 1, loadingDate: -1 });
+loadingSchema.index({ user: 1, loadingDate: -1 });
 loadingSchema.index({ supplier: 1, loadingDate: -1 });
 loadingSchema.index({ chickenType: 1, loadingDate: -1 });
 loadingSchema.index({ loadingDate: -1 });

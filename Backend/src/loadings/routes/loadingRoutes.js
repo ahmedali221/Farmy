@@ -8,8 +8,8 @@ router.post('/', loadingController.createLoading);
 // Get all loadings
 router.get('/', loadingController.getAllLoadings);
 
-// Get loadings by current employee
-router.get('/employee', loadingController.getLoadingsByEmployee);
+// Get loadings by current user
+router.get('/user', loadingController.getLoadingsByUser);
 
 // Get loadings by specific supplier
 router.get('/supplier/:supplierId', loadingController.getLoadingsBySupplier);

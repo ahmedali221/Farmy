@@ -204,57 +204,6 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
               ),
               const SizedBox(height: 24),
 
-              // Statistics Section
-              Text(
-                'إحصائيات النظام',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                children: [
-                  _buildStatCard(
-                    context,
-                    'الموظفين',
-                    dashboardData['employees'].toString(),
-                    Icons.group,
-                    Colors.blue,
-                    '',
-                  ),
-                  _buildStatCard(
-                    context,
-                    'العملاء',
-                    dashboardData['customers'].toString(),
-                    Icons.person,
-                    Colors.green,
-                    '',
-                  ),
-                  _buildStatCard(
-                    context,
-                    'الموردين',
-                    dashboardData['suppliers'].toString(),
-                    Icons.business,
-                    Colors.orange,
-                    '',
-                  ),
-                  _buildStatCard(
-                    context,
-                    'أصناف المخزون',
-                    dashboardData['inventoryItems'].toString(),
-                    Icons.inventory,
-                    Colors.purple,
-                    '',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
               // History Section
               Text(
                 'السجلات والتقارير',

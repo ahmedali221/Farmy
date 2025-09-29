@@ -47,7 +47,7 @@ exports.createLoading = async (req, res) => {
     const loadingData = {
       ...req.body,
       ...calculatedValues, // Add calculated netWeight and totalLoading
-      employee: req.user.id // Current logged-in employee
+      user: req.user.id // Current logged-in user (manager or employee)
     };
 
     // Check if chicken type exists - handle both ObjectId and name
@@ -94,9 +94,9 @@ exports.createLoading = async (req, res) => {
     }
 
     // Populate references for response
-    await loading.populate('chickenType supplier employee');
+    await loading.populate('chickenType supplier user');
 
-    logger.info(`Loading created: ${loading._id} by employee: ${req.user.id}`);
+    logger.info(`Loading created: ${loading._id} by user: ${req.user.id}`);
     res.status(201).json(loading);
   } catch (err) {
     logger.error(`Error creating loading: ${err.message}`);
@@ -109,7 +109,7 @@ exports.getAllLoadings = async (req, res) => {
     const loadings = await Loading.find()
       .populate('chickenType')
       .populate('supplier')
-      .populate('employee')
+      .populate('user')
       .sort({ loadingDate: -1 });
     
     logger.info('All loadings fetched');
@@ -120,17 +120,17 @@ exports.getAllLoadings = async (req, res) => {
   }
 };
 
-exports.getLoadingsByEmployee = async (req, res) => {
+exports.getLoadingsByUser = async (req, res) => {
   try {
-    const loadings = await Loading.find({ employee: req.user.id })
+    const loadings = await Loading.find({ user: req.user.id })
       .populate('chickenType')
       .populate('supplier')
       .sort({ loadingDate: -1 });
     
-    logger.info(`Loadings fetched for employee: ${req.user.id}`);
+    logger.info(`Loadings fetched for user: ${req.user.id}`);
     res.json(loadings);
   } catch (err) {
-    logger.error(`Error fetching employee loadings: ${err.message}`);
+    logger.error(`Error fetching user loadings: ${err.message}`);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -140,7 +140,7 @@ exports.getLoadingsBySupplier = async (req, res) => {
     const { supplierId } = req.params;
     const loadings = await Loading.find({ supplier: supplierId })
       .populate('chickenType')
-      .populate('employee')
+      .populate('user')
       .sort({ loadingDate: -1 });
     
     logger.info(`Loadings fetched for supplier: ${supplierId}`);
@@ -156,7 +156,7 @@ exports.getLoadingById = async (req, res) => {
     const loading = await Loading.findById(req.params.id)
       .populate('chickenType')
       .populate('supplier')
-      .populate('employee');
+      .populate('user');
     
     if (!loading) {
       return res.status(404).json({ message: 'Loading not found' });
@@ -206,7 +206,7 @@ exports.updateLoading = async (req, res) => {
       req.params.id,
       updateData,
       { new: true, runValidators: true }
-    ).populate('chickenType supplier employee');
+    ).populate('chickenType supplier user');
 
     if (!loading) {
       return res.status(404).json({ message: 'Loading not found' });

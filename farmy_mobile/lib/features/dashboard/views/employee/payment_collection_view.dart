@@ -25,6 +25,7 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
   // Form controllers
   final _formKey = GlobalKey<FormState>();
   String? selectedCustomerId;
+  final _customerNameController = TextEditingController();
   final _totalOutstandingController = TextEditingController();
   final _paidAmountController = TextEditingController();
   final _discountController = TextEditingController();
@@ -42,6 +43,7 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
 
   @override
   void dispose() {
+    _customerNameController.dispose();
     _totalOutstandingController.dispose();
     _paidAmountController.dispose();
     _discountController.dispose();
@@ -384,28 +386,137 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
                                     // Customer Selection
                                     _SectionCard(
                                       title: 'اختيار العميل',
-                                      child: _DropdownField(
-                                        label: 'العميل',
-                                        value: selectedCustomerId,
-                                        items: customers.map((c) {
-                                          return DropdownMenuItem<String>(
-                                            value: c['_id'],
-                                            child: Text(
-                                              c['name'] ?? '',
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: Colors.black,
-                                              ),
-                                            ),
-                                          );
-                                        }).toList(),
-                                        onChanged: _onCustomerSelected,
-                                        validator: (value) {
-                                          if (value == null) {
-                                            return 'يرجى اختيار العميل';
-                                          }
-                                          return null;
-                                        },
+                                      child: Directionality(
+                                        textDirection: TextDirection.rtl,
+                                        child: Autocomplete<String>(
+                                          optionsBuilder:
+                                              (TextEditingValue value) {
+                                                final query = value.text
+                                                    .trim()
+                                                    .toLowerCase();
+                                                if (query.isEmpty) {
+                                                  return const Iterable<
+                                                    String
+                                                  >.empty();
+                                                }
+                                                return customers
+                                                    .map(
+                                                      (c) =>
+                                                          c['name']
+                                                              ?.toString() ??
+                                                          '',
+                                                    )
+                                                    .where(
+                                                      (name) => name
+                                                          .toLowerCase()
+                                                          .contains(query),
+                                                    )
+                                                    .take(10);
+                                              },
+                                          onSelected: (String selection) {
+                                            _customerNameController.text =
+                                                selection;
+                                            try {
+                                              final cust = customers.firstWhere(
+                                                (c) =>
+                                                    (c['name']
+                                                            ?.toString()
+                                                            .toLowerCase() ??
+                                                        '') ==
+                                                    selection
+                                                        .trim()
+                                                        .toLowerCase(),
+                                              );
+                                              _onCustomerSelected(
+                                                cust['_id']?.toString(),
+                                              );
+                                            } catch (_) {}
+                                          },
+                                          fieldViewBuilder:
+                                              (
+                                                context,
+                                                textEditingController,
+                                                focusNode,
+                                                onFieldSubmitted,
+                                              ) {
+                                                textEditingController.text =
+                                                    _customerNameController
+                                                        .text;
+                                                textEditingController
+                                                        .selection =
+                                                    TextSelection.fromPosition(
+                                                      TextPosition(
+                                                        offset:
+                                                            textEditingController
+                                                                .text
+                                                                .length,
+                                                      ),
+                                                    );
+                                                return TextFormField(
+                                                  controller:
+                                                      _customerNameController,
+                                                  focusNode: focusNode,
+                                                  decoration:
+                                                      const InputDecoration(
+                                                        labelText: 'اسم العميل',
+                                                        border:
+                                                            OutlineInputBorder(),
+                                                      ),
+                                                  onChanged: (_) {
+                                                    // Clear selected id until user selects a suggestion
+                                                    setState(() {
+                                                      selectedCustomerId = null;
+                                                    });
+                                                  },
+                                                  validator: (_) {
+                                                    if (selectedCustomerId ==
+                                                        null) {
+                                                      return 'يرجى اختيار العميل من القائمة';
+                                                    }
+                                                    return null;
+                                                  },
+                                                );
+                                              },
+                                          optionsViewBuilder:
+                                              (context, onSelected, options) {
+                                                return Align(
+                                                  alignment: Alignment.topRight,
+                                                  child: Material(
+                                                    elevation: 4,
+                                                    child: SizedBox(
+                                                      width:
+                                                          MediaQuery.of(
+                                                            context,
+                                                          ).size.width -
+                                                          32,
+                                                      child: ListView.builder(
+                                                        padding:
+                                                            EdgeInsets.zero,
+                                                        itemCount:
+                                                            options.length,
+                                                        itemBuilder:
+                                                            (context, index) {
+                                                              final option =
+                                                                  options
+                                                                      .elementAt(
+                                                                        index,
+                                                                      );
+                                                              return ListTile(
+                                                                title: Text(
+                                                                  option,
+                                                                ),
+                                                                onTap: () =>
+                                                                    onSelected(
+                                                                      option,
+                                                                    ),
+                                                              );
+                                                            },
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(height: 16),
@@ -826,53 +937,7 @@ class _NumField extends StatelessWidget {
   }
 }
 
-class _DropdownField extends StatelessWidget {
-  final String label;
-  final String? value;
-  final List<DropdownMenuItem<String>> items;
-  final ValueChanged<String?> onChanged;
-  final String? Function(String?)? validator;
-
-  const _DropdownField({
-    required this.label,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-    this.validator,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      items: items.map((item) {
-        return DropdownMenuItem<String>(
-          value: item.value,
-          child: DefaultTextStyle(
-            style: const TextStyle(overflow: TextOverflow.ellipsis),
-            maxLines: 1,
-            child: item.child,
-          ),
-        );
-      }).toList(),
-      onChanged: onChanged,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        alignLabelWithHint: true,
-      ),
-      dropdownColor: Colors.white,
-      icon: const Icon(Icons.arrow_drop_down),
-    );
-  }
-}
+// Removed legacy dropdown field in favor of Autocomplete-based input
 
 class _PaymentHistoryDialog extends StatefulWidget {
   @override

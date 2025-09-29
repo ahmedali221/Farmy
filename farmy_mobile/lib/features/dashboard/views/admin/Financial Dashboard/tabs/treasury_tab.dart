@@ -28,6 +28,8 @@ class _TreasuryTabState extends State<TreasuryTab> {
   double _totalLoadingAmount = 0.0;
   double _totalExternalRevenue = 0.0;
   List<Map<String, dynamic>> _externalRevenueHistory = [];
+  double _totalWithdrawals = 0.0;
+  List<Map<String, dynamic>> _withdrawalsHistory = [];
 
   @override
   void initState() {
@@ -64,18 +66,26 @@ class _TreasuryTabState extends State<TreasuryTab> {
         return sum + totalLoadingAmount.toDouble();
       });
 
-      // Filter and sum external revenue (no employee, positive revenue)
+      // External revenue and withdrawals (no employee)
       final List<Map<String, dynamic>> externalList = [];
-      final external = financeReports.fold<double>(0.0, (sum, rec) {
-        final hasEmployee =
+      final List<Map<String, dynamic>> withdrawalsList = [];
+      double external = 0.0;
+      double withdrawals = 0.0;
+      for (final rec in financeReports) {
+        final bool hasEmployee =
             rec['employee'] != null && rec['employee'].toString().isNotEmpty;
+        if (hasEmployee) continue;
         final num revenue = (rec['revenue'] ?? 0) as num;
-        if (!hasEmployee && revenue > 0) {
+        final num expenses = (rec['expenses'] ?? 0) as num;
+        if (revenue > 0) {
           externalList.add(rec);
-          return sum + revenue.toDouble();
+          external += revenue.toDouble();
         }
-        return sum;
-      });
+        if (expenses > 0) {
+          withdrawalsList.add(rec);
+          withdrawals += expenses.toDouble();
+        }
+      }
 
       try {
         final users = await _employeeService.getAllEmployeeUsers();
@@ -103,6 +113,8 @@ class _TreasuryTabState extends State<TreasuryTab> {
         _totalLoadingAmount = totalLoading;
         _totalExternalRevenue = external;
         _externalRevenueHistory = externalList;
+        _totalWithdrawals = withdrawals;
+        _withdrawalsHistory = withdrawalsList;
         _otherExpensesByEmployee
           ..clear()
           ..addAll(serverExpenses);
@@ -189,7 +201,6 @@ class _TreasuryTabState extends State<TreasuryTab> {
           source: source?.isEmpty == true ? null : source,
           notes: notes?.isEmpty == true ? null : notes,
         );
-        // Refresh or optimistically update
         setState(() {
           _totalExternalRevenue += value;
           _externalRevenueHistory.insert(0, {
@@ -213,46 +224,92 @@ class _TreasuryTabState extends State<TreasuryTab> {
     }
   }
 
+  Future<void> _showWithdrawDialog() async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => const _WithdrawDialog(),
+    );
+    if (result != null) {
+      try {
+        final double value = ((result['value'] ?? 0) as num).toDouble();
+        final String? toWhom = (result['toWhom'] as String?)?.trim();
+        final String? notes = (result['notes'] as String?)?.trim();
+        await _financeService.createFinancialRecord(
+          date: DateTime.now(),
+          type: 'daily',
+          expenses: value,
+          source: toWhom?.isEmpty == true ? null : toWhom,
+          notes: notes?.isEmpty == true ? null : notes,
+        );
+        setState(() {
+          _totalWithdrawals += value;
+          _withdrawalsHistory.insert(0, {
+            'date': DateTime.now().toIso8601String(),
+            'expenses': value,
+            if (toWhom != null && toWhom.isNotEmpty) 'source': toWhom,
+            if (notes != null && notes.isNotEmpty) 'notes': notes,
+          });
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم تسجيل سحب من الخزنة')),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل في تسجيل السحب: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(strokeWidth: 3),
-            SizedBox(height: 16),
-            Text('جاري تحميل البيانات...', style: TextStyle(fontSize: 16)),
-          ],
+      return const Directionality(
+        textDirection: TextDirection.rtl,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(strokeWidth: 3),
+              SizedBox(height: 16),
+              Text('جاري تحميل البيانات...', style: TextStyle(fontSize: 16)),
+            ],
+          ),
         ),
       );
     }
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-              const SizedBox(height: 16),
-              Text(
-                'حدث خطأ في تحميل البيانات',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _loadData,
-                icon: const Icon(Icons.refresh),
-                label: const Text('إعادة المحاولة'),
-              ),
-            ],
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+                const SizedBox(height: 16),
+                const Text(
+                  'حدث خطأ في تحميل البيانات',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _loadData,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('إعادة المحاولة'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -261,140 +318,429 @@ class _TreasuryTabState extends State<TreasuryTab> {
     final double total = _totalCollected();
     final double totalOther = _sumAllOtherExpenses();
     final double net =
-        total + _totalExternalRevenue - _totalLoadingAmount - totalOther;
+        total +
+        _totalExternalRevenue -
+        _totalLoadingAmount -
+        totalOther -
+        _totalWithdrawals;
 
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          children: [
-            // Header Card
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Theme.of(context).primaryColor,
-                    Theme.of(context).primaryColor.withOpacity(0.85),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: RefreshIndicator(
+        onRefresh: _loadData,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              // Header Card
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Theme.of(context).primaryColor,
+                      Theme.of(context).primaryColor.withOpacity(0.85),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context).primaryColor.withOpacity(0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 8),
+                    ),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Theme.of(context).primaryColor.withOpacity(0.3),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  const Icon(
-                    Icons.account_balance_wallet,
-                    color: Colors.white,
-                    size: 64,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'الخزنة المالية',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.account_balance_wallet,
                       color: Colors.white,
+                      size: 64,
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildSummaryCard(
-                    'إجمالي التحصيل',
-                    total,
-                    Colors.greenAccent,
-                    Icons.money,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildSummaryCard(
-                    'إيرادات خارجية',
-                    _totalExternalRevenue,
-                    Colors.purpleAccent,
-                    Icons.account_balance,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildSummaryCard(
-                    'إجمالي التحميل',
-                    _totalLoadingAmount,
-                    Colors.blueAccent,
-                    Icons.local_shipping,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildSummaryCard(
-                    'المصاريف الأخرى',
-                    totalOther,
-                    Colors.orangeAccent,
-                    Icons.receipt_long,
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withOpacity(0.3)),
-                    ),
-                    child: _summaryRow(
-                      'إجمالي الخزنة',
-                      net,
-                      Colors.white,
-                      bold: true,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.add_circle_outline, size: 24),
-                      label: const Text(
-                        'إضافة إيراد خارجي',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      onPressed: _showAddExternalRevenueDialog,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Theme.of(context).primaryColor,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 4,
+                    const SizedBox(height: 16),
+                    const Text(
+                      'الخزنة المالية',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+                    _buildSummaryCard(
+                      'إجمالي التحصيل',
+                      total,
+                      Colors.greenAccent,
+                      Icons.money,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildSummaryCard(
+                      'إيرادات خارجية',
+                      _totalExternalRevenue,
+                      Colors.purpleAccent,
+                      Icons.account_balance,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildSummaryCard(
+                      'إجمالي التحميل',
+                      _totalLoadingAmount,
+                      Colors.blueAccent,
+                      Icons.local_shipping,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildSummaryCard(
+                      'المصاريف الأخرى',
+                      totalOther,
+                      Colors.orangeAccent,
+                      Icons.receipt_long,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildSummaryCard(
+                      'سحوبات',
+                      _totalWithdrawals,
+                      Colors.redAccent,
+                      Icons.outbox,
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                        ),
+                      ),
+                      child: _summaryRow(
+                        'إجمالي الخزنة',
+                        net,
+                        Colors.white,
+                        bold: true,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            icon: const Icon(
+                              Icons.add_circle_outline,
+                              size: 24,
+                            ),
+                            label: const Text(
+                              'إضافة إيراد خارجي',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            onPressed: _showAddExternalRevenueDialog,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Theme.of(context).primaryColor,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.outbox, size: 24),
+                            label: const Text(
+                              'سحب من الخزنة',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            onPressed: _showWithdrawDialog,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.redAccent,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            // External Revenue History Section
-            if (_externalRevenueHistory.isNotEmpty)
+
+              // External Revenue History Section
+              if (_externalRevenueHistory.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.history,
+                            color: Theme.of(context).primaryColor,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'سجل الإيرادات الخارجية',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _externalRevenueHistory.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, i) {
+                          final item = _externalRevenueHistory[i];
+                          final String source = (item['source'] ?? 'غير محدد')
+                              .toString();
+                          final String notes = (item['notes'] ?? '').toString();
+                          final num revenueNum = (item['revenue'] ?? 0) as num;
+                          final double revenue = revenueNum.toDouble();
+                          final String dateStr = (item['date'] ?? '')
+                              .toString();
+                          DateTime? dt;
+                          try {
+                            dt = DateTime.tryParse(dateStr);
+                          } catch (_) {}
+                          return Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.purple.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.attach_money,
+                                      color: Colors.purple,
+                                      size: 24,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'EGP ${revenue.toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.purple,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'المصدر: $source',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                        if (notes.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'ملاحظات: $notes',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        ],
+                                        if (dt != null) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Withdrawals History Section
+              if (_withdrawalsHistory.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.history_toggle_off,
+                            color: Colors.redAccent,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'سجل السحوبات',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _withdrawalsHistory.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, i) {
+                          final item = _withdrawalsHistory[i];
+                          final String toWhom = (item['source'] ?? 'غير محدد')
+                              .toString();
+                          final String notes = (item['notes'] ?? '').toString();
+                          final num expensesNum =
+                              (item['expenses'] ?? 0) as num;
+                          final double expenses = expensesNum.toDouble();
+                          final String dateStr = (item['date'] ?? '')
+                              .toString();
+                          DateTime? dt;
+                          try {
+                            dt = DateTime.tryParse(dateStr);
+                          } catch (_) {}
+                          return Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.redAccent.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.outbox,
+                                      color: Colors.redAccent,
+                                      size: 24,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'EGP ${expenses.toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.redAccent,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'إلى: $toWhom',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                        if (notes.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'ملاحظات: $notes',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        ],
+                                        if (dt != null) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Employee Collections Section
               Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                margin: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Icon(
-                          Icons.history,
+                          Icons.people,
                           color: Theme.of(context).primaryColor,
                           size: 24,
                         ),
                         const SizedBox(width: 8),
                         const Text(
-                          'سجل الإيرادات الخارجية',
+                          'تحصيلات الموظفين',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -403,157 +749,42 @@ class _TreasuryTabState extends State<TreasuryTab> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _externalRevenueHistory.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, i) {
-                        final item = _externalRevenueHistory[i];
-                        final String source = (item['source'] ?? 'غير محدد')
-                            .toString();
-                        final String notes = (item['notes'] ?? '').toString();
-                        final num revenueNum = (item['revenue'] ?? 0) as num;
-                        final double revenue = revenueNum.toDouble();
-                        final String dateStr = (item['date'] ?? '').toString();
-                        DateTime? dt;
-                        try {
-                          dt = DateTime.tryParse(dateStr);
-                        } catch (_) {}
-                        return Card(
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    _employeeCollections.isEmpty
+                        ? _buildEmptyState(
+                            Icons.people_outline,
+                            'لا يوجد تحصيلات',
+                            'لم يتم العثور على أي مبالغ محصلة للموظفين',
+                          )
+                        : ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _employeeCollections.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              final item = _employeeCollections[index];
+                              final String employeeId = (item['userId'] ?? '')
+                                  .toString();
+                              final double amount =
+                                  ((item['totalCollected'] ?? 0) as num)
+                                      .toDouble();
+                              final int count = ((item['count'] ?? 0) as num)
+                                  .toInt();
+                              final displayName =
+                                  _employeeIdToName[employeeId] ?? employeeId;
+                              return _employeeCollectionTile(
+                                employeeId,
+                                displayName,
+                                amount,
+                                count,
+                              );
+                            },
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.purple.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(
-                                    Icons.attach_money,
-                                    color: Colors.purple,
-                                    size: 24,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'EGP ${revenue.toStringAsFixed(2)}',
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.purple,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'المصدر: $source',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                      if (notes.isNotEmpty) ...[
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'ملاحظات: $notes',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                      ],
-                                      if (dt != null) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
                   ],
                 ),
               ),
-            // Employee Collections Section
-            Container(
-              margin: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.people,
-                        color: Theme.of(context).primaryColor,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'تحصيلات الموظفين',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _employeeCollections.isEmpty
-                      ? _buildEmptyState(
-                          Icons.people_outline,
-                          'لا يوجد تحصيلات',
-                          'لم يتم العثور على أي مبالغ محصلة للموظفين',
-                        )
-                      : ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _employeeCollections.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final item = _employeeCollections[index];
-                            final String employeeId = (item['userId'] ?? '')
-                                .toString();
-                            final double amount =
-                                ((item['totalCollected'] ?? 0) as num)
-                                    .toDouble();
-                            final int count = ((item['count'] ?? 0) as num)
-                                .toInt();
-                            final displayName =
-                                _employeeIdToName[employeeId] ?? employeeId;
-                            return _employeeCollectionTile(
-                              employeeId,
-                              displayName,
-                              amount,
-                              count,
-                            );
-                          },
-                        ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -826,57 +1057,61 @@ class _OtherExpenseDialogState extends State<_OtherExpenseDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('إضافة مصروف للموظف'),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'اسم المصروف',
-                border: OutlineInputBorder(),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Text('إضافة مصروف للموظف'),
+        content: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'اسم المصروف',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'اسم المصروف مطلوب'
+                    : null,
               ),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'اسم المصروف مطلوب' : null,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _valueController,
-              decoration: const InputDecoration(
-                labelText: 'قيمة المصروف (EGP)',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _valueController,
+                decoration: const InputDecoration(
+                  labelText: 'قيمة المصروف (EGP)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'القيمة مطلوبة';
+                  final d = double.tryParse(v);
+                  if (d == null || d < 0) return 'أدخل قيمة صحيحة';
+                  return null;
+                },
               ),
-              keyboardType: TextInputType.number,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'القيمة مطلوبة';
-                final d = double.tryParse(v);
-                if (d == null || d < 0) return 'أدخل قيمة صحيحة';
-                return null;
-              },
-            ),
-          ],
+            ],
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_formKey.currentState!.validate()) {
+                Navigator.pop(context, {
+                  'name': _nameController.text.trim(),
+                  'value': double.parse(_valueController.text),
+                });
+              }
+            },
+            child: const Text('إضافة'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('إلغاء'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              Navigator.pop(context, {
-                'name': _nameController.text.trim(),
-                'value': double.parse(_valueController.text),
-              });
-            }
-          },
-          child: const Text('إضافة'),
-        ),
-      ],
     );
   }
 }
@@ -904,65 +1139,157 @@ class _ExternalRevenueDialogState extends State<_ExternalRevenueDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('إضافة إيراد خارجي للخزنة'),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: _valueController,
-              decoration: const InputDecoration(
-                labelText: 'قيمة الإيراد (EGP)',
-                border: OutlineInputBorder(),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Text('إضافة إيراد خارجي للخزنة'),
+        content: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _valueController,
+                decoration: const InputDecoration(
+                  labelText: 'قيمة الإيراد (EGP)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'القيمة مطلوبة';
+                  final d = double.tryParse(v);
+                  if (d == null || d <= 0) return 'أدخل قيمة صحيحة (> 0)';
+                  return null;
+                },
               ),
-              keyboardType: TextInputType.number,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'القيمة مطلوبة';
-                final d = double.tryParse(v);
-                if (d == null || d <= 0) return 'أدخل قيمة صحيحة (> 0)';
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _sourceController,
-              decoration: const InputDecoration(
-                labelText: 'من طرف (اختياري)',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _sourceController,
+                decoration: const InputDecoration(
+                  labelText: 'من طرف (اختياري)',
+                  border: OutlineInputBorder(),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _notesController,
-              decoration: const InputDecoration(
-                labelText: 'ملاحظات (اختياري)',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _notesController,
+                decoration: const InputDecoration(
+                  labelText: 'ملاحظات (اختياري)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
               ),
-              maxLines: 2,
-            ),
-          ],
+            ],
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_formKey.currentState!.validate()) {
+                Navigator.pop(context, {
+                  'value': double.parse(_valueController.text),
+                  'source': _sourceController.text,
+                  'notes': _notesController.text,
+                });
+              }
+            },
+            child: const Text('إضافة'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('إلغاء'),
+    );
+  }
+}
+
+class _WithdrawDialog extends StatefulWidget {
+  const _WithdrawDialog();
+
+  @override
+  State<_WithdrawDialog> createState() => _WithdrawDialogState();
+}
+
+class _WithdrawDialogState extends State<_WithdrawDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _valueController = TextEditingController();
+  final _toWhomController = TextEditingController();
+  final _notesController = TextEditingController();
+
+  @override
+  void dispose() {
+    _valueController.dispose();
+    _toWhomController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Text('سحب من الخزنة'),
+        content: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _valueController,
+                decoration: const InputDecoration(
+                  labelText: 'قيمة السحب (EGP)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'القيمة مطلوبة';
+                  final d = double.tryParse(v);
+                  if (d == null || d <= 0) return 'أدخل قيمة صحيحة (> 0)';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _toWhomController,
+                decoration: const InputDecoration(
+                  labelText: 'إلى من (اختياري)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _notesController,
+                decoration: const InputDecoration(
+                  labelText: 'ملاحظات (اختياري)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
         ),
-        ElevatedButton(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              Navigator.pop(context, {
-                'value': double.parse(_valueController.text),
-                'source': _sourceController.text,
-                'notes': _notesController.text,
-              });
-            }
-          },
-          child: const Text('إضافة'),
-        ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_formKey.currentState!.validate()) {
+                Navigator.pop(context, {
+                  'value': double.parse(_valueController.text),
+                  'toWhom': _toWhomController.text,
+                  'notes': _notesController.text,
+                });
+              }
+            },
+            child: const Text('سحب'),
+          ),
+        ],
+      ),
     );
   }
 }

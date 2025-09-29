@@ -83,12 +83,12 @@ class LoadingApiService {
     }
   }
 
-  /// Get loadings by current employee
-  Future<List<Map<String, dynamic>>> getLoadingsByEmployee() async {
+  /// Get loadings by current user
+  Future<List<Map<String, dynamic>>> getLoadingsByUser() async {
     try {
       final headers = await _getAuthHeaders();
       final response = await http.get(
-        Uri.parse('$baseUrl/loadings/employee'),
+        Uri.parse('$baseUrl/loadings/user'),
         headers: headers,
       );
 
@@ -97,7 +97,7 @@ class LoadingApiService {
         return data.cast<Map<String, dynamic>>();
       } else {
         throw ApiException(
-          message: 'Failed to load employee loadings',
+          message: 'Failed to load user loadings',
           statusCode: response.statusCode,
         );
       }

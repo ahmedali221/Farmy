@@ -146,11 +146,8 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     } catch (_) {
       // Not found → create new supplier
       final supplierService = serviceLocator<SupplierApiService>();
-      final created = await supplierService.createSupplier({
-        'name': name,
-        'supplierType': 'chicken',
-        'status': 'active',
-      });
+      // Backend supplier model only allows: name, phone, address
+      final created = await supplierService.createSupplier({'name': name});
       // Update local cache
       suppliers = [...suppliers, created];
       return created['_id'] as String;
