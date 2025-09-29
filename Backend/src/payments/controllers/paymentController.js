@@ -168,6 +168,39 @@ exports.getPaymentSummary = async (req, res) => {
   }
 };
 
+// Delete payment by ID and recalculate customer's outstanding
+exports.deletePayment = async (req, res) => {
+  try {
+    const payment = await Payment.findById(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+
+    const customerId = payment.customer;
+    await Payment.findByIdAndDelete(req.params.id);
+
+    // Recalculate customer's outstanding based on latest remainingAmount
+    try {
+      const latest = await Payment.findOne({ customer: customerId })
+        .sort({ createdAt: -1 })
+        .select('remainingAmount');
+      const customer = await Customer.findById(customerId);
+      if (customer) {
+        customer.outstandingDebts = latest?.remainingAmount || 0;
+        await customer.save();
+      }
+    } catch (recalcErr) {
+      logger.error(`Error recalculating customer outstanding after payment delete: ${recalcErr.message}`);
+    }
+
+    logger.info(`Payment deleted: ${req.params.id}`);
+    return res.status(200).json({ message: 'Payment deleted successfully' });
+  } catch (err) {
+    logger.error(`Error deleting payment: ${err.message}`);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // List payments collected by a specific user, optionally grouped by day
 exports.getPaymentsByUser = async (req, res) => {
   try {

@@ -260,13 +260,21 @@ class PaymentApiService {
       );
 
       if (response.statusCode != 200 && response.statusCode != 204) {
-        final dynamic errorData = json.decode(response.body);
-        throw ApiException(
-          message: (errorData is Map<String, dynamic>)
-              ? (errorData['message'] ?? 'Failed to delete payment')
-              : 'Failed to delete payment',
-          statusCode: response.statusCode,
-        );
+        try {
+          final dynamic errorData = json.decode(response.body);
+          throw ApiException(
+            message: (errorData is Map<String, dynamic>)
+                ? (errorData['message'] ?? 'Failed to delete payment')
+                : 'Failed to delete payment',
+            statusCode: response.statusCode,
+          );
+        } catch (_) {
+          // Non-JSON error (e.g., HTML 404 page); surface generic error with status
+          throw ApiException(
+            message: 'Failed to delete payment',
+            statusCode: response.statusCode,
+          );
+        }
       }
     } catch (e) {
       if (e is ApiException) rethrow;

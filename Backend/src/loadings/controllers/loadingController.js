@@ -222,11 +222,27 @@ exports.updateLoading = async (req, res) => {
 
 exports.deleteLoading = async (req, res) => {
   try {
-    const loading = await Loading.findByIdAndDelete(req.params.id);
-
+    // Fetch first to know quantities and chicken type
+    const loading = await Loading.findById(req.params.id);
     if (!loading) {
       return res.status(404).json({ message: 'Loading not found' });
     }
+
+    // Restore chicken stock by the quantity of this loading
+    try {
+      if (loading.chickenType && typeof loading.quantity === 'number') {
+        const ct = await ChickenType.findById(loading.chickenType);
+        if (ct) {
+          const current = typeof ct.stock === 'number' ? ct.stock : 0;
+          const restored = current + Math.max(0, loading.quantity);
+          await ChickenType.findByIdAndUpdate(ct._id, { $set: { stock: restored } });
+        }
+      }
+    } catch (stockErr) {
+      logger.error(`Failed to restore chicken stock on delete: ${stockErr.message}`);
+    }
+
+    await Loading.findByIdAndDelete(req.params.id);
 
     logger.info(`Loading deleted: ${req.params.id}`);
     res.json({ message: 'Loading deleted successfully' });

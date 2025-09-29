@@ -195,7 +195,7 @@ class LoadingApiService {
         headers: headers,
       );
 
-      if (response.statusCode != 200) {
+      if (response.statusCode != 200 && response.statusCode != 204) {
         final errorData = json.decode(response.body);
         throw ApiException(
           message: errorData['message'] ?? 'Failed to delete loading',
