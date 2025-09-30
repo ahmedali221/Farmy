@@ -14,7 +14,8 @@ const paymentSchema = Joi.object({
   totalPrice: Joi.number().min(0).required(),
   paidAmount: Joi.number().min(0).required(),
   discount: Joi.number().min(0).default(0),
-  paymentMethod: Joi.string().valid('cash').default('cash')
+  paymentMethod: Joi.string().valid('cash').default('cash'),
+  paymentDate: Joi.date().optional()
 });
 
 exports.createPayment = async (req, res) => {
@@ -32,7 +33,8 @@ exports.createPayment = async (req, res) => {
       ...req.body,
       user: req.user.id,
       remainingAmount: remaining,
-      status
+      status,
+      paymentDate: req.body.paymentDate ? new Date(req.body.paymentDate) : Date.now()
     };
 
     const payment = new Payment(paymentData);
@@ -58,7 +60,7 @@ exports.getAllPayments = async (req, res) => {
     const payments = await Payment.find()
       .populate('customer', 'name contactInfo')
       .populate('user', 'username role')
-      .sort({ createdAt: -1 });
+      .sort({ paymentDate: -1, createdAt: -1 });
 
     res.json(payments);
   } catch (err) {
@@ -102,26 +104,39 @@ exports.getPaymentsByOrder = async (req, res) => {
 };
 
 exports.updatePayment = async (req, res) => {
-  const { error } = paymentSchema.validate(req.body);
-  if (error) return res.status(400).json({ message: error.details[0].message });
-
   try {
-    const previousPayment = await Payment.findById(req.params.id);
-    if (!previousPayment) {
-      return res.status(404).json({ message: 'Payment not found' });
+    const id = req.params.id;
+    const existing = await Payment.findById(id);
+    if (!existing) return res.status(404).json({ message: 'Payment not found' });
+
+    // Partial validation: all fields optional for updates
+    const partialSchema = paymentSchema.fork(Object.keys(paymentSchema.describe().keys), (s) => s.optional());
+    const { error } = partialSchema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.details[0].message });
+
+    const updateData = { ...req.body };
+    if (updateData.paymentDate) {
+      updateData.paymentDate = new Date(updateData.paymentDate);
+    }
+
+    // Recompute remainingAmount and status if related fields change
+    const willRecalc = ['totalPrice', 'paidAmount', 'discount'].some(k => updateData[k] !== undefined);
+    if (willRecalc) {
+      const total = updateData.totalPrice !== undefined ? Number(updateData.totalPrice) : existing.totalPrice || 0;
+      const paid = updateData.paidAmount !== undefined ? Number(updateData.paidAmount) : existing.paidAmount || 0;
+      const discount = updateData.discount !== undefined ? Number(updateData.discount) : existing.discount || 0;
+      const remaining = Math.max(0, total - paid - discount);
+      updateData.remainingAmount = remaining;
+      updateData.status = remaining === 0 ? 'completed' : 'partial';
     }
 
     const payment = await Payment.findByIdAndUpdate(
-      req.params.id,
-      req.body,
+      id,
+      updateData,
       { new: true }
-    ).populate('customer user', 'username role');
+    ).populate('customer', 'name contactInfo').populate('user', 'username role');
 
-    if (!payment) {
-      return res.status(404).json({ message: 'Payment not found' });
-    }
-
-    // Recalculate customer's outstanding as the new remaining amount
+    // Update customer's outstanding to payment.remainingAmount
     const customer = await Customer.findById(payment.customer);
     if (customer) {
       const newRemaining = Math.max(0, (payment.totalPrice || 0) - (payment.paidAmount || 0) - (payment.discount || 0));
@@ -129,7 +144,7 @@ exports.updatePayment = async (req, res) => {
       await customer.save();
     }
 
-    logger.info(`Payment updated: ${req.params.id}`);
+    logger.info(`Payment updated: ${id}`);
     res.json(payment);
   } catch (err) {
     logger.error(`Error updating payment: ${err.message}`);

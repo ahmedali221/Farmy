@@ -34,11 +34,14 @@ class _DistributionViewState extends State<DistributionView> {
 
   double _mealAccount = 0;
   double _totalAccount = 0;
+  double _oldOutstandingSnapshot = 0;
   bool _loading = true;
   bool _saving = false;
   bool _posting = false;
 
   String _debugLog = '';
+
+  DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
@@ -142,10 +145,15 @@ class _DistributionViewState extends State<DistributionView> {
       _netWeightCtrl.text = net.toStringAsFixed(2);
       _mealAccount = mealAccount;
       _totalAccount = totalAccount;
+      _oldOutstandingSnapshot = outstanding;
     });
   }
 
-  Future<void> _generateAndPrintPdf() async {
+  Future<void> _generateAndPrintPdf({
+    required double oldOutstanding,
+    required double mealAccount,
+    required double newOutstanding,
+  }) async {
     try {
       final pdf = pw.Document();
 
@@ -233,18 +241,17 @@ class _DistributionViewState extends State<DistributionView> {
                         _buildTableRow('السعر (ج.م/كجم)', _priceCtrl.text, ttf),
                         _buildTableRow(
                           'حساب الوجبة (ج.م)',
-                          _mealAccount.toStringAsFixed(2),
+                          mealAccount.toStringAsFixed(2),
                           ttf,
                         ),
                         _buildTableRow(
                           'المستحق القديم قبل الفاتورة (ج.م)',
-                          (_selectedCustomer?['outstandingDebts'] ?? 0)
-                              .toString(),
+                          oldOutstanding.toStringAsFixed(2),
                           ttf,
                         ),
                         _buildTableRow(
                           'المستحق الجديد بعد الفاتورة (ج.م)',
-                          _totalAccount.toStringAsFixed(2),
+                          newOutstanding.toStringAsFixed(2),
                           ttf,
                           isBold: true,
                         ),
@@ -368,8 +375,8 @@ class _DistributionViewState extends State<DistributionView> {
         'quantity': int.tryParse(_quantityCtrl.text) ?? 0,
         'grossWeight': double.tryParse(_grossWeightCtrl.text) ?? 0.0,
         'price': double.tryParse(_priceCtrl.text) ?? 0.0,
-        // Hint backend to set distributionDate explicitly to today (matches stock window)
-        'distributionDate': DateTime.now().toIso8601String(),
+        // Use user-selected distribution date (can be old date)
+        'distributionDate': _selectedDate.toIso8601String(),
       };
       log('POST /distributions payload: ' + payload.toString());
       final created = await employeeService.createDistribution(payload);
@@ -407,7 +414,16 @@ class _DistributionViewState extends State<DistributionView> {
         const SnackBar(content: Text('تم تسجيل التوزيع وتحديث المديونية')),
       );
 
-      await _generateAndPrintPdf();
+      // Capture snapshot values for the PDF to ensure "old outstanding" reflects pre-order value
+      final oldOutstanding = _oldOutstandingSnapshot;
+      final mealAccount = _mealAccount;
+      final newOutstanding = oldOutstanding + mealAccount;
+
+      await _generateAndPrintPdf(
+        oldOutstanding: oldOutstanding,
+        mealAccount: mealAccount,
+        newOutstanding: newOutstanding,
+      );
       log('PDF generated successfully');
       // Debug: fetch after-submit stock snapshot
       try {
@@ -449,6 +465,7 @@ class _DistributionViewState extends State<DistributionView> {
       _priceCtrl.clear();
       _mealAccount = 0;
       _totalAccount = 0;
+      _selectedDate = DateTime.now();
     });
   }
 
@@ -532,6 +549,36 @@ class _DistributionViewState extends State<DistributionView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Date selector
+                            Row(
+                              children: [
+                                const Icon(Icons.calendar_today, size: 18),
+                                const SizedBox(width: 8),
+                                const Text('تاريخ التوزيع:'),
+                                const Spacer(),
+                                OutlinedButton.icon(
+                                  icon: const Icon(
+                                    Icons.calendar_today,
+                                    size: 16,
+                                  ),
+                                  label: Text(
+                                    '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                                  ),
+                                  onPressed: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: _selectedDate,
+                                      firstDate: DateTime(2024, 1, 1),
+                                      lastDate: DateTime.now(),
+                                    );
+                                    if (picked != null) {
+                                      setState(() => _selectedDate = picked);
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
                             Directionality(
                               textDirection: TextDirection.rtl,
                               child: Autocomplete<String>(

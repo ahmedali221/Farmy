@@ -47,6 +47,9 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
   final _loadingPriceController = TextEditingController();
   final _totalLoadingController = TextEditingController();
 
+  // User-selected operational date for the loading
+  DateTime _selectedDate = DateTime.now();
+
   @override
   void initState() {
     super.initState();
@@ -186,8 +189,8 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
         'quantity': double.parse(_quantityController.text),
         'grossWeight': double.tryParse(_grossWeightController.text) ?? 0,
         'loadingPrice': double.tryParse(_loadingPriceController.text) ?? 0,
-        // Hint backend to set loadingDate explicitly to today (matches stock window)
-        'loadingDate': DateTime.now().toIso8601String(),
+        // Use the user-selected date (can be an old date)
+        'loadingDate': _selectedDate.toIso8601String(),
         'notes': null, // Default to null as per requirements
       };
 
@@ -248,6 +251,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
       _loadingPriceController.clear();
       _totalLoadingController.clear();
       isOrderSubmitted = false;
+      _selectedDate = DateTime.now();
     });
   }
 
@@ -400,6 +404,49 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                 key: _formKey,
                                 child: Column(
                                   children: [
+                                    // Date selector
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.calendar_today,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Text('تاريخ التحميل:'),
+                                          const Spacer(),
+                                          OutlinedButton.icon(
+                                            icon: const Icon(
+                                              Icons.calendar_today,
+                                              size: 16,
+                                            ),
+                                            label: Text(
+                                              '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                                            ),
+                                            onPressed: () async {
+                                              final picked =
+                                                  await showDatePicker(
+                                                    context: context,
+                                                    initialDate: _selectedDate,
+                                                    firstDate: DateTime(
+                                                      2024,
+                                                      1,
+                                                      1,
+                                                    ),
+                                                    lastDate: DateTime.now(),
+                                                  );
+                                              if (picked != null) {
+                                                setState(
+                                                  () => _selectedDate = picked,
+                                                );
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
                                     // Supplier Selection (text input)
                                     _SectionCard(
                                       title: 'المورد',

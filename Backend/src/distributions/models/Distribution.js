@@ -9,7 +9,8 @@ const distributionSchema = new mongoose.Schema({
   netWeight: { type: Number, required: true, min: 0 },
   price: { type: Number, required: true, min: 0 },
   totalAmount: { type: Number, required: true, min: 0 },
-  distributionDate: { type: Date, default: Date.now }
+  // Explicit operational date selected by the user for this distribution
+  distributionDate: { type: Date, required: true, index: true, default: Date.now }
 }, { timestamps: true });
 
 // Pre-save middleware to calculate fields

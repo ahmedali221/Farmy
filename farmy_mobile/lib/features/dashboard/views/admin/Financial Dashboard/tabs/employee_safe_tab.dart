@@ -21,7 +21,10 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _employeeCollections = [];
+  List<Map<String, dynamic>> _managerCollections = [];
   final Map<String, String> _employeeIdToName = {};
+  final Map<String, String> _managerIdToName = {};
+  bool _showManagers = false;
   final Map<String, List<Map<String, dynamic>>> _otherExpensesByEmployee = {};
 
   @override
@@ -44,13 +47,17 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
       try {
         final users = await _employeeService.getAllEmployeeUsers();
         _employeeIdToName.clear();
+        _managerIdToName.clear();
         for (final u in users) {
           final String id = (u['_id'] ?? '').toString();
           final String role = (u['role'] ?? '').toString();
-          final String name = (u['username'] ?? u['name'] ?? 'موظف').toString();
-          // Only include users with employee role
-          if (id.isNotEmpty && role == 'employee') {
+          final String name = (u['username'] ?? u['name'] ?? 'مستخدم')
+              .toString();
+          if (id.isEmpty) continue;
+          if (role == 'employee') {
             _employeeIdToName[id] = name;
+          } else if (role == 'manager') {
+            _managerIdToName[id] = name;
           }
         }
       } catch (_) {}
@@ -65,8 +72,20 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
         } catch (_) {}
       }
 
+      // Split list by role maps
+      final employeesOnly = list.where((it) {
+        final String id = (it['userId'] ?? '').toString();
+        return id.isNotEmpty && _employeeIdToName.containsKey(id);
+      }).toList();
+      // Include manager records even if we don't have a username lookup; fall back to ID on display
+      final managersOnly = list.where((it) {
+        final String id = (it['userId'] ?? '').toString();
+        return id.isNotEmpty && !_employeeIdToName.containsKey(id);
+      }).toList();
+
       setState(() {
-        _employeeCollections = list;
+        _employeeCollections = employeesOnly;
+        _managerCollections = managersOnly;
         _otherExpensesByEmployee
           ..clear()
           ..addAll(serverExpenses);
@@ -101,79 +120,159 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
         physics: const AlwaysScrollableScrollPhysics(),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: _employeeCollections.isEmpty
-              ? _buildEmptyState(
-                  Icons.people_outline,
-                  'لا يوجد موظفون لديهم تحصيل',
-                  'أعد التحميل بعد تسجيل المدفوعات',
-                )
-              : Column(
-                  children: _employeeCollections.map((item) {
-                    final String employeeId = (item['userId'] ?? '').toString();
-                    final String name =
-                        _employeeIdToName[employeeId] ?? employeeId;
-                    final double collected =
-                        ((item['totalCollected'] ?? 0) as num).toDouble();
-                    final double transfersIn =
-                        ((item['transfersIn'] ?? 0) as num).toDouble();
-                    final double transfersOut =
-                        ((item['transfersOut'] ?? 0) as num).toDouble();
-                    final double netAvailable =
-                        ((item['netAvailable'] ??
-                                    (collected + transfersIn - transfersOut))
-                                as num)
-                            .toDouble();
-                    final double extra = _sumEmployeeExpenses(employeeId);
-                    final double net = netAvailable - extra;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Theme.of(context).primaryColor,
-                            child: const Icon(
-                              Icons.person,
-                              color: Colors.white,
-                            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  FilterChip(
+                    label: const Text('عرض المديرين'),
+                    selected: _showManagers,
+                    onSelected: (v) {
+                      setState(() {
+                        _showManagers = v;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (!_showManagers) ...[
+                if (_employeeCollections.isEmpty)
+                  _buildEmptyState(
+                    Icons.people_outline,
+                    'لا يوجد موظفون لديهم تحصيل',
+                    'أعد التحميل بعد تسجيل المدفوعات',
+                  )
+                else
+                  Column(
+                    children: _employeeCollections.map((item) {
+                      final String employeeId = (item['userId'] ?? '')
+                          .toString();
+                      final String name =
+                          _employeeIdToName[employeeId] ?? 'موظف';
+                      final double collected =
+                          ((item['totalCollected'] ?? 0) as num).toDouble();
+                      final double transfersIn =
+                          ((item['transfersIn'] ?? 0) as num).toDouble();
+                      final double transfersOut =
+                          ((item['transfersOut'] ?? 0) as num).toDouble();
+                      final double netAvailable =
+                          ((item['netAvailable'] ??
+                                      (collected + transfersIn - transfersOut))
+                                  as num)
+                              .toDouble();
+                      final double extra = _sumEmployeeExpenses(employeeId);
+                      final double net = netAvailable - extra;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: Card(
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          title: Text(
-                            name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'تحصيل: ${collected.toStringAsFixed(2)}  •  صافي: ${net.toStringAsFixed(2)}',
-                            style: TextStyle(color: Colors.grey[700]),
-                          ),
-                          trailing: const Icon(Icons.chevron_left),
-                          onTap: () async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => _EmployeeSafeDetailsPage(
-                                  employeeId: employeeId,
-                                  employeeName: name,
-                                  collected: collected,
-                                  transfersIn: transfersIn,
-                                  transfersOut: transfersOut,
-                                  initialOtherExpenses:
-                                      _otherExpensesByEmployee[employeeId] ??
-                                      const [],
-                                ),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Theme.of(context).primaryColor,
+                              child: const Icon(
+                                Icons.person,
+                                color: Colors.white,
                               ),
-                            );
-                            _loadData();
-                          },
+                            ),
+                            title: Text(
+                              name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'تحصيل: ${collected.toStringAsFixed(2)}  •  صافي: ${net.toStringAsFixed(2)}',
+                              style: TextStyle(color: Colors.grey[700]),
+                            ),
+                            trailing: const Icon(Icons.chevron_left),
+                            onTap: () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => _EmployeeSafeDetailsPage(
+                                    employeeId: employeeId,
+                                    employeeName: name,
+                                    collected: collected,
+                                    transfersIn: transfersIn,
+                                    transfersOut: transfersOut,
+                                    initialOtherExpenses:
+                                        _otherExpensesByEmployee[employeeId] ??
+                                        const [],
+                                  ),
+                                ),
+                              );
+                              _loadData();
+                            },
+                          ),
                         ),
-                      ),
-                    );
-                  }).toList(),
-                ),
+                      );
+                    }).toList(),
+                  ),
+              ] else ...[
+                if (_managerCollections.isEmpty)
+                  _buildEmptyState(
+                    Icons.admin_panel_settings,
+                    'لا يوجد مديرون لديهم تحصيل',
+                    'أعد التحميل بعد تسجيل المدفوعات',
+                  )
+                else
+                  Column(
+                    children: _managerCollections.map((item) {
+                      final String managerId = (item['userId'] ?? '')
+                          .toString();
+                      final String name =
+                          _managerIdToName[managerId] ?? managerId;
+                      final double collected =
+                          ((item['totalCollected'] ?? 0) as num).toDouble();
+                      final double transfersIn =
+                          ((item['transfersIn'] ?? 0) as num).toDouble();
+                      final double transfersOut =
+                          ((item['transfersOut'] ?? 0) as num).toDouble();
+                      final double netAvailable =
+                          ((item['netAvailable'] ??
+                                      (collected + transfersIn - transfersOut))
+                                  as num)
+                              .toDouble();
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: Card(
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ListTile(
+                            leading: const CircleAvatar(
+                              backgroundColor: Colors.teal,
+                              child: Icon(
+                                Icons.admin_panel_settings,
+                                color: Colors.white,
+                              ),
+                            ),
+                            title: Text(
+                              name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'تحصيل: ${collected.toStringAsFixed(2)}  •  صافي: ${netAvailable.toStringAsFixed(2)}',
+                              style: TextStyle(color: Colors.grey[700]),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+              ],
+            ],
+          ),
         ),
       ),
     );

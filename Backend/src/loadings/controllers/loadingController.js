@@ -172,48 +172,56 @@ exports.getLoadingById = async (req, res) => {
 
 exports.updateLoading = async (req, res) => {
   try {
-    const { error } = loadingSchema.validate(req.body);
+    const id = req.params.id;
+    const existing = await Loading.findById(id);
+    if (!existing) return res.status(404).json({ message: 'Loading not found' });
+
+    // Allow partial updates; validate only provided keys
+    const partialSchema = loadingSchema.fork(Object.keys(loadingSchema.describe().keys), (s) => s.optional());
+    const { error } = partialSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    // Calculate auto-calculated fields
-    const calculatedValues = calculateLoadingValues(req.body);
-    
-    const updateData = {
-      ...req.body,
-      ...calculatedValues
-    };
+    const updateData = { ...req.body };
 
     // Handle chicken type lookup if provided
     if (updateData.chickenType) {
       let chickenType;
       if (mongoose.Types.ObjectId.isValid(updateData.chickenType)) {
-        // If it's a valid ObjectId, find by ID
         chickenType = await ChickenType.findById(updateData.chickenType);
       } else {
-        // If it's a name, find by name
         chickenType = await ChickenType.findOne({ name: updateData.chickenType });
       }
-      
       if (!chickenType) {
         return res.status(404).json({ message: 'Chicken type not found' });
       }
-      
-      // Update updateData to use the actual ObjectId
       updateData.chickenType = chickenType._id;
     }
 
-    const loading = await Loading.findByIdAndUpdate(
-      req.params.id,
+    // If any of quantity/grossWeight/loadingPrice changes, recalc fields
+    const willRecalc = ['quantity', 'grossWeight', 'loadingPrice'].some(k => updateData[k] !== undefined);
+    if (willRecalc) {
+      const base = {
+        quantity: updateData.quantity !== undefined ? Number(updateData.quantity) : existing.quantity,
+        grossWeight: updateData.grossWeight !== undefined ? Number(updateData.grossWeight) : existing.grossWeight,
+        loadingPrice: updateData.loadingPrice !== undefined ? Number(updateData.loadingPrice) : existing.loadingPrice
+      };
+      const calculated = calculateLoadingValues(base);
+      Object.assign(updateData, calculated);
+    }
+
+    // Normalize loadingDate if provided
+    if (updateData.loadingDate) {
+      updateData.loadingDate = new Date(updateData.loadingDate);
+    }
+
+    const updated = await Loading.findByIdAndUpdate(
+      id,
       updateData,
       { new: true, runValidators: true }
     ).populate('chickenType supplier user');
 
-    if (!loading) {
-      return res.status(404).json({ message: 'Loading not found' });
-    }
-
-    logger.info(`Loading updated: ${req.params.id}`);
-    res.json(loading);
+    logger.info(`Loading updated: ${id}`);
+    res.json(updated);
   } catch (err) {
     logger.error(`Error updating loading: ${err.message}`);
     res.status(500).json({ message: 'Server error' });

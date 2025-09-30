@@ -85,6 +85,57 @@ exports.getDailyNetWeight = async (req, res) => {
   }
 };
 
+// Update distribution by ID
+exports.updateDistribution = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const distribution = await Distribution.findById(id);
+    if (!distribution) {
+      return res.status(404).json({ message: 'Distribution not found' });
+    }
+
+    const prevTotalAmount = Number(distribution.totalAmount || 0);
+
+    // Allow updating: quantity, grossWeight, price, distributionDate
+    const updatable = {};
+    if (req.body.quantity !== undefined) updatable.quantity = Number(req.body.quantity);
+    if (req.body.grossWeight !== undefined) updatable.grossWeight = Number(req.body.grossWeight);
+    if (req.body.price !== undefined) updatable.price = Number(req.body.price);
+    if (req.body.distributionDate) updatable.distributionDate = new Date(req.body.distributionDate);
+
+    // Apply updates to document
+    Object.assign(distribution, updatable);
+
+    // Recompute dependent fields similar to pre-save to be explicit
+    distribution.emptyWeight = distribution.quantity * 8;
+    distribution.netWeight = Math.max(0, distribution.grossWeight - distribution.emptyWeight);
+    distribution.totalAmount = distribution.netWeight * distribution.price;
+
+    await distribution.save();
+
+    // Adjust customer's outstanding debts by the delta
+    const customerDoc = await Customer.findById(distribution.customer);
+    if (customerDoc) {
+      const current = Number(customerDoc.outstandingDebts || 0);
+      const newTotal = Number(distribution.totalAmount || 0);
+      const delta = newTotal - prevTotalAmount;
+      customerDoc.outstandingDebts = Math.max(0, current + delta);
+      await customerDoc.save();
+    }
+
+    // Populate refs for consistent frontend display
+    await distribution.populate('customer', 'name contactInfo');
+    await distribution.populate('user', 'username role');
+
+    logger.info(`Distribution updated: ${id} by user: ${req.user?.id || 'unknown'}`);
+    return res.status(200).json(distribution);
+  } catch (err) {
+    logger.error(`Error updating distribution: ${err.message}`);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // Delete single distribution by ID
 exports.deleteDistribution = async (req, res) => {
   try {

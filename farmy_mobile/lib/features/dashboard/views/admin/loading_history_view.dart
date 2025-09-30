@@ -155,6 +155,143 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
     }
   }
 
+  Future<void> _editLoading(Map<String, dynamic> m) async {
+    final qtyCtrl = TextEditingController(
+      text: (m['quantity'] ?? 0).toString(),
+    );
+    final grossCtrl = TextEditingController(
+      text: (m['grossWeight'] ?? 0).toString(),
+    );
+    final priceCtrl = TextEditingController(
+      text: (m['loadingPrice'] ?? 0).toString(),
+    );
+    DateTime selectedDate;
+    try {
+      final raw = (m['loadingDate'] ?? m['createdAt'] ?? m['date'])?.toString();
+      selectedDate = raw != null ? DateTime.parse(raw) : DateTime.now();
+    } catch (_) {
+      selectedDate = DateTime.now();
+    }
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('تعديل سجل التحميل'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Date selector
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('تاريخ التحميل:'),
+                      const Spacer(),
+                      StatefulBuilder(
+                        builder: (context, setInner) => OutlinedButton.icon(
+                          icon: const Icon(Icons.calendar_today, size: 16),
+                          label: Text(
+                            '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                          ),
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate,
+                              firstDate: DateTime(2024, 1, 1),
+                              lastDate: DateTime.now(),
+                            );
+                            if (picked != null) {
+                              setInner(() => selectedDate = picked);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: qtyCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'الكمية',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: grossCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'وزن القائم (كجم)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: priceCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'سعر التحميل (ج.م/كجم)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('إلغاء'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('حفظ'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      try {
+        final String id = (m['_id'] ?? '').toString();
+        if (id.isEmpty) throw Exception('معرّف غير صالح');
+        final updated = await _loadingService.updateLoading(id, {
+          'quantity': int.tryParse(qtyCtrl.text) ?? m['quantity'] ?? 0,
+          'grossWeight':
+              double.tryParse(grossCtrl.text) ??
+              (m['grossWeight'] ?? 0).toDouble(),
+          'loadingPrice':
+              double.tryParse(priceCtrl.text) ??
+              (m['loadingPrice'] ?? 0).toDouble(),
+          'loadingDate': selectedDate.toIso8601String(),
+        });
+        if (!mounted) return;
+        setState(() {
+          final idx = _loadings.indexWhere((x) => x['_id'] == id);
+          if (idx != -1) _loadings[idx] = updated;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم تحديث سجل التحميل')));
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل التحديث: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -468,6 +605,11 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                tooltip: 'تعديل هذا السجل',
+                icon: const Icon(Icons.edit, color: Colors.blueAccent),
+                onPressed: () => _editLoading(m),
+              ),
               Text(
                 '${totalLoading.toDouble().toStringAsFixed(0)} ج.م',
                 style: const TextStyle(fontWeight: FontWeight.bold),

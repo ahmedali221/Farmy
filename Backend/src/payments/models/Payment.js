@@ -44,7 +44,9 @@ const paymentSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'completed', 'partial'],
     default: 'pending'
-  }
+  },
+  // Explicit operational date selected by the user for this payment
+  paymentDate: { type: Date, required: true, index: true, default: Date.now }
 }, { timestamps: true });
 
 // Calculate remaining amount and set status before saving

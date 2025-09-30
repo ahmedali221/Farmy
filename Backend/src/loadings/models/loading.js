@@ -55,6 +55,8 @@ const loadingSchema = new mongoose.Schema({
   // بيانات إضافية
   loadingDate: {
     type: Date,
+    required: true,
+    index: true,
     default: Date.now
   },
   notes: {

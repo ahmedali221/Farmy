@@ -38,7 +38,7 @@ class _PaymentHistoryViewState extends State<PaymentHistoryView> {
       // Filter payments by selected date
       final filteredPayments = allPayments.where((payment) {
         final paymentDate = DateTime.parse(
-          payment['createdAt'] ?? payment['paymentDate'] ?? '',
+          payment['paymentDate'] ?? payment['createdAt'] ?? '',
         );
         return paymentDate.year == date.year &&
             paymentDate.month == date.month &&
@@ -110,6 +110,144 @@ class _PaymentHistoryViewState extends State<PaymentHistoryView> {
       return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return 'تاريخ غير صحيح';
+    }
+  }
+
+  Future<void> _editPayment(Map<String, dynamic> m) async {
+    final totalCtrl = TextEditingController(
+      text: (m['totalPrice'] ?? 0).toString(),
+    );
+    final paidCtrl = TextEditingController(
+      text: (m['paidAmount'] ?? 0).toString(),
+    );
+    final discountCtrl = TextEditingController(
+      text: (m['discount'] ?? 0).toString(),
+    );
+    DateTime selectedDate;
+    try {
+      final raw = (m['paymentDate'] ?? m['createdAt'])?.toString();
+      selectedDate = raw != null ? DateTime.parse(raw) : DateTime.now();
+    } catch (_) {
+      selectedDate = DateTime.now();
+    }
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تعديل سجل الدفع'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 18),
+                    const SizedBox(width: 8),
+                    const Text('تاريخ الدفع:'),
+                    const Spacer(),
+                    StatefulBuilder(
+                      builder: (context, setInner) => OutlinedButton.icon(
+                        icon: const Icon(Icons.calendar_today, size: 16),
+                        label: Text(
+                          '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                        ),
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime(2024, 1, 1),
+                            lastDate: DateTime.now(),
+                          );
+                          if (picked != null) {
+                            setInner(() => selectedDate = picked);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: totalCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'إجمالي المستحق',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: paidCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'المدفوع',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: discountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'الخصم',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('إلغاء'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final String id = (m['_id'] ?? '').toString();
+        if (id.isEmpty) throw Exception('معرّف غير صالح');
+        final updated = await _paymentService.updatePayment(id, {
+          'totalPrice':
+              double.tryParse(totalCtrl.text) ??
+              (m['totalPrice'] ?? 0).toDouble(),
+          'paidAmount':
+              double.tryParse(paidCtrl.text) ??
+              (m['paidAmount'] ?? 0).toDouble(),
+          'discount':
+              double.tryParse(discountCtrl.text) ??
+              (m['discount'] ?? 0).toDouble(),
+          'paymentDate': selectedDate.toIso8601String(),
+        });
+        if (!mounted) return;
+        setState(() {
+          final idx = _payments.indexWhere((x) => x['_id'] == id);
+          if (idx != -1) _payments[idx] = updated;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم تحديث سجل الدفع')));
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل التحديث: $e')));
+      }
     }
   }
 
@@ -427,7 +565,7 @@ class _PaymentHistoryViewState extends State<PaymentHistoryView> {
                               final String title =
                                   m['customer']?['name'] ?? 'عميل غير معروف';
                               final String subtitle = _formatDateTime(
-                                m['createdAt'],
+                                m['paymentDate'] ?? m['createdAt'],
                               );
                               final num paid = (m['paidAmount'] ?? 0) as num;
                               return ListTile(
@@ -456,6 +594,14 @@ class _PaymentHistoryViewState extends State<PaymentHistoryView> {
                                       ),
                                     ),
                                     const SizedBox(width: 8),
+                                    IconButton(
+                                      tooltip: 'تعديل هذا السجل',
+                                      icon: const Icon(
+                                        Icons.edit,
+                                        color: Colors.blueAccent,
+                                      ),
+                                      onPressed: () => _editPayment(m),
+                                    ),
                                     IconButton(
                                       tooltip: 'حذف هذا السجل',
                                       icon: const Icon(

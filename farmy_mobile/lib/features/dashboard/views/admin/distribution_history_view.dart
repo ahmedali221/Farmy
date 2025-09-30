@@ -126,6 +126,140 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
     });
   }
 
+  Future<void> _editDistribution(Map<String, dynamic> d) async {
+    final qtyCtrl = TextEditingController(
+      text: (d['quantity'] ?? 0).toString(),
+    );
+    final grossCtrl = TextEditingController(
+      text: (d['grossWeight'] ?? 0).toString(),
+    );
+    final priceCtrl = TextEditingController(text: (d['price'] ?? 0).toString());
+    DateTime selectedDate;
+    try {
+      final raw = (d['distributionDate'] ?? d['createdAt'])?.toString();
+      selectedDate = raw != null ? DateTime.parse(raw) : DateTime.now();
+    } catch (_) {
+      selectedDate = DateTime.now();
+    }
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('تعديل سجل التوزيع'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Date selector
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('تاريخ التوزيع:'),
+                      const Spacer(),
+                      StatefulBuilder(
+                        builder: (context, setInner) => OutlinedButton.icon(
+                          icon: const Icon(Icons.calendar_today, size: 16),
+                          label: Text(
+                            '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                          ),
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate,
+                              firstDate: DateTime(2024, 1, 1),
+                              lastDate: DateTime.now(),
+                            );
+                            if (picked != null) {
+                              setInner(() => selectedDate = picked);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: qtyCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'الكمية',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: grossCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'وزن القائم (كجم)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: priceCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'السعر (ج.م/كجم)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('إلغاء'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('حفظ'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      try {
+        final id = (d['_id'] ?? '').toString();
+        if (id.isEmpty) throw Exception('معرّف غير صالح');
+        final updated = await _distributionService.updateDistribution(id, {
+          'quantity': int.tryParse(qtyCtrl.text) ?? d['quantity'] ?? 0,
+          'grossWeight':
+              double.tryParse(grossCtrl.text) ??
+              (d['grossWeight'] ?? 0).toDouble(),
+          'price':
+              double.tryParse(priceCtrl.text) ?? (d['price'] ?? 0).toDouble(),
+          'distributionDate': selectedDate.toIso8601String(),
+        });
+        if (!mounted) return;
+        setState(() {
+          final idx = _distributions.indexWhere((x) => x['_id'] == id);
+          if (idx != -1) _distributions[idx] = updated;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم تحديث سجل التوزيع')));
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل التحديث: $e')));
+      }
+    }
+  }
+
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
@@ -458,6 +592,11 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                tooltip: 'تعديل هذا السجل',
+                icon: const Icon(Icons.edit, color: Colors.blueAccent),
+                onPressed: () => _editDistribution(d),
+              ),
               Text(
                 '${totalAmount.toDouble().toStringAsFixed(0)} ج.م',
                 style: const TextStyle(fontWeight: FontWeight.bold),
