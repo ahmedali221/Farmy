@@ -1,8 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/loading_api_service.dart';
 import '../../../../core/services/inventory_api_service.dart';
+import '../../../../core/utils/pdf_arabic_utils.dart';
 
 class LoadingHistoryView extends StatefulWidget {
   const LoadingHistoryView({super.key});
@@ -877,12 +882,339 @@ class _LoadingDetailsPage extends StatelessWidget {
   final Map<String, dynamic> loading;
   const _LoadingDetailsPage({required this.loading});
 
+  String _formatDateTime(String? dateTime) {
+    if (dateTime == null) return 'غير معروف';
+    try {
+      final dt = DateTime.parse(dateTime);
+      return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return 'تاريخ غير صحيح';
+    }
+  }
+
+  String _buildLoadingHtml() {
+    final netWeight = (loading['netWeight'] ?? 0) as num;
+    final totalLoading = (loading['totalLoading'] ?? 0) as num;
+    final grossWeight = (loading['grossWeight'] ?? 0) as num;
+    final quantity = (loading['quantity'] ?? 0) as num;
+    final loadingPrice = (loading['loadingPrice'] ?? 0) as num;
+    final orderId = loading['_id']?.toString().substring(0, 8) ?? 'غير معروف';
+    final createdAt = _formatDateTime(loading['createdAt']);
+    final chickenType = loading['chickenType']?['name'] ?? 'غير معروف';
+    final supplierName = loading['supplier']?['name'] ?? 'غير معروف';
+    final notes = loading['notes']?.toString() ?? '';
+
+    return '''
+      <div style="padding: 20px; max-width: 800px; margin: 0 auto;">
+        <h1 style="text-align: center; color: #1976d2;">تفاصيل طلب التحميل</h1>
+        <hr style="border: 1px solid #1976d2; margin: 20px 0;">
+        
+        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <h2 style="margin: 0 0 10px 0;">معلومات الطلب</h2>
+          <p><strong>رقم الطلب:</strong> #$orderId</p>
+          <p><strong>التاريخ:</strong> $createdAt</p>
+          <p style="font-size: 18px; color: #1976d2;"><strong>إجمالي المبلغ:</strong> ${totalLoading.toDouble().toStringAsFixed(0)} ج.م</p>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <h3 style="background: #f5f5f5; padding: 10px; border-radius: 5px;">معلومات المورد والنوع</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>المورد:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">$supplierName</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>نوع الدجاج:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">$chickenType</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <h3 style="background: #f5f5f5; padding: 10px; border-radius: 5px;">تفاصيل التحميل</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>الكمية:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${quantity.toInt()} وحدة</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>الوزن القائم:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${grossWeight.toDouble().toStringAsFixed(1)} كجم</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>الوزن الصافي:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${netWeight.toDouble().toStringAsFixed(1)} كجم</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>سعر التحميل:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${loadingPrice.toDouble().toStringAsFixed(0)} ج.م/كجم</td>
+            </tr>
+          </table>
+        </div>
+
+        ${notes.isNotEmpty ? '''
+        <div style="margin-bottom: 20px;">
+          <h3 style="background: #f5f5f5; padding: 10px; border-radius: 5px;">ملاحظات</h3>
+          <p style="padding: 10px; background: #fff3e0; border-radius: 5px;">$notes</p>
+        </div>
+        ''' : ''}
+
+        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #1976d2;">
+          <p style="color: #666; font-size: 12px;">تم إنشاء هذا التقرير من نظام إدارة المزرعة</p>
+        </div>
+      </div>
+    ''';
+  }
+
+  Future<void> _printPdf(BuildContext context) async {
+    try {
+      final html = _buildLoadingHtml();
+      await PdfArabicUtils.printArabicHtml(htmlBody: html);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل الطباعة: $e')));
+      }
+    }
+  }
+
+  Future<void> _sharePdf(BuildContext context) async {
+    try {
+      print('Starting PDF share process...');
+
+      // First test: Simple share without PDF generation
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('بدء عملية المشاركة...')));
+
+      final html = _buildLoadingHtml();
+      print('HTML generated, creating PDF...');
+      final pdfBytes = await PdfArabicUtils.generateArabicHtmlPdf(
+        htmlBody: html,
+      );
+      print('PDF created, saving to file...');
+
+      final tempDir = await getTemporaryDirectory();
+      final orderId = loading['_id']?.toString().substring(0, 8) ?? 'unknown';
+      final supplierName = loading['supplier']?['name'] ?? 'مورد غير معروف';
+      final createdAt = _formatDateTime(loading['createdAt']);
+      final dateStr = createdAt
+          .replaceAll('/', '-')
+          .replaceAll(' ', '_')
+          .replaceAll(':', '-');
+      final fileName = 'تحميل_${supplierName}_$dateStr.pdf';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(pdfBytes);
+      print('PDF saved to: ${file.path}');
+
+      if (!context.mounted) return;
+
+      print('Showing share options dialog...');
+
+      // Test: Try direct share first
+      try {
+        await Share.shareXFiles([
+          XFile(file.path),
+        ], text: 'تفاصيل طلب التحميل - $supplierName');
+        print('Direct share completed');
+        return;
+      } catch (e) {
+        print('Direct share failed: $e');
+      }
+
+      // Show share options dialog
+      await showModalBottomSheet(
+        context: context,
+        builder: (ctx) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'مشاركة PDF عبر',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFF25D366),
+                    child: Image.asset(
+                      'assets/whatsapp_icon.png',
+                      width: 24,
+                      height: 24,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.chat, color: Colors.white),
+                    ),
+                  ),
+                  title: const Text('واتساب'),
+                  onTap: () async {
+                    print('WhatsApp option tapped');
+                    Navigator.pop(ctx);
+                    await _shareViaWhatsApp(context, file, orderId);
+                  },
+                ),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFF0088CC),
+                    child: Icon(Icons.telegram, color: Colors.white),
+                  ),
+                  title: const Text('تيليجرام'),
+                  onTap: () async {
+                    print('Telegram option tapped');
+                    Navigator.pop(ctx);
+                    await _shareViaTelegram(context, file, orderId);
+                  },
+                ),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Colors.blue,
+                    child: Icon(Icons.share, color: Colors.white),
+                  ),
+                  title: const Text('تطبيقات أخرى'),
+                  onTap: () async {
+                    print('Other apps option tapped');
+                    Navigator.pop(ctx);
+                    await Share.shareXFiles([
+                      XFile(file.path),
+                    ], text: 'تفاصيل طلب التحميل #$orderId');
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      );
+      print('Share dialog completed');
+    } catch (e) {
+      print('Share PDF error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل المشاركة: $e')));
+      }
+    }
+  }
+
+  Future<void> _shareViaWhatsApp(
+    BuildContext context,
+    File file,
+    String orderId,
+  ) async {
+    try {
+      final supplierName = loading['supplier']?['name'] ?? 'مورد غير معروف';
+      print('Starting WhatsApp share for order: $orderId');
+
+      // Try WhatsApp scheme first
+      final whatsappUrl = Uri.parse('whatsapp://send');
+      if (await canLaunchUrl(whatsappUrl)) {
+        print('WhatsApp is available, launching...');
+        await launchUrl(whatsappUrl);
+
+        // Then share the file
+        await Share.shareXFiles([
+          XFile(file.path),
+        ], text: 'تفاصيل طلب التحميل - $supplierName');
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم فتح واتساب، يمكنك إرسال الملف')),
+          );
+        }
+      } else {
+        print('WhatsApp not available, using general share');
+        // Fallback: use general share
+        await Share.shareXFiles([
+          XFile(file.path),
+        ], text: 'تفاصيل طلب التحميل - $supplierName');
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('واتساب غير مثبت، تم فتح خيارات المشاركة'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('WhatsApp share error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل المشاركة عبر واتساب: $e')));
+      }
+    }
+  }
+
+  Future<void> _shareViaTelegram(
+    BuildContext context,
+    File file,
+    String orderId,
+  ) async {
+    try {
+      final supplierName = loading['supplier']?['name'] ?? 'مورد غير معروف';
+      print('Starting Telegram share for order: $orderId');
+
+      // Try Telegram scheme first
+      final telegramUrl = Uri.parse('tg://');
+      if (await canLaunchUrl(telegramUrl)) {
+        print('Telegram is available, launching...');
+        await launchUrl(telegramUrl);
+
+        // Then share the file
+        await Share.shareXFiles([
+          XFile(file.path),
+        ], text: 'تفاصيل طلب التحميل - $supplierName');
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم فتح تيليجرام، يمكنك إرسال الملف')),
+          );
+        }
+      } else {
+        print('Telegram not available, using general share');
+        // Fallback: use general share
+        await Share.shareXFiles([
+          XFile(file.path),
+        ], text: 'تفاصيل طلب التحميل - $supplierName');
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تيليجرام غير مثبت، تم فتح خيارات المشاركة'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Telegram share error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('فشل المشاركة عبر تيليجرام: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('تفاصيل طلب التحميل')),
+        appBar: AppBar(
+          title: const Text('تفاصيل طلب التحميل'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.print),
+              tooltip: 'طباعة',
+              onPressed: () => _printPdf(context),
+            ),
+          ],
+        ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: _LoadingHistoryViewState()._buildLoadingCard(loading),

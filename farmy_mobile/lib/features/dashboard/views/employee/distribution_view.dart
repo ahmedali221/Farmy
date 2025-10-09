@@ -6,7 +6,6 @@ import 'package:printing/printing.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/customer_api_service.dart';
-import '../../../../core/services/employee_api_service.dart';
 import '../../../../core/services/distribution_api_service.dart';
 import '../../../../core/services/inventory_api_service.dart';
 import '../../../authentication/cubit/auth_cubit.dart';
@@ -26,6 +25,14 @@ class _DistributionViewState extends State<DistributionView> {
   Map<String, dynamic>? _selectedCustomer;
   final TextEditingController _customerNameCtrl = TextEditingController();
 
+  // Chicken type selection
+  List<Map<String, dynamic>> _chickenTypes = [];
+  Map<String, dynamic>? _selectedChickenType;
+
+  // Available quantities information
+  Map<String, dynamic>? _availableQuantities;
+  bool _loadingQuantities = false;
+
   final TextEditingController _quantityCtrl = TextEditingController();
   final TextEditingController _grossWeightCtrl = TextEditingController();
   final TextEditingController _emptyWeightCtrl = TextEditingController();
@@ -36,7 +43,6 @@ class _DistributionViewState extends State<DistributionView> {
   double _totalAccount = 0;
   double _oldOutstandingSnapshot = 0;
   bool _loading = true;
-  bool _saving = false;
   bool _posting = false;
 
   String _debugLog = '';
@@ -47,6 +53,7 @@ class _DistributionViewState extends State<DistributionView> {
   void initState() {
     super.initState();
     _loadCustomers();
+    _loadChickenTypes();
     WidgetsBinding.instance.addPostFrameCallback((_) => _recalculate());
   }
 
@@ -75,6 +82,57 @@ class _DistributionViewState extends State<DistributionView> {
       if (!mounted) return;
       setState(() => _loading = false);
       _showErrorDialog('فشل تحميل العملاء: $e');
+    }
+  }
+
+  Future<void> _loadChickenTypes() async {
+    try {
+      final distributionService = serviceLocator<DistributionApiService>();
+      final chickenTypes = await distributionService.getAvailableChickenTypes(
+        _selectedDate,
+      );
+      if (!mounted) return;
+      setState(() {
+        _chickenTypes = chickenTypes;
+        _selectedChickenType = null;
+      });
+      print('Loaded available chicken types: $_chickenTypes');
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorDialog('فشل تحميل أنواع الفراخ المتاحة: $e');
+    }
+  }
+
+  Future<void> _loadAvailableQuantities() async {
+    if (_selectedChickenType == null) {
+      setState(() {
+        _availableQuantities = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _loadingQuantities = true;
+    });
+
+    try {
+      final distributionService = serviceLocator<DistributionApiService>();
+      final quantities = await distributionService.getAvailableQuantities(
+        _selectedDate,
+        _selectedChickenType!['_id'] as String,
+      );
+      if (!mounted) return;
+      setState(() {
+        _availableQuantities = quantities;
+        _loadingQuantities = false;
+      });
+      print('Loaded available quantities: $_availableQuantities');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingQuantities = false;
+      });
+      _showErrorDialog('فشل تحميل الكميات المتاحة: $e');
     }
   }
 
@@ -335,9 +393,14 @@ class _DistributionViewState extends State<DistributionView> {
       setState(() {});
       return;
     }
+    if (_selectedChickenType == null) {
+      log('No chicken type selected');
+      _showErrorDialog('يرجى اختيار نوع الفراخ أولاً');
+      setState(() {});
+      return;
+    }
 
     setState(() {
-      _saving = true;
       _posting = true;
     });
 
@@ -369,9 +432,10 @@ class _DistributionViewState extends State<DistributionView> {
       // Ensure customer exists or create it, then post
       final customerId = await _ensureCustomerIdFromName();
 
-      final employeeService = serviceLocator<EmployeeApiService>();
+      final distributionService = serviceLocator<DistributionApiService>();
       final payload = {
         'customer': customerId,
+        'chickenType': _selectedChickenType!['_id'],
         'quantity': int.tryParse(_quantityCtrl.text) ?? 0,
         'grossWeight': double.tryParse(_grossWeightCtrl.text) ?? 0.0,
         'price': double.tryParse(_priceCtrl.text) ?? 0.0,
@@ -379,7 +443,7 @@ class _DistributionViewState extends State<DistributionView> {
         'distributionDate': _selectedDate.toIso8601String(),
       };
       log('POST /distributions payload: ' + payload.toString());
-      final created = await employeeService.createDistribution(payload);
+      final created = await distributionService.createDistribution(payload);
       log('Created distribution: ${created['_id']}');
       // Show record net weight
       final net = double.tryParse(_netWeightCtrl.text) ?? 0;
@@ -446,7 +510,6 @@ class _DistributionViewState extends State<DistributionView> {
     } finally {
       if (!mounted) return;
       setState(() {
-        _saving = false;
         _posting = false;
       });
       // Reset form after successful submission
@@ -458,6 +521,8 @@ class _DistributionViewState extends State<DistributionView> {
     setState(() {
       _customerNameCtrl.clear();
       _selectedCustomer = null;
+      _selectedChickenType = null;
+      _availableQuantities = null;
       _quantityCtrl.clear();
       _grossWeightCtrl.clear();
       _emptyWeightCtrl.clear();
@@ -573,6 +638,8 @@ class _DistributionViewState extends State<DistributionView> {
                                     );
                                     if (picked != null) {
                                       setState(() => _selectedDate = picked);
+                                      _loadChickenTypes();
+                                      _loadAvailableQuantities();
                                     }
                                   },
                                 ),
@@ -663,6 +730,160 @@ class _DistributionViewState extends State<DistributionView> {
                               ),
                             ),
                             const SizedBox(height: 16),
+
+                            // Chicken Type Selection
+                            DropdownButtonFormField<Map<String, dynamic>>(
+                              value: _selectedChickenType,
+                              decoration: const InputDecoration(
+                                labelText: 'نوع الفراخ',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: _chickenTypes.map((chickenType) {
+                                return DropdownMenuItem<Map<String, dynamic>>(
+                                  value: chickenType,
+                                  child: Text(
+                                    chickenType['name'] ?? 'غير محدد',
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (Map<String, dynamic>? value) {
+                                setState(() {
+                                  _selectedChickenType = value;
+                                });
+                                _loadAvailableQuantities();
+                              },
+                              validator: (value) {
+                                if (value == null) {
+                                  return 'يرجى اختيار نوع الفراخ';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Available Quantities Information
+                            if (_selectedChickenType != null) ...[
+                              if (_loadingQuantities)
+                                const Card(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(16.0),
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  ),
+                                )
+                              else if (_availableQuantities != null)
+                                Card(
+                                  color: Colors.blue[50],
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.info_outline,
+                                              color: Colors.blue[700],
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'الكميات المتاحة',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.blue[700],
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: _InfoCard(
+                                                title: 'العدد المتاح',
+                                                value:
+                                                    '${_availableQuantities!['totalAvailableQuantity']}',
+                                                icon: Icons.numbers,
+                                                color: Colors.green,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: _InfoCard(
+                                                title: 'الوزن الصافي المتاح',
+                                                value:
+                                                    '${(_availableQuantities!['totalAvailableNetWeight'] as num).toStringAsFixed(2)} كجم',
+                                                icon: Icons.scale,
+                                                color: Colors.orange,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if ((_availableQuantities!['loadings']
+                                                as List)
+                                            .isNotEmpty) ...[
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            'تفاصيل طلبات التحميل:',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.grey[700],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          ...(_availableQuantities!['loadings']
+                                                  as List)
+                                              .map(
+                                                (loading) => Container(
+                                                  margin: const EdgeInsets.only(
+                                                    bottom: 4,
+                                                  ),
+                                                  padding: const EdgeInsets.all(
+                                                    8,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          4,
+                                                        ),
+                                                    border: Border.all(
+                                                      color: Colors.grey[300]!,
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.local_shipping,
+                                                        size: 16,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      Expanded(
+                                                        child: Text(
+                                                          '${loading['supplier']} - ${loading['remainingQuantity']} عدد - ${(loading['remainingNetWeight'] as num).toStringAsFixed(2)} كجم',
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 12,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              )
+                                              .toList(),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(height: 16),
+                            ],
+
                             TextFormField(
                               controller: _quantityCtrl,
                               keyboardType: TextInputType.number,
@@ -1170,6 +1391,57 @@ class _DistributionHistoryDialogState
                       );
                     },
                   ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _InfoCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

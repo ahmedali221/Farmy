@@ -14,14 +14,37 @@ class SupplierManagementView extends StatefulWidget {
 class _SupplierManagementViewState extends State<SupplierManagementView> {
   List<Map<String, dynamic>> suppliers = [];
   List<Map<String, dynamic>> loadingOrders = [];
+  List<Map<String, dynamic>> filteredSuppliers = [];
   bool isLoading = true;
   late final LoadingApiService _loadingService;
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadingService = serviceLocator<LoadingApiService>();
+    _searchController.addListener(_filterSuppliers);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterSuppliers() {
+    final query = _searchController.text.trim().toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        filteredSuppliers = suppliers;
+      } else {
+        filteredSuppliers = suppliers.where((supplier) {
+          final name = supplier['name']?.toString().toLowerCase() ?? '';
+          return name.contains(query);
+        }).toList();
+      }
+    });
   }
 
   Future<void> _loadData() async {
@@ -34,8 +57,7 @@ class _SupplierManagementViewState extends State<SupplierManagementView> {
       setState(() {
         suppliers = suppliersList;
         loadingOrders = loadingOrdersList;
-
-        // Debug: Print supplier and loading data
+        filteredSuppliers = suppliers;
         print('Debug - Suppliers count: ${suppliers.length}');
         if (suppliers.isNotEmpty) {
           print('Debug - First supplier: ${suppliers.first}');
@@ -121,7 +143,6 @@ class _SupplierManagementViewState extends State<SupplierManagementView> {
       final supplier = order['supplier'];
       if (supplier == null) return false;
 
-      // Handle both populated and non-populated supplier data
       if (supplier is Map<String, dynamic>) {
         return supplier['_id'] == supplierId;
       }
@@ -137,7 +158,6 @@ class _SupplierManagementViewState extends State<SupplierManagementView> {
       final supplier = order['supplier'];
       if (supplier == null) return false;
 
-      // Handle both populated and non-populated supplier data
       if (supplier is Map<String, dynamic>) {
         return supplier['_id'] == supplierId;
       }
@@ -238,121 +258,164 @@ class _SupplierManagementViewState extends State<SupplierManagementView> {
               ),
             ],
           ),
-          body: isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : suppliers.isEmpty
-              ? const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.business_outlined,
-                        size: 64,
-                        color: Colors.grey,
-                      ),
-                      SizedBox(height: 16),
-                      Text('لا توجد موردين', style: TextStyle(fontSize: 18)),
-                    ],
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    labelText: 'البحث باسم المورد',
+                    prefixIcon: const Icon(Icons.search),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              _filterSuppliers();
+                            },
+                          )
+                        : null,
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: suppliers.length,
-                  itemBuilder: (context, index) {
-                    final supplier = suppliers[index];
-                    final supplierId = supplier['_id'];
-                    print('Debug - Supplier ID: $supplierId');
-                    final totals = _getSupplierLoadingTotals(supplierId);
-                    final loadingCount = _getSupplierLoadingOrdersCount(
-                      supplierId,
-                    );
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.blue,
-                          child: Icon(Icons.business, color: Colors.white),
-                        ),
-                        title: Text(
-                          supplier['name'] ?? 'غير معروف',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('الهاتف: ${supplier['phone'] ?? 'غير متوفر'}'),
-                            Text(
-                              'العنوان: ${supplier['address'] ?? 'غير متوفر'}',
-                            ),
-                            Text('طلبات التحميل: $loadingCount'),
-                            if (totals['totalValue'] > 0) ...[
-                              Text(
-                                'إجمالي القيمة: ${totals['totalValue'].toStringAsFixed(0)} ج.م',
-                              ),
-                              Text(
-                                'إجمالي الوزن: ${totals['totalWeight'].toStringAsFixed(1)} كجم',
-                              ),
-                            ],
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.local_shipping, size: 20),
-                              onPressed: () =>
-                                  _navigateToLoadingOrders(context, supplier),
-                              tooltip: 'طلبات التحميل',
-                            ),
-                            PopupMenuButton(
-                              itemBuilder: (context) => [
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.edit, size: 20),
-                                      SizedBox(width: 8),
-                                      Text('تعديل'),
-                                    ],
-                                  ),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.delete,
-                                        size: 20,
-                                        color: Colors.red,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'حذف',
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                              onSelected: (value) {
-                                if (value == 'edit') {
-                                  _showEditSupplierDialog(supplier);
-                                } else if (value == 'delete') {
-                                  _deleteSupplier(
-                                    supplier['_id'],
-                                    supplier['name'],
-                                  );
-                                }
-                              },
-                            ),
-                          ],
-                        ),
-                        isThreeLine: true,
-                      ),
-                    );
-                  },
                 ),
+              ),
+              Expanded(
+                child: isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : filteredSuppliers.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.business_outlined,
+                              size: 64,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'لا توجد موردين',
+                              style: TextStyle(fontSize: 18),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: filteredSuppliers.length,
+                        itemBuilder: (context, index) {
+                          final supplier = filteredSuppliers[index];
+                          final supplierId = supplier['_id'];
+                          print('Debug - Supplier ID: $supplierId');
+                          final totals = _getSupplierLoadingTotals(supplierId);
+                          final loadingCount = _getSupplierLoadingOrdersCount(
+                            supplierId,
+                          );
+
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.blue,
+                                child: Icon(
+                                  Icons.business,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              title: Text(
+                                supplier['name'] ?? 'غير معروف',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'الهاتف: ${supplier['phone'] ?? 'غير متوفر'}',
+                                  ),
+                                  Text(
+                                    'العنوان: ${supplier['address'] ?? 'غير متوفر'}',
+                                  ),
+                                  Text('طلبات التحميل: $loadingCount'),
+                                  if (totals['totalValue'] > 0) ...[
+                                    Text(
+                                      'إجمالي القيمة: ${totals['totalValue'].toStringAsFixed(0)} ج.م',
+                                    ),
+                                    Text(
+                                      'إجمالي الوزن: ${totals['totalWeight'].toStringAsFixed(1)} كجم',
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.local_shipping,
+                                      size: 20,
+                                    ),
+                                    onPressed: () => _navigateToLoadingOrders(
+                                      context,
+                                      supplier,
+                                    ),
+                                    tooltip: 'طلبات التحميل',
+                                  ),
+                                  PopupMenuButton(
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit, size: 20),
+                                            SizedBox(width: 8),
+                                            Text('تعديل'),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.delete,
+                                              size: 20,
+                                              color: Colors.red,
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'حذف',
+                                              style: TextStyle(
+                                                color: Colors.red,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                    onSelected: (value) {
+                                      if (value == 'edit') {
+                                        _showEditSupplierDialog(supplier);
+                                      } else if (value == 'delete') {
+                                        _deleteSupplier(
+                                          supplier['_id'],
+                                          supplier['name'],
+                                        );
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                              isThreeLine: true,
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -374,7 +437,6 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
-
   bool isEditing = false;
 
   @override
@@ -433,7 +495,6 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        // Basic Information
                         _buildSectionTitle('معلومات المورد'),
                         TextFormField(
                           controller: _nameController,

@@ -258,4 +258,28 @@ class LoadingApiService {
       throw ApiException(message: 'Network error: $e', statusCode: 0);
     }
   }
+
+  /// Get loadings by date
+  Future<List<Map<String, dynamic>>> getLoadingsByDate(String date) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/loadings/by-date?date=$date'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load loadings by date',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
 }

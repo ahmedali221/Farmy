@@ -105,6 +105,28 @@ const loadingSchema = new mongoose.Schema({
     default: 'cash'
   },
   
+  // بيانات التوزيع
+  distributedQuantity: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  distributedNetWeight: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  remainingQuantity: {
+    type: Number,
+    default: function() { return this.quantity; },
+    min: 0
+  },
+  remainingNetWeight: {
+    type: Number,
+    default: function() { return this.netWeight; },
+    min: 0
+  },
+  
   // بيانات المراجعة (اختيارية)
   reviewedBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -142,6 +164,10 @@ loadingSchema.pre('save', function(next) {
   
   // حساب إجمالي التحميل
   this.totalLoading = this.netWeight * this.loadingPrice;
+  
+  // حساب الكميات المتبقية
+  this.remainingQuantity = Math.max(0, this.quantity - (this.distributedQuantity || 0));
+  this.remainingNetWeight = Math.max(0, this.netWeight - (this.distributedNetWeight || 0));
   
   next();
 });

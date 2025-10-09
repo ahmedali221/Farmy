@@ -272,6 +272,35 @@ exports.deleteAllLoadings = async (req, res) => {
   }
 };
 
+// Get loadings by date
+exports.getLoadingsByDate = async (req, res) => {
+  try {
+    const { date } = req.query;
+    
+    if (!date) {
+      return res.status(400).json({ message: 'Date parameter is required' });
+    }
+
+    const targetDate = new Date(date);
+    const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+    const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
+
+    const loadings = await Loading.find({
+      loadingDate: { $gte: startOfDay, $lt: endOfDay }
+    })
+    .populate('chickenType', 'name')
+    .populate('supplier', 'name')
+    .populate('user', 'username')
+    .sort({ loadingDate: -1 });
+
+    logger.info(`Loadings fetched for date: ${date}`);
+    res.json(loadings);
+  } catch (err) {
+    logger.error(`Error fetching loadings by date: ${err.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // Get loading statistics
 exports.getLoadingStats = async (req, res) => {
   try {

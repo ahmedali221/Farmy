@@ -381,7 +381,7 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
       padding: const EdgeInsets.all(16),
       itemCount: _dailyGroups.length,
       itemBuilder: (context, index) {
-            final group = _dailyGroups[index];
+        final group = _dailyGroups[index];
         return _buildDayGroup(group);
       },
     );
@@ -419,32 +419,32 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.calendar_today,
-                    size: 18,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      dateLabel,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_today,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    dateLabel,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
                   ),
+                ),
                 Wrap(
-                      spacing: 6,
-                      children: [
+                  spacing: 6,
+                  children: [
                     if (hasDistributions)
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -490,14 +490,14 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
                         ),
                       ),
                   ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
                 if (dayDistributionTotal > 0)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -537,34 +537,34 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
                         fontSize: 12,
                       ),
                     ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
 
             // Show distributions first
-              if (hasDistributions) ...[
+            if (hasDistributions) ...[
               _buildSectionHeader(
-                  'طلبات التوزيع',
-                  Icons.outbound,
+                'طلبات التوزيع',
+                Icons.outbound,
                 Colors.orange,
-                ),
-                const SizedBox(height: 8),
+              ),
+              const SizedBox(height: 8),
               ...group.distributions.map(
                 (distribution) => _buildDistributionTile(distribution),
               ),
-                const SizedBox(height: 12),
-              ],
+              const SizedBox(height: 12),
+            ],
 
             // Then show payments
-              if (hasPayments) ...[
+            if (hasPayments) ...[
               _buildSectionHeader('المدفوعات', Icons.payment, Colors.green),
-                const SizedBox(height: 8),
+              const SizedBox(height: 8),
               ...group.payments.map((payment) => _buildPaymentTile(payment)),
-              ],
             ],
-          ),
+          ],
         ),
+      ),
     );
   }
 
@@ -614,160 +614,6 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
           ],
         ),
         onTap: () => _navigateToPaymentDetails(payment),
-      ),
-    );
-  }
-
-  Widget _buildPaymentCard(Map<String, dynamic> payment) {
-    final idStr = payment['_id']?.toString() ?? '';
-    final paymentId = idStr.length >= 8
-        ? idStr.substring(0, 8)
-        : (idStr.isEmpty ? 'غير معروف' : idStr);
-    final createdAt = _formatDateTime(payment['createdAt']);
-    final totalPriceValue = payment['totalPrice'] ?? 0;
-    final discountValue = payment['discount'] ?? 0;
-    final paidAmountValue = payment['paidAmount'] ?? payment['amount'] ?? 0;
-
-    final totalPrice = totalPriceValue is num
-        ? totalPriceValue.toDouble()
-        : 0.0;
-    final discount = discountValue is num ? discountValue.toDouble() : 0.0;
-    final paidAmount = paidAmountValue is num
-        ? paidAmountValue.toDouble()
-        : 0.0;
-    final remainingAfter = (totalPrice - paidAmount - discount).clamp(
-      0.0,
-      double.infinity,
-    );
-    final notes = payment['notes']?.toString();
-    final employee = payment['employee'];
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: Colors.green.withOpacity(0.1),
-                  child: const Icon(
-                    Icons.payment,
-                    size: 20,
-                    color: Colors.green,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'دفعة #$paymentId',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      Text(
-                        createdAt,
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildPaymentDetailRow(
-              'إجمالي المستحق',
-              'ج.م ${totalPrice.toStringAsFixed(2)}',
-              Icons.pending_actions,
-              Colors.orange,
-            ),
-            if (discount > 0)
-              _buildPaymentDetailRow(
-                'الخصم',
-                'ج.م ${discount.toStringAsFixed(2)}',
-                Icons.percent,
-                Colors.deepOrange,
-              ),
-            _buildPaymentDetailRow(
-              'المدفوع',
-              'ج.م ${paidAmount.toStringAsFixed(2)}',
-              Icons.attach_money,
-              Colors.green,
-            ),
-            _buildPaymentDetailRow(
-              'المتبقي',
-              'ج.م ${remainingAfter.toStringAsFixed(2)}',
-              Icons.check_circle,
-              remainingAfter > 0 ? Colors.red : Colors.green,
-            ),
-            if (employee != null)
-              _buildPaymentDetailRow(
-                'جامع المال',
-                employee['username'] ?? employee['name'] ?? 'غير معروف',
-                Icons.person,
-                Colors.brown,
-              ),
-            if (notes != null && notes.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.note, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 8),
-                    Expanded(
-      child: Text(
-                        'ملاحظات: $notes',
-                        style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentDetailRow(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
-          Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -872,169 +718,86 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
     );
   }
 
-  Widget _buildDistributionCard(Map<String, dynamic> distribution) {
-    final idStr = distribution['_id']?.toString() ?? '';
-    final distId = idStr.length >= 8
-        ? idStr.substring(0, 8)
-        : (idStr.isEmpty ? 'غير معروف' : idStr);
-    final createdAt = _formatDateTime(distribution['createdAt']);
-    final quantityValue = distribution['quantity'] ?? 0;
-    final netWeightValue = distribution['netWeight'] ?? 0;
-    final totalAmountValue = distribution['totalAmount'] ?? 0;
-
-    final quantity = quantityValue is num
-        ? quantityValue.toInt()
-        : (quantityValue is String ? int.tryParse(quantityValue) ?? 0 : 0);
-    final netWeight = netWeightValue is num
-        ? netWeightValue.toDouble()
-        : (netWeightValue is String
-              ? double.tryParse(netWeightValue) ?? 0.0
-              : 0.0);
-    final totalAmount = totalAmountValue is num
-        ? totalAmountValue.toDouble()
-        : (totalAmountValue is String
-              ? double.tryParse(totalAmountValue) ?? 0.0
-              : 0.0);
-    final employee = distribution['user'] ?? distribution['employee'];
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      child: Padding(
-      padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Colors.orange.withOpacity(0.1),
-                  child: const Icon(
-                    Icons.outbound,
-                    size: 16,
-                    color: Colors.orange,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                    'توزيع #$distId',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                  ),
-                ),
-                Text(
-                  createdAt,
-                        style: TextStyle(color: Colors.grey[600], fontSize: 11),
-                ),
-              ],
-            ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            _buildPaymentDetailRow(
-              'الكمية',
-              '$quantity وحدة',
-              Icons.inventory,
-              Colors.purple,
-            ),
-            _buildPaymentDetailRow(
-              'الوزن الصافي',
-              '${netWeight.toStringAsFixed(1)} كجم',
-              Icons.scale_outlined,
-              Colors.green,
-            ),
-            _buildPaymentDetailRow(
-              'إجمالي المبلغ',
-              'ج.م ${totalAmount.toStringAsFixed(2)}',
-              Icons.attach_money,
-              Colors.red,
-            ),
-            if (employee != null)
-              _buildPaymentDetailRow(
-                'الموظف',
-                (employee is Map<String, dynamic>
-                    ? (employee['username'] ?? employee['name'] ?? 'غير معروف')
-                    : employee.toString()),
-                Icons.person,
-                Colors.brown,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _navigateToDistributionDetails(Map<String, dynamic> distribution) {
-    // TODO: Navigate to distribution details page
-    // For now, show a dialog with distribution details
+  void _navigateToDistributionDetails(Map<String, dynamic> distribution) async {
+    // Show loading dialog first
     showDialog(
       context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: Text(
-            'تفاصيل التوزيع #${distribution['_id']?.toString().substring(0, 8) ?? 'غير معروف'}',
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-              _buildDetailRow(
-                'الكمية',
-                '${distribution['quantity'] ?? 0} وحدة',
-              ),
-              _buildDetailRow(
-                'الوزن القائم',
-                '${distribution['grossWeight'] ?? 0} كجم',
-              ),
-              _buildDetailRow(
-                'الوزن الفارغ',
-                '${distribution['emptyWeight'] ?? 0} كجم',
-              ),
-              _buildDetailRow(
-                'الوزن الصافي',
-                '${distribution['netWeight'] ?? 0} كجم',
-              ),
-              _buildDetailRow(
-                'سعر الكيلو',
-                'ج.م ${distribution['price'] ?? 0}',
-              ),
-              _buildDetailRow(
-                'إجمالي المبلغ',
-                'ج.م ${distribution['totalAmount'] ?? 0}',
-              ),
-              _buildDetailRow(
-                'تاريخ التوزيع',
-                _formatDateTime(
-                  distribution['distributionDate'] ?? distribution['createdAt'],
-                ),
-              ),
-              if (distribution['user'] != null)
-                _buildDetailRow(
-                  'الموظف',
-                  distribution['user']['username'] ??
-                      distribution['user']['name'] ??
-                      'غير معروف',
-                ),
-              ],
-            ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('إغلاق'),
-            ),
-          ],
-        ),
-      ),
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
+
+    try {
+      // Get detailed distribution data with debt information
+      final distributionId = distribution['_id']?.toString();
+      if (distributionId == null) {
+        Navigator.of(context).pop(); // Close loading dialog
+        _showErrorDialog('خطأ: معرف التوزيع غير صحيح');
+        return;
+      }
+
+      final detailedDistribution = await _distributionService
+          .getDistributionById(distributionId);
+
+      // Debug: Print the received data
+      print('Detailed Distribution Data: $detailedDistribution');
+      print(
+        'Outstanding Before: ${detailedDistribution['outstandingBeforeDistribution']}',
+      );
+      print(
+        'Outstanding After: ${detailedDistribution['outstandingAfterDistribution']}',
+      );
+      print('Total Amount: ${detailedDistribution['totalAmount']}');
+      print(
+        'Total Distributions Before: ${detailedDistribution['totalDistributionsBeforeThis']}',
+      );
+      print(
+        'Total Distributions Up To: ${detailedDistribution['totalDistributionsUpToThis']}',
+      );
+      print(
+        'Total Payments Up To: ${detailedDistribution['totalPaymentsUpToThis']}',
+      );
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show detailed distribution dialog
+      showDialog(
+        context: context,
+        builder: (context) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: Text('تفاصيل التوزيع #${distributionId.substring(0, 8)}'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Debt progression section
+                  _buildDebtProgressionSection(detailedDistribution),
+
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 16),
+
+                  // Distribution details section
+                  _buildDistributionDetailsSection(detailedDistribution),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('إغلاق'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+      _showErrorDialog('خطأ في تحميل تفاصيل التوزيع: $e');
+    }
   }
 
   void _navigateToPaymentDetails(Map<String, dynamic> payment) {
@@ -1052,12 +815,13 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildDetailRow('إسم الموظف', payment['user']['username']),
               _buildDetailRow(
                 'إجمالي المستحق',
                 'ج.م ${payment['totalPrice'] ?? 0}',
               ),
               _buildDetailRow(
-              'المدفوع',
+                'المدفوع',
                 'ج.م ${payment['paidAmount'] ?? payment['amount'] ?? 0}',
               ),
               _buildDetailRow('الخصم', 'ج.م ${payment['discount'] ?? 0}'),
@@ -1123,6 +887,213 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
       default:
         return method.isEmpty ? 'غير محدد' : method;
     }
+  }
+
+  Widget _buildDebtProgressionSection(Map<String, dynamic> distribution) {
+    final debtBefore = (distribution['outstandingBeforeDistribution'] ?? 0)
+        .toDouble();
+    final distributionAmount = (distribution['totalAmount'] ?? 0).toDouble();
+    final debtAfter = (distribution['outstandingAfterDistribution'] ?? 0)
+        .toDouble();
+
+    // Debug: Print the values being used
+    print('Debt Before: $debtBefore');
+    print('Distribution Amount: $distributionAmount');
+    print('Debt After: $debtAfter');
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.account_balance_wallet, color: Colors.blue, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'تطور المديونية',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Debt before
+          _buildDebtRow(
+            'المديونية قبل التوزيع',
+            debtBefore,
+            Icons.arrow_back,
+            Colors.orange,
+          ),
+
+          const SizedBox(height: 8),
+
+          // Distribution amount
+          _buildDebtRow(
+            'مبلغ التوزيع',
+            distributionAmount,
+            Icons.add,
+            Colors.red,
+          ),
+
+          const SizedBox(height: 8),
+
+          // Debt after
+          _buildDebtRow(
+            'المديونية بعد التوزيع',
+            debtAfter,
+            Icons.arrow_forward,
+            Colors.green,
+          ),
+
+          // Show calculation breakdown if values are 0
+          if (debtBefore == 0 && debtAfter == 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.yellow.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.yellow.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'تفاصيل الحساب:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'إجمالي التوزيعات قبل هذا التوزيع: ج.م ${distribution['totalDistributionsBeforeThis'] ?? 0}',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                  ),
+                  Text(
+                    'إجمالي المدفوعات حتى تاريخ التوزيع: ج.م ${distribution['totalPaymentsUpToThis'] ?? 0}',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                  ),
+                  Text(
+                    'المديونية قبل التوزيع = التوزيعات - المدفوعات = ج.م ${debtBefore.toStringAsFixed(2)}',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDebtRow(
+    String label,
+    double amount,
+    IconData icon,
+    Color color,
+  ) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+        const Spacer(),
+        Text(
+          'ج.م ${amount.toStringAsFixed(2)}',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDistributionDetailsSection(Map<String, dynamic> distribution) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.inventory, color: Colors.purple, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'تفاصيل التوزيع',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.purple,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        _buildDetailRow('الكمية', '${distribution['quantity'] ?? 0} وحدة'),
+        _buildDetailRow(
+          'الوزن القائم',
+          '${distribution['grossWeight'] ?? 0} كجم',
+        ),
+        _buildDetailRow(
+          'الوزن الفارغ',
+          '${distribution['emptyWeight'] ?? 0} كجم',
+        ),
+        _buildDetailRow(
+          'الوزن الصافي',
+          '${distribution['netWeight'] ?? 0} كجم',
+        ),
+        _buildDetailRow('سعر الكيلو', 'ج.م ${distribution['price'] ?? 0}'),
+        _buildDetailRow(
+          'إجمالي المبلغ',
+          'ج.م ${distribution['totalAmount'] ?? 0}',
+        ),
+        _buildDetailRow(
+          'تاريخ التوزيع',
+          _formatDateTime(
+            distribution['distributionDate'] ?? distribution['createdAt'],
+          ),
+        ),
+        if (distribution['user'] != null)
+          _buildDetailRow(
+            'الموظف',
+            distribution['user']['username'] ??
+                distribution['user']['name'] ??
+                'غير معروف',
+          ),
+      ],
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('خطأ'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('موافق'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

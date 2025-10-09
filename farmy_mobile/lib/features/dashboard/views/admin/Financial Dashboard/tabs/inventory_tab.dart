@@ -4,7 +4,9 @@ import 'dart:ui' as ui show TextDirection;
 import '../../../../../../core/di/service_locator.dart';
 import '../../../../../../core/services/inventory_api_service.dart';
 import '../../../../../../core/services/payment_api_service.dart';
-import '../../../../../../features/authentication/services/token_service.dart';
+import '../../../../../../core/services/distribution_api_service.dart';
+import 'loading_details_page.dart';
+import 'distribution_details_page.dart';
 
 class InventoryTab extends StatefulWidget {
   const InventoryTab({super.key});
@@ -17,34 +19,21 @@ class _InventoryTabState extends State<InventoryTab> {
   final InventoryApiService _inventoryApi =
       serviceLocator<InventoryApiService>();
   final PaymentApiService _paymentApi = serviceLocator<PaymentApiService>();
-  final TokenService _tokenService = serviceLocator<TokenService>();
+  final DistributionApiService _distributionApi =
+      serviceLocator<DistributionApiService>();
 
   DateTime _selectedDate = DateTime.now();
   bool _loading = false;
   Map<String, dynamic>? _data;
   num _discountsTotal = 0;
-  String? _userRole;
+  Map<String, dynamic>? _shortageData;
 
   final TextEditingController _adjController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _loadUserRole();
     _fetch();
-  }
-
-  Future<void> _loadUserRole() async {
-    try {
-      final user = await _tokenService.getUser();
-      if (user != null) {
-        setState(() {
-          _userRole = user.role;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
   }
 
   @override
@@ -74,6 +63,17 @@ class _InventoryTabState extends State<InventoryTab> {
       final String dateStr = _formatDate(_selectedDate);
       final data = await _inventoryApi.getDailyInventoryByDate(dateStr);
       final profit = await _inventoryApi.getDailyProfit(dateStr);
+
+      // Load shortage data
+      Map<String, dynamic>? shortageData;
+      try {
+        shortageData = await _distributionApi.getDistributionShortages(
+          _selectedDate,
+        );
+      } catch (e) {
+        debugPrint('[InventoryTab] Failed to load shortage data: $e');
+      }
+
       // Compute total discounts for payments on selected date
       num discountsTotal = 0;
       try {
@@ -114,6 +114,7 @@ class _InventoryTabState extends State<InventoryTab> {
           'loadingPricesSum': profit['loadingPricesSum'],
         };
         _discountsTotal = discountsTotal;
+        _shortageData = shortageData;
         // If backend has a saved adjustment, reflect it; otherwise start from 0
         final num backendAdj = (data['adminAdjustment'] ?? 0) as num;
         _adjController.text = backendAdj.toString();
@@ -268,19 +269,43 @@ class _InventoryTabState extends State<InventoryTab> {
                       // Net loading (read-only)
                       _SectionLabel('وزن صافي التحميل'),
                       const SizedBox(height: 8),
-                      _MetricTile(
-                        label: 'وزن صافي التحميل',
-                        value: netLoading,
-                        color: Colors.blue,
+                      InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => LoadingDetailsPage(
+                                date: _formatDate(_selectedDate),
+                                totalNetWeight: netLoading,
+                              ),
+                            ),
+                          );
+                        },
+                        child: _MetricTile(
+                          label: 'وزن صافي التحميل',
+                          value: netLoading,
+                          color: Colors.blue,
+                        ),
                       ),
 
                       const SizedBox(height: 16),
                       _SectionLabel('وزن صافي التوزيع (محسوب تلقائياً)'),
                       const SizedBox(height: 8),
-                      _MetricTile(
-                        label: 'وزن صافي التوزيع',
-                        value: netDist,
-                        color: Colors.orange,
+                      InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => DistributionDetailsPage(
+                                date: _formatDate(_selectedDate),
+                                totalNetWeight: netDist,
+                              ),
+                            ),
+                          );
+                        },
+                        child: _MetricTile(
+                          label: 'وزن صافي التوزيع',
+                          value: netDist,
+                          color: Colors.orange,
+                        ),
                       ),
 
                       const SizedBox(height: 16),
@@ -382,6 +407,51 @@ class _InventoryTabState extends State<InventoryTab> {
                   ),
                 ),
               ),
+
+              // Shortage Information Section
+              if (_shortageData != null &&
+                  (_shortageData!['totalShortages'] as num) > 0) ...[
+                const SizedBox(height: 16),
+                Card(
+                  color: Colors.red[50],
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.warning, color: Colors.red[700]),
+                            const SizedBox(width: 8),
+                            Text(
+                              'العجز في التوزيعات',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red[700],
+                                fontSize: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'عدد أنواع الفراخ التي بها عجز: ${_shortageData!['totalShortages']}',
+                          style: TextStyle(
+                            color: Colors.red[600],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ...(_shortageData!['shortagesByChickenType'] as List)
+                            .map(
+                              (shortage) => _ShortageCard(shortage: shortage),
+                            )
+                            .toList(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -406,11 +476,23 @@ class _MetricTile extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border.all(color: color.withOpacity(0.4)),
         borderRadius: BorderRadius.circular(8),
+        color: color.withOpacity(0.05),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: color)),
+          Row(
+            children: [
+              Expanded(
+                child: Text(label, style: TextStyle(color: color)),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: color.withOpacity(0.7),
+              ),
+            ],
+          ),
           const SizedBox(height: 6),
           Text(
             NumberFormat('#,##0.###').format(value),
@@ -573,6 +655,196 @@ class _ReadOnlyNumberField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
+      ),
+    );
+  }
+}
+
+class _ShortageCard extends StatelessWidget {
+  final Map<String, dynamic> shortage;
+
+  const _ShortageCard({required this.shortage});
+
+  @override
+  Widget build(BuildContext context) {
+    final chickenTypeName = shortage['chickenTypeName'] ?? 'غير محدد';
+    final availableQuantity = (shortage['availableQuantity'] ?? 0) as num;
+    final availableNetWeight = (shortage['availableNetWeight'] ?? 0) as num;
+    final distributedQuantity = (shortage['distributedQuantity'] ?? 0) as num;
+    final distributedNetWeight = (shortage['distributedNetWeight'] ?? 0) as num;
+    final quantityShortage = (shortage['quantityShortage'] ?? 0) as num;
+    final netWeightShortage = (shortage['netWeightShortage'] ?? 0) as num;
+    final distributions = (shortage['distributions'] ?? []) as List;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red[300]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.pets, color: Colors.red[600], size: 20),
+              const SizedBox(width: 8),
+              Text(
+                chickenTypeName,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red[700],
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Available vs Distributed comparison
+          Row(
+            children: [
+              Expanded(
+                child: _ShortageInfoTile(
+                  title: 'المتاح',
+                  quantity: availableQuantity,
+                  netWeight: availableNetWeight,
+                  color: Colors.green,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _ShortageInfoTile(
+                  title: 'الموزع',
+                  quantity: distributedQuantity,
+                  netWeight: distributedNetWeight,
+                  color: Colors.blue,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Shortage amounts
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.red[100],
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red[700], size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'العجز: ${quantityShortage.toInt()} عدد - ${netWeightShortage.toStringAsFixed(2)} كجم',
+                    style: TextStyle(
+                      color: Colors.red[700],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Distribution details
+          if (distributions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'تفاصيل التوزيعات:',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...distributions
+                .map(
+                  (dist) => Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.person, size: 14, color: Colors.grey[600]),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${dist['customer']} - ${dist['quantity']} عدد - ${(dist['netWeight'] as num).toStringAsFixed(2)} كجم - ${NumberFormat('#,##0.###').format(dist['totalAmount'])} ج.م',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ShortageInfoTile extends StatelessWidget {
+  final String title;
+  final num quantity;
+  final num netWeight;
+  final Color color;
+
+  const _ShortageInfoTile({
+    required this.title,
+    required this.quantity,
+    required this.netWeight,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${quantity.toInt()} عدد',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 11,
+            ),
+          ),
+          Text(
+            '${netWeight.toStringAsFixed(2)} كجم',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 11,
+            ),
+          ),
+        ],
       ),
     );
   }

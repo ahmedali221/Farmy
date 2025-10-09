@@ -1,8 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/distribution_api_service.dart';
 import '../../../../core/services/inventory_api_service.dart';
+import '../../../../core/utils/pdf_arabic_utils.dart';
 
 class DistributionHistoryView extends StatefulWidget {
   const DistributionHistoryView({super.key});
@@ -115,14 +120,18 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
   double _calculateTotalWeight() {
     return _filteredDistributions.fold<double>(0.0, (sum, distribution) {
       final netWeight = (distribution['netWeight'] ?? 0) as num;
+      // Use the exact value without rounding
       return sum + netWeight.toDouble();
     });
   }
 
   double _calculateTotalValue() {
     return _filteredDistributions.fold<double>(0.0, (sum, distribution) {
-      final totalAmount = (distribution['totalAmount'] ?? 0) as num;
-      return sum + totalAmount.toDouble();
+      // Calculate the value directly from the form values
+      final grossWeight = (distribution['grossWeight'] ?? 0) as num;
+      final price = (distribution['price'] ?? 0) as num;
+      // Use the exact values as written in the form
+      return sum + (grossWeight.toDouble() * price.toDouble());
     });
   }
 
@@ -843,7 +852,7 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
               ),
             ),
             title: const Text('سعر الكيلو'),
-            subtitle: Text('${price.toDouble().toStringAsFixed(0)} ج.م/كجم'),
+            subtitle: Text('${price.toDouble()} ج.م/كجم'),
             dense: true,
           ),
         ],
@@ -856,12 +865,290 @@ class _DistributionDetailsPage extends StatelessWidget {
   final Map<String, dynamic> distribution;
   const _DistributionDetailsPage({required this.distribution});
 
+  String _formatDateTime(String? dateTime) {
+    if (dateTime == null) return 'غير معروف';
+    try {
+      final dt = DateTime.parse(dateTime);
+      return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return 'تاريخ غير صحيح';
+    }
+  }
+
+  String _buildDistributionHtml() {
+    final netWeight = (distribution['netWeight'] ?? 0) as num;
+    final totalAmount = (distribution['totalAmount'] ?? 0) as num;
+    final grossWeight = (distribution['grossWeight'] ?? 0) as num;
+    final quantity = (distribution['quantity'] ?? 0) as num;
+    final price = (distribution['price'] ?? 0) as num;
+    final orderId =
+        distribution['_id']?.toString().substring(0, 8) ?? 'غير معروف';
+    final createdAt = _formatDateTime(
+      distribution['createdAt'] ?? distribution['distributionDate'],
+    );
+    final customerName = distribution['customer']?['name'] ?? 'غير معروف';
+    final userName = distribution['user']?['username'] ?? 'غير معروف';
+
+    return '''
+      <div style="padding: 20px; max-width: 800px; margin: 0 auto;">
+        <h1 style="text-align: center; color: #2e7d32;">تفاصيل طلب التوزيع</h1>
+        <hr style="border: 1px solid #2e7d32; margin: 20px 0;">
+        
+        <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <h2 style="margin: 0 0 10px 0;">معلومات الطلب</h2>
+          <p><strong>رقم الطلب:</strong> #$orderId</p>
+          <p><strong>التاريخ:</strong> $createdAt</p>
+          <p style="font-size: 18px; color: #2e7d32;"><strong>إجمالي المبلغ:</strong> ${totalAmount.toDouble().toStringAsFixed(0)} ج.م</p>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <h3 style="background: #f5f5f5; padding: 10px; border-radius: 5px;">معلومات العميل والموظف</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>العميل:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">$customerName</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>المستخدم:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">$userName</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <h3 style="background: #f5f5f5; padding: 10px; border-radius: 5px;">تفاصيل التوزيع</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>الكمية:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${quantity.toInt()} وحدة</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>الوزن القائم:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${grossWeight.toDouble().toStringAsFixed(1)} كجم</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>الوزن الصافي:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${netWeight.toDouble().toStringAsFixed(1)} كجم</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>سعر الكيلو:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${price.toDouble()} ج.م/كجم</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #2e7d32;">
+          <p style="color: #666; font-size: 12px;">تم إنشاء هذا التقرير من نظام إدارة المزرعة</p>
+        </div>
+      </div>
+    ''';
+  }
+
+  Future<void> _printPdf(BuildContext context) async {
+    try {
+      final html = _buildDistributionHtml();
+      await PdfArabicUtils.printArabicHtml(htmlBody: html);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل الطباعة: $e')));
+      }
+    }
+  }
+
+  Future<void> _sharePdf(BuildContext context) async {
+    try {
+      final html = _buildDistributionHtml();
+      final pdfBytes = await PdfArabicUtils.generateArabicHtmlPdf(
+        htmlBody: html,
+      );
+
+      final tempDir = await getTemporaryDirectory();
+      final orderId =
+          distribution['_id']?.toString().substring(0, 8) ?? 'unknown';
+      final customerName =
+          distribution['customer']?['name'] ?? 'عميل غير معروف';
+      final createdAt = _formatDateTime(
+        distribution['createdAt'] ?? distribution['distributionDate'],
+      );
+      final dateStr = createdAt
+          .replaceAll('/', '-')
+          .replaceAll(' ', '_')
+          .replaceAll(':', '-');
+      final fileName = 'توزيع_${customerName}_$dateStr.pdf';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(pdfBytes);
+
+      if (!context.mounted) return;
+
+      // Show share options dialog
+      await showModalBottomSheet(
+        context: context,
+        builder: (ctx) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'مشاركة PDF عبر',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFF25D366),
+                    child: Image.asset(
+                      'assets/whatsapp_icon.png',
+                      width: 24,
+                      height: 24,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.chat, color: Colors.white),
+                    ),
+                  ),
+                  title: const Text('واتساب'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _shareViaWhatsApp(context, file, orderId);
+                  },
+                ),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFF0088CC),
+                    child: Icon(Icons.telegram, color: Colors.white),
+                  ),
+                  title: const Text('تيليجرام'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _shareViaTelegram(context, file, orderId);
+                  },
+                ),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Colors.blue,
+                    child: Icon(Icons.share, color: Colors.white),
+                  ),
+                  title: const Text('تطبيقات أخرى'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await Share.shareXFiles([
+                      XFile(file.path),
+                    ], text: 'تفاصيل طلب التوزيع #$orderId');
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل المشاركة: $e')));
+      }
+    }
+  }
+
+  Future<void> _shareViaWhatsApp(
+    BuildContext context,
+    File file,
+    String orderId,
+  ) async {
+    try {
+      // Try to share directly via WhatsApp using share_plus with result
+      final customerName =
+          distribution['customer']?['name'] ?? 'عميل غير معروف';
+      final result = await Share.shareXFiles([
+        XFile(file.path),
+      ], text: 'تفاصيل طلب التوزيع - $customerName');
+
+      // If sharing was successful, try to open WhatsApp explicitly
+      if (result.status == ShareResultStatus.success) {
+        // Try WhatsApp scheme
+        final whatsappUrl = Uri.parse('whatsapp://send');
+        if (await canLaunchUrl(whatsappUrl)) {
+          await launchUrl(whatsappUrl);
+        }
+      } else {
+        // Fallback: try to open WhatsApp directly
+        final whatsappUrl = Uri.parse('whatsapp://send');
+        if (await canLaunchUrl(whatsappUrl)) {
+          await launchUrl(whatsappUrl);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('قم بإرفاق الملف من معرض الصور')),
+            );
+          }
+        } else {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('واتساب غير مثبت على هذا الجهاز')),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل المشاركة عبر واتساب: $e')));
+      }
+    }
+  }
+
+  Future<void> _shareViaTelegram(
+    BuildContext context,
+    File file,
+    String orderId,
+  ) async {
+    try {
+      // Share the file first
+      final customerName =
+          distribution['customer']?['name'] ?? 'عميل غير معروف';
+      await Share.shareXFiles([
+        XFile(file.path),
+      ], text: 'تفاصيل طلب التوزيع - $customerName');
+
+      // Try to open Telegram
+      final telegramUrl = Uri.parse('tg://');
+      if (await canLaunchUrl(telegramUrl)) {
+        await launchUrl(telegramUrl);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تيليجرام غير مثبت على هذا الجهاز')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('فشل المشاركة عبر تيليجرام: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('تفاصيل طلب التوزيع')),
+        appBar: AppBar(
+          title: const Text('تفاصيل طلب التوزيع'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.print),
+              tooltip: 'طباعة',
+              onPressed: () => _printPdf(context),
+            ),
+          ],
+        ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: _DistributionHistoryViewState()._buildDistributionCard(

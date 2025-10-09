@@ -16,12 +16,35 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
   List<Map<String, dynamic>> customers = [];
   List<Map<String, dynamic>> distributions = [];
   List<Map<String, dynamic>> payments = [];
+  List<Map<String, dynamic>> filteredCustomers = [];
   bool isLoading = true;
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _searchController.addListener(_filterCustomers);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterCustomers() {
+    final query = _searchController.text.trim().toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        filteredCustomers = customers;
+      } else {
+        filteredCustomers = customers.where((customer) {
+          final name = customer['name']?.toString().toLowerCase() ?? '';
+          return name.contains(query);
+        }).toList();
+      }
+    });
   }
 
   Future<void> _loadData() async {
@@ -31,7 +54,6 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
       final distributionService = serviceLocator<DistributionApiService>();
       final paymentService = serviceLocator<PaymentApiService>();
 
-      // Load all data in parallel
       final results = await Future.wait([
         customerService.getAllCustomers(),
         distributionService.getAllDistributions(),
@@ -42,6 +64,7 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
         customers = results[0];
         distributions = results[1];
         payments = results[2];
+        filteredCustomers = customers;
       });
 
       setState(() => isLoading = false);
@@ -151,199 +174,241 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
               ),
             ],
           ),
-          body: isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : customers.isEmpty
-              ? const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.people_outline, size: 64, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text('لا توجد عملاء', style: TextStyle(fontSize: 18)),
-                    ],
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    labelText: 'البحث باسم العميل',
+                    prefixIcon: const Icon(Icons.search),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              _filterCustomers();
+                            },
+                          )
+                        : null,
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: customers.length,
-                  itemBuilder: (context, index) {
-                    final customer = customers[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.green,
-                          child: Text(
-                            (customer['name']?.toString() ?? 'ع')
-                                .substring(0, 1)
-                                .toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          customer['name']?.toString() ?? 'غير معروف',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'الهاتف: ${customer['contactInfo']?['phone']?.toString() ?? 'غير متوفر'}',
-                            ),
-                            Text(
-                              'العنوان: ${customer['contactInfo']?['address']?.toString() ?? 'غير متوفر'}',
-                            ),
-                            Builder(
-                              builder: (context) {
-                                final customerStats = _getCustomerStats(
-                                  customer['_id'],
-                                );
-                                final remaining =
-                                    customerStats['remaining'] ?? 0.0;
-                                final totalDistributions =
-                                    customerStats['totalDistributions'] ?? 0;
-                                final totalPayments =
-                                    customerStats['totalPayments'] ?? 0;
-
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          remaining > 0
-                                              ? Icons.pending_actions
-                                              : Icons.check_circle,
-                                          size: 16,
-                                          color: remaining > 0
-                                              ? Colors.red
-                                              : Colors.green,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          remaining > 0
-                                              ? 'متبقي: ج.م ${remaining.toStringAsFixed(2)}'
-                                              : 'مدفوع بالكامل',
-                                          style: TextStyle(
-                                            color: remaining > 0
-                                                ? Colors.red
-                                                : Colors.green,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 4,
-                                      children: [
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.outbound,
-                                              size: 14,
-                                              color: Colors.orange,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'توزيعات: $totalDistributions',
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                color: Colors.orange,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.payment,
-                                              size: 14,
-                                              color: Colors.green,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'مدفوعات: $totalPayments',
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                color: Colors.green,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.history, size: 20),
-                              onPressed: () =>
-                                  _navigateToCustomerHistory(context, customer),
-                              tooltip: 'السجل التاريخي الكامل',
-                            ),
-                            PopupMenuButton(
-                              itemBuilder: (context) => [
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.edit, size: 20),
-                                      SizedBox(width: 8),
-                                      Text('تعديل'),
-                                    ],
-                                  ),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.delete,
-                                        size: 20,
-                                        color: Colors.red,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'حذف',
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                              onSelected: (value) {
-                                if (value == 'edit') {
-                                  _showEditCustomerDialog(customer);
-                                } else if (value == 'delete') {
-                                  _deleteCustomer(
-                                    customer['_id'],
-                                    customer['name']?.toString() ?? 'غير معروف',
-                                  );
-                                }
-                              },
-                            ),
-                          ],
-                        ),
-                        isThreeLine: true,
-                      ),
-                    );
-                  },
                 ),
+              ),
+              Expanded(
+                child: isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : filteredCustomers.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.people_outline,
+                              size: 64,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'لا توجد عملاء',
+                              style: TextStyle(fontSize: 18),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: filteredCustomers.length,
+                        itemBuilder: (context, index) {
+                          final customer = filteredCustomers[index];
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.green,
+                                child: Text(
+                                  (customer['name']?.toString() ?? 'ع')
+                                      .substring(0, 1)
+                                      .toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                customer['name']?.toString() ?? 'غير معروف',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'الهاتف: ${customer['contactInfo']?['phone']?.toString() ?? 'غير متوفر'}',
+                                  ),
+                                  Text(
+                                    'العنوان: ${customer['contactInfo']?['address']?.toString() ?? 'غير متوفر'}',
+                                  ),
+                                  Builder(
+                                    builder: (context) {
+                                      final customerStats = _getCustomerStats(
+                                        customer['_id'],
+                                      );
+                                      final remaining =
+                                          customerStats['remaining'] ?? 0.0;
+                                      final totalDistributions =
+                                          customerStats['totalDistributions'] ??
+                                          0;
+                                      final totalPayments =
+                                          customerStats['totalPayments'] ?? 0;
+
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                remaining > 0
+                                                    ? Icons.pending_actions
+                                                    : Icons.check_circle,
+                                                size: 16,
+                                                color: remaining > 0
+                                                    ? Colors.red
+                                                    : Colors.green,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                remaining > 0
+                                                    ? 'متبقي: ج.م ${remaining.toStringAsFixed(2)}'
+                                                    : 'مدفوع بالكامل',
+                                                style: TextStyle(
+                                                  color: remaining > 0
+                                                      ? Colors.red
+                                                      : Colors.green,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 4,
+                                            children: [
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.outbound,
+                                                    size: 14,
+                                                    color: Colors.orange,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    'توزيعات: $totalDistributions',
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.orange,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.payment,
+                                                    size: 14,
+                                                    color: Colors.green,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    'مدفوعات: $totalPayments',
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.green,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.history, size: 20),
+                                    onPressed: () => _navigateToCustomerHistory(
+                                      context,
+                                      customer,
+                                    ),
+                                    tooltip: 'السجل التاريخي الكامل',
+                                  ),
+                                  PopupMenuButton(
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit, size: 20),
+                                            SizedBox(width: 8),
+                                            Text('تعديل'),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.delete,
+                                              size: 20,
+                                              color: Colors.red,
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'حذف',
+                                              style: TextStyle(
+                                                color: Colors.red,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                    onSelected: (value) {
+                                      if (value == 'edit') {
+                                        _showEditCustomerDialog(customer);
+                                      } else if (value == 'delete') {
+                                        _deleteCustomer(
+                                          customer['_id'],
+                                          customer['name']?.toString() ??
+                                              'غير معروف',
+                                        );
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                              isThreeLine: true,
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
           floatingActionButton: FloatingActionButton(
             onPressed: _showAddCustomerDialog,
             child: const Icon(Icons.add),
@@ -426,17 +491,14 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
       };
     }
 
-    // Get customer distributions
     final customerDistributions = distributions
         .where((dist) => dist['customer']?['_id'] == customerId)
         .toList();
 
-    // Get customer payments
     final customerPayments = payments
         .where((payment) => payment['customer']?['_id'] == customerId)
         .toList();
 
-    // Calculate totals
     final totalValue = customerDistributions.fold(0.0, (sum, dist) {
       final amount = dist['totalAmount'];
       if (amount is num) {
@@ -467,8 +529,6 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
       'totalPayments': customerPayments.length,
     };
   }
-
-  // Removed navigate to loading orders per request
 
   void _navigateToCustomerHistory(
     BuildContext context,
@@ -523,10 +583,10 @@ class _CustomerFormDialogState extends State<_CustomerFormDialog> {
           'phone': _phoneController.text.trim(),
           'address': _addressController.text.trim(),
         },
-        'outstandingDebts': 0, // Default value
-        'orders': [], // Default empty array
-        'payments': [], // Default empty array
-        'receipts': [], // Default empty array
+        'outstandingDebts': 0,
+        'orders': [],
+        'payments': [],
+        'receipts': [],
       };
       widget.onSave(customerData);
       Navigator.of(context).pop();

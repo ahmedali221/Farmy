@@ -24,11 +24,12 @@ class DistributionApiService {
   ///
   /// Required fields:
   /// - customer: ID of the customer (العميل)
+  /// - chickenType: ID of the chicken type (نوع الفراخ)
+  /// - sourceLoading: ID of the source loading order (طلب التحميل المصدر)
   /// - quantity: Number of units (الكمية)
   /// - grossWeight: Gross weight in kg (الوزن القائم)
   /// - price: Price per kg (سعر الكيلو)
   /// - distributionDate: Distribution date (تاريخ التوزيع)
-  /// - notes: Optional notes (ملاحظات)
   ///
   /// Auto-calculated by backend (do NOT send from frontend):
   /// - emptyWeight = quantity * 8
@@ -166,6 +167,11 @@ class DistributionApiService {
   }
 
   /// Get distribution by ID
+  ///
+  /// Returns a Map containing:
+  /// - All standard distribution fields
+  /// - outstandingBeforeDistribution: Customer's outstanding debts before this distribution
+  /// - outstandingAfterDistribution: Customer's outstanding debts after this distribution
   Future<Map<String, dynamic>> getDistributionById(String id) async {
     try {
       final headers = await _getAuthHeaders();
@@ -176,6 +182,11 @@ class DistributionApiService {
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
+      } else if (response.statusCode == 404) {
+        throw ApiException(
+          message: 'Distribution not found',
+          statusCode: response.statusCode,
+        );
       } else {
         throw ApiException(
           message: 'Failed to load distribution',
@@ -260,6 +271,130 @@ class DistributionApiService {
     }
   }
 
+  /// Get available loadings for distribution
+  ///
+  /// Parameters:
+  /// - date: The distribution date
+  /// - chickenType: The chicken type ID
+  Future<List<Map<String, dynamic>>> getAvailableLoadings(
+    DateTime date,
+    String chickenType,
+  ) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/distributions/available-loadings?date=${date.toIso8601String()}&chickenType=$chickenType',
+        ),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load available loadings',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get chicken types that have loadings on a specific date
+  ///
+  /// Parameters:
+  /// - date: The distribution date
+  Future<List<Map<String, dynamic>>> getAvailableChickenTypes(
+    DateTime date,
+  ) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/distributions/available-chicken-types?date=${date.toIso8601String()}',
+        ),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load available chicken types',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get available quantities for a specific chicken type on a date
+  ///
+  /// Parameters:
+  /// - date: The distribution date
+  /// - chickenType: The chicken type ID
+  Future<Map<String, dynamic>> getAvailableQuantities(
+    DateTime date,
+    String chickenType,
+  ) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/distributions/available-quantities?date=${date.toIso8601String()}&chickenType=$chickenType',
+        ),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw ApiException(
+          message: 'Failed to load available quantities',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get distribution shortages for a specific date
+  ///
+  /// Parameters:
+  /// - date: The distribution date
+  Future<Map<String, dynamic>> getDistributionShortages(DateTime date) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/distributions/distribution-shortages?date=${date.toIso8601String()}',
+        ),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw ApiException(
+          message: 'Failed to load distribution shortages',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
   /// Get daily net weight for distributions
   Future<Map<String, dynamic>> getDailyNetWeight(DateTime date) async {
     try {
@@ -276,6 +411,30 @@ class DistributionApiService {
       } else {
         throw ApiException(
           message: 'Failed to load daily net weight',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
+  /// Get distributions by date
+  Future<List<Map<String, dynamic>>> getDistributionsByDate(String date) async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/distributions/by-date?date=$date'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load distributions by date',
           statusCode: response.statusCode,
         );
       }
