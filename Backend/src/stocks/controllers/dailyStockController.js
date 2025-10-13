@@ -3,6 +3,8 @@ const Loading = require('../../loadings/models/loading');
 const Distribution = require('../../distributions/models/Distribution');
 const Payment = require('../../payments/models/Payment');
 const EmployeeExpense = require('../../employeeExpenses/models/EmployeeExpense');
+const DailyWaste = require('../../waste/models/DailyWaste');
+const ChickenType = require('../../managers/models/ChickenType');
 const logger = require('../../utils/logger');
 
 function normalizeDate(d) {
@@ -142,12 +144,13 @@ exports.getByDate = async (req, res) => {
 };
 
 // Daily profit:
-// الربح اليومي = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل − إجمالي المصروفات - مصروفات التحميل
+// الربح اليومي = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل − إجمالي المصروفات - مصروفات التحميل - تكلفة الهالك
 // Where:
 // - مبلغ إجمالي الوجبات: sum of distributions totalAmount for the day
 // - مبلغ إجمالي التحميل: sum of loadings totalLoading for the day
 // - إجمالي ما تم خصمه: sum of payments.discount for the day
 // - مصروفات التحميل: sum of employeeExpenses.value for the day
+// - تكلفة الهالك: sum of waste netWeight * average price for the day
 exports.getDailyProfit = async (req, res) => {
   try {
     const { date } = req.query;
@@ -190,7 +193,26 @@ exports.getDailyProfit = async (req, res) => {
     ]);
     const loadingPricesSum = (loadPriceAgg[0]?.totalPrice) || 0;
 
-    const profit = distributionsTotal - loadingsTotal - expensesTotal - loadingPricesSum;
+    // Calculate waste cost for the day
+    let wasteCost = 0;
+    try {
+      const wasteData = await DailyWaste.find({
+        date: { $gte: d, $lt: nextDay }
+      }).populate('chickenType', 'price');
+
+      for (const waste of wasteData) {
+        if (waste.chickenType && waste.totalWasteNetWeight > 0) {
+          // Calculate cost based on chicken type price per kg
+          const pricePerKg = waste.chickenType.price || 0;
+          wasteCost += waste.totalWasteNetWeight * pricePerKg;
+        }
+      }
+    } catch (wasteError) {
+      logger.warn(`Failed to calculate waste cost: ${wasteError.message}`);
+      // Continue without waste cost if calculation fails
+    }
+
+    const profit = distributionsTotal - loadingsTotal - expensesTotal - loadingPricesSum - wasteCost;
 
     return res.json({
       date: d,
@@ -199,6 +221,7 @@ exports.getDailyProfit = async (req, res) => {
       loadingsTotal,
       expensesTotal,
       loadingPricesSum,
+      wasteCost,
     });
   } catch (err) {
     return res.status(500).json({ message: 'Server error' });

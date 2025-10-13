@@ -243,7 +243,11 @@ class _DistributionViewState extends State<DistributionView> {
                       style: pw.TextStyle(font: ttf, fontSize: 16),
                     ),
                     pw.Text(
-                      'التاريخ: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+                      'نوع الفراخ: ${_selectedChickenType?['name'] ?? 'غير محدد'}',
+                      style: pw.TextStyle(font: ttf, fontSize: 16),
+                    ),
+                    pw.Text(
+                      'التاريخ: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year} - ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
                       style: pw.TextStyle(font: ttf, fontSize: 16),
                     ),
                     pw.SizedBox(height: 16),

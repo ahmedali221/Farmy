@@ -275,7 +275,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
 <div dir="rtl" style="font-family: NotoArabic, sans-serif;">
   <div style="display:flex;justify-content:space-between;align-items:center;background:#e3f2fd;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
     <div style="font-weight:700;font-size:18px;color:#0d47a1;">$appName</div>
-    <div style="font-size:12px;color:#0d47a1;">${now.day}/${now.month}/${now.year} ${now.hour}:${now.minute.toString().padLeft(2, '0')}</div>
+    <div style="font-size:12px;color:#0d47a1;">${now.day}/${now.month}/${now.year} - ${now.hour}:${now.minute.toString().padLeft(2, '0')}</div>
   </div>
   <h2 style="margin:6px 0 10px 0;">إيصال تحميل</h2>
   <div style="border:1px solid #e0e0e0;border-radius:8px;padding:10px;margin-bottom:12px;background:#fafafa;">

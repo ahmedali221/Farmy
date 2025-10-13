@@ -5,6 +5,7 @@ import '../../../../../../core/di/service_locator.dart';
 import '../../../../../../core/services/inventory_api_service.dart';
 import '../../../../../../core/services/payment_api_service.dart';
 import '../../../../../../core/services/distribution_api_service.dart';
+import '../../../../../../core/services/waste_api_service.dart';
 import 'loading_details_page.dart';
 import 'distribution_details_page.dart';
 
@@ -21,12 +22,14 @@ class _InventoryTabState extends State<InventoryTab> {
   final PaymentApiService _paymentApi = serviceLocator<PaymentApiService>();
   final DistributionApiService _distributionApi =
       serviceLocator<DistributionApiService>();
+  final WasteApiService _wasteApi = serviceLocator<WasteApiService>();
 
   DateTime _selectedDate = DateTime.now();
   bool _loading = false;
   Map<String, dynamic>? _data;
   num _discountsTotal = 0;
   Map<String, dynamic>? _shortageData;
+  Map<String, dynamic>? _wasteData;
 
   final TextEditingController _adjController = TextEditingController();
 
@@ -74,6 +77,14 @@ class _InventoryTabState extends State<InventoryTab> {
         debugPrint('[InventoryTab] Failed to load shortage data: $e');
       }
 
+      // Load waste data
+      Map<String, dynamic>? wasteData;
+      try {
+        wasteData = await _wasteApi.getWasteByDate(dateStr);
+      } catch (e) {
+        debugPrint('[InventoryTab] Failed to load waste data: $e');
+      }
+
       // Compute total discounts for payments on selected date
       num discountsTotal = 0;
       try {
@@ -112,9 +123,11 @@ class _InventoryTabState extends State<InventoryTab> {
           'loadingsTotal': profit['loadingsTotal'],
           'expensesTotal': profit['expensesTotal'],
           'loadingPricesSum': profit['loadingPricesSum'],
+          'wasteCost': profit['wasteCost'] ?? 0,
         };
         _discountsTotal = discountsTotal;
         _shortageData = shortageData;
+        _wasteData = wasteData;
         // If backend has a saved adjustment, reflect it; otherwise start from 0
         final num backendAdj = (data['adminAdjustment'] ?? 0) as num;
         _adjController.text = backendAdj.toString();
@@ -220,6 +233,7 @@ class _InventoryTabState extends State<InventoryTab> {
     final num loadingsTotal = (_data?['loadingsTotal'] ?? 0) as num;
     final num expensesTotal = (_data?['expensesTotal'] ?? 0) as num;
     final num loadingPricesSum = (_data?['loadingPricesSum'] ?? 0) as num;
+    final num wasteCost = (_data?['wasteCost'] ?? 0) as num;
     final num profit = (_data?['profit'] ?? 0) as num;
 
     return Directionality(
@@ -392,13 +406,14 @@ class _InventoryTabState extends State<InventoryTab> {
                                 expensesTotal: expensesTotal,
                                 loadingPricesSum: loadingPricesSum,
                                 discountsTotal: _discountsTotal,
+                                wasteCost: wasteCost,
                               ),
                             ),
                           );
                         },
                         child: _MetricTile(
                           label:
-                              'الربح = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل - إجمالي المصروفات - مصروفات التحميل',
+                              'الربح = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل - إجمالي المصروفات - مصروفات التحميل - تكلفة الهالك',
                           value: profit,
                           color: Colors.teal,
                         ),
@@ -446,6 +461,53 @@ class _InventoryTabState extends State<InventoryTab> {
                             .map(
                               (shortage) => _ShortageCard(shortage: shortage),
                             )
+                            .toList(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
+              // Waste Information Section
+              if (_wasteData != null &&
+                  _wasteData!['wasteByChickenType'] != null &&
+                  (_wasteData!['wasteByChickenType'] as List).isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Card(
+                  color: Colors.orange[50],
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.delete_outline,
+                              color: Colors.orange[700],
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'الهالك من التوزيع الزائد',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange[700],
+                                fontSize: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'إجمالي الهالك: ${(_wasteData!['totals']['totalQuantity'] as num).toInt()} عدد - ${(_wasteData!['totals']['totalNetWeight'] as num).toStringAsFixed(2)} كجم',
+                          style: TextStyle(
+                            color: Colors.orange[600],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ...(_wasteData!['wasteByChickenType'] as List)
+                            .map((waste) => _WasteCard(waste: waste))
                             .toList(),
                       ],
                     ),
@@ -514,6 +576,7 @@ class _DailyProfitDetailsPage extends StatelessWidget {
   final num expensesTotal;
   final num loadingPricesSum;
   final num discountsTotal;
+  final num wasteCost;
 
   const _DailyProfitDetailsPage({
     required this.date,
@@ -523,6 +586,7 @@ class _DailyProfitDetailsPage extends StatelessWidget {
     required this.expensesTotal,
     required this.loadingPricesSum,
     required this.discountsTotal,
+    required this.wasteCost,
   });
 
   @override
@@ -536,7 +600,7 @@ class _DailyProfitDetailsPage extends StatelessWidget {
           children: [
             _MetricTile(
               label:
-                  'الربح = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل - إجمالي المصروفات - مصروفات التحميل',
+                  'الربح = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل - إجمالي المصروفات - مصروفات التحميل - تكلفة الهالك',
               value: profit,
               color: Colors.teal,
             ),
@@ -591,6 +655,19 @@ class _DailyProfitDetailsPage extends StatelessWidget {
                     title: const Text('مصروفات التحميل (مجموع أسعار التحميل)'),
                     trailing: Text(
                       NumberFormat('#,##0.###').format(loadingPricesSum),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.orange,
+                    ),
+                    title: const Text('تكلفة الهالك'),
+                    trailing: Text(
+                      NumberFormat('#,##0.###').format(wasteCost),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -842,6 +919,107 @@ class _ShortageInfoTile extends StatelessWidget {
               color: color,
               fontWeight: FontWeight.bold,
               fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WasteCard extends StatelessWidget {
+  final Map<String, dynamic> waste;
+
+  const _WasteCard({required this.waste});
+
+  @override
+  Widget build(BuildContext context) {
+    final chickenTypeName = waste['chickenType']?['name'] ?? 'غير محدد';
+    final overDistributionQuantity =
+        (waste['overDistributionQuantity'] ?? 0) as num;
+    final overDistributionNetWeight =
+        (waste['overDistributionNetWeight'] ?? 0) as num;
+    final totalWasteQuantity = (waste['totalWasteQuantity'] ?? 0) as num;
+    final totalWasteNetWeight = (waste['totalWasteNetWeight'] ?? 0) as num;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange[300]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.pets, color: Colors.orange[600], size: 20),
+              const SizedBox(width: 8),
+              Text(
+                chickenTypeName,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange[700],
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Over-distribution waste details
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.orange[100],
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.trending_up,
+                      color: Colors.orange[700],
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'هالك من التوزيع الزائد: ${overDistributionQuantity.toInt()} عدد - ${overDistributionNetWeight.toStringAsFixed(2)} كجم',
+                        style: TextStyle(
+                          color: Colors.orange[700],
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (totalWasteQuantity > overDistributionQuantity) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.grey[600],
+                        size: 14,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'إجمالي الهالك: ${totalWasteQuantity.toInt()} عدد - ${totalWasteNetWeight.toStringAsFixed(2)} كجم',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             ),
           ),
         ],

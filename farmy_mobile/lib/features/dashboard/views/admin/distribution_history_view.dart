@@ -909,6 +909,10 @@ class _DistributionDetailsPage extends StatelessWidget {
               <td style="padding: 8px; border-bottom: 1px solid #ddd;">$customerName</td>
             </tr>
             <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>نوع الفراخ:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${distribution['chickenType']?['name'] ?? 'غير محدد'}</td>
+            </tr>
+            <tr>
               <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>المستخدم:</strong></td>
               <td style="padding: 8px; border-bottom: 1px solid #ddd;">$userName</td>
             </tr>

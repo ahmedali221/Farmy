@@ -42,6 +42,7 @@ const supplierRoutes = require('./src/suppliers/routes/supplierRoutes');
 const employeeExpenseRoutes = require('./src/employeeExpenses/routes/employeeExpenseRoutes');
 const transferRoutes = require('./src/transfers/routes/transferRoutes');
 const distributionRoutes = require('./src/distributions/routes/distributionRoutes');
+const wasteRoutes = require('./src/waste/routes/wasteRoutes');
 const dailyStockController = require('./src/stocks/controllers/dailyStockController');
 
 // Healthcheck (public)
@@ -74,6 +75,7 @@ app.use('/api/suppliers', auth(['manager', 'employee']), supplierRoutes);
 app.use('/api/employee-expenses', auth(['manager', 'employee']), employeeExpenseRoutes);
 app.use('/api/transfers', auth(['manager']), transferRoutes);
 app.use('/api/distributions', auth(['manager', 'employee']), distributionRoutes);
+app.use('/api/waste', wasteRoutes);
 // Stocks endpoints
 app.get('/api/stocks/week', auth(['manager']), dailyStockController.getWeek);
 app.get('/api/stocks/by-date', auth(['manager']), dailyStockController.getByDate);

@@ -193,7 +193,12 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
               ? const Center(child: CircularProgressIndicator())
               : _error != null
               ? _buildErrorWidget()
-              : _buildGroupedPaymentsList(),
+              : Column(
+                  children: [
+                    _buildCustomerDebtSummary(),
+                    Expanded(child: _buildGroupedPaymentsList()),
+                  ],
+                ),
         ),
       ),
     );
@@ -211,6 +216,251 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
           ElevatedButton(
             onPressed: _loadAllData,
             child: const Text('إعادة المحاولة'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerDebtSummary() {
+    // Calculate current debt
+    final totalDistributionValue = _distributions.fold(0.0, (
+      sum,
+      distribution,
+    ) {
+      final amount = distribution['totalAmount'] ?? 0;
+      if (amount is num) {
+        return sum + amount.toDouble();
+      } else if (amount is String) {
+        return sum + (double.tryParse(amount) ?? 0.0);
+      }
+      return sum;
+    });
+
+    final totalPaidValue = _payments.fold(0.0, (sum, payment) {
+      final paidAmount = payment['paidAmount'] ?? payment['amount'] ?? 0;
+      if (paidAmount is num) {
+        return sum + paidAmount.toDouble();
+      } else if (paidAmount is String) {
+        return sum + (double.tryParse(paidAmount) ?? 0.0);
+      }
+      return sum;
+    });
+
+    final totalDiscount = _payments.fold(0.0, (sum, payment) {
+      final discount = payment['discount'] ?? 0;
+      if (discount is num) {
+        return sum + discount.toDouble();
+      } else if (discount is String) {
+        return sum + (double.tryParse(discount) ?? 0.0);
+      }
+      return sum;
+    });
+
+    final currentDebt =
+        (totalDistributionValue - totalPaidValue - totalDiscount).clamp(
+          0.0,
+          double.infinity,
+        );
+    final isDebtFree = currentDebt <= 0;
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDebtFree
+              ? [Colors.green.shade50, Colors.green.shade100]
+              : [Colors.white, Colors.grey.shade50],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDebtFree ? Colors.green.shade300 : Colors.grey.shade300,
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isDebtFree ? Colors.green : Colors.grey).withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: (isDebtFree ? Colors.green : Colors.grey)
+                    .withOpacity(0.2),
+                child: Icon(
+                  isDebtFree
+                      ? Icons.check_circle
+                      : Icons.account_balance_wallet,
+                  color: isDebtFree ? Colors.green : Colors.grey,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'حالة المديونية',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.customer['name'] ?? 'غير معروف',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDebtFree
+                            ? Colors.green.shade700
+                            : Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildDebtInfoCard(
+                  'إجمالي التوزيعات',
+                  '${totalDistributionValue.toStringAsFixed(2)} ج.م',
+                  Icons.outbound,
+                  Colors.orange,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildDebtInfoCard(
+                  'إجمالي المدفوعات',
+                  '${totalPaidValue.toStringAsFixed(2)} ج.م',
+                  Icons.payment,
+                  Colors.green,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildDebtInfoCard(
+                  'إجمالي الخصومات',
+                  '${totalDiscount.toStringAsFixed(2)} ج.م',
+                  Icons.percent,
+                  Colors.deepOrange,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: (isDebtFree ? Colors.green : Colors.grey)
+                        .withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: (isDebtFree ? Colors.green : Colors.grey)
+                          .withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        isDebtFree ? Icons.check_circle : Icons.warning,
+                        color: isDebtFree ? Colors.green : Colors.grey,
+                        size: 24,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'المديونية الحالية',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${currentDebt.toStringAsFixed(2)} ج.م',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDebtFree ? Colors.green : Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isDebtFree ? 'مدفوع بالكامل' : 'مطلوب الدفع',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: isDebtFree
+                              ? Colors.green.shade600
+                              : Colors.grey.shade600,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDebtInfoCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

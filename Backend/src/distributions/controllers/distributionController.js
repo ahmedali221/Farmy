@@ -2,6 +2,7 @@ const Distribution = require('../models/Distribution');
 const Loading = require('../../loadings/models/loading');
 const Customer = require('../../customers/models/Customer');
 const ChickenType = require('../../managers/models/ChickenType');
+const DailyWaste = require('../../waste/models/DailyWaste');
 const Joi = require('joi');
 const mongoose = require('mongoose');
 const logger = require('../../utils/logger');
@@ -104,6 +105,38 @@ exports.createDistribution = async (req, res) => {
     // Increase customer's outstanding debts by totalAmount
     customerDoc.outstandingDebts = Math.max(0, (customerDoc.outstandingDebts || 0) + totalAmount);
     await customerDoc.save();
+
+    // Track over-distribution as waste
+    if (quantityExceeded || netWeightExceeded) {
+      const overQuantity = Math.max(0, quantity - totalAvailableQuantity);
+      const overNetWeight = Math.max(0, netWeight - totalAvailableNetWeight);
+      
+      if (overQuantity > 0 || overNetWeight > 0) {
+        try {
+          await DailyWaste.findOneAndUpdate(
+            { 
+              date: startOfDay, 
+              chickenType: chickenTypeDoc._id 
+            },
+            {
+              $inc: {
+                overDistributionQuantity: overQuantity,
+                overDistributionNetWeight: overNetWeight,
+              }
+            },
+            { 
+              upsert: true, 
+              new: true 
+            }
+          );
+          
+          logger.info(`Tracked over-distribution waste: ${overQuantity} qty, ${overNetWeight} kg for chicken type "${chickenTypeDoc.name}" on ${targetDate.toDateString()}`);
+        } catch (wasteError) {
+          logger.error(`Failed to track over-distribution waste: ${wasteError.message}`);
+          // Don't fail the distribution if waste tracking fails
+        }
+      }
+    }
 
     // Populate references for response
     await distribution.populate('customer', 'name contactInfo');
