@@ -1,7 +1,6 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const Joi = require('joi');
-const mongoose = require('mongoose');
 const logger = require('../../utils/logger');
 
 const loginSchema = Joi.object({
@@ -20,17 +19,8 @@ exports.signup = async (req, res) => {
     const { error } = signupSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    // Check MongoDB connection state before querying
-    if (mongoose.connection.readyState !== 1) {
-      logger.error('MongoDB connection not ready during signup, state:', mongoose.connection.readyState);
-      return res.status(503).json({ 
-        message: 'Database connection unavailable. Please try again later.' 
-      });
-    }
-
     // Check if user already exists
-    const existingUser = await User.findOne({ username: req.body.username })
-      .maxTimeMS(15000); // 15 second timeout for the query
+    const existingUser = await User.findOne({ username: req.body.username });
     if (existingUser) {
       return res.status(400).json({ message: 'Username already exists' });
     }
@@ -64,21 +54,7 @@ exports.signup = async (req, res) => {
     });
   } catch (err) {
     logger.error(`Signup error: ${err.message}`);
-    
-    // Handle specific MongoDB errors
-    if (err.name === 'MongoServerSelectionError' || err.name === 'MongoTimeoutError') {
-      return res.status(503).json({ 
-        message: 'Database connection timeout. Please try again later.' 
-      });
-    }
-    
-    if (err.name === 'MongoNetworkError') {
-      return res.status(503).json({ 
-        message: 'Database network error. Please check your connection.' 
-      });
-    }
-    
-    res.status(500).json({ message: 'Internal server error. Please try again.' });
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -87,17 +63,7 @@ exports.login = async (req, res) => {
     const { error } = loginSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    // Check MongoDB connection state before querying
-    if (mongoose.connection.readyState !== 1) {
-      logger.error('MongoDB connection not ready, state:', mongoose.connection.readyState);
-      return res.status(503).json({ 
-        message: 'Database connection unavailable. Please try again later.' 
-      });
-    }
-
-    const user = await User.findOne({ username: req.body.username })
-      .maxTimeMS(15000); // 15 second timeout for the query
-      
+    const user = await User.findOne({ username: req.body.username });
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
     const isMatch = await user.comparePassword(req.body.password);
@@ -120,21 +86,7 @@ exports.login = async (req, res) => {
     });
   } catch (err) {
     logger.error(`Login error: ${err.message}`);
-    
-    // Handle specific MongoDB errors
-    if (err.name === 'MongoServerSelectionError' || err.name === 'MongoTimeoutError') {
-      return res.status(503).json({ 
-        message: 'Database connection timeout. Please try again later.' 
-      });
-    }
-    
-    if (err.name === 'MongoNetworkError') {
-      return res.status(503).json({ 
-        message: 'Database network error. Please check your connection.' 
-      });
-    }
-    
-    res.status(500).json({ message: 'Internal server error. Please try again.' });
+    res.status(500).json({ message: err.message });
   }
 };
 
