@@ -7,42 +7,44 @@ const errorHandler = require('./src/middleware/error');
 
 dotenv.config();
 
-// Ensure a single MongoDB connection across serverless invocations
-if (!global._mongooseConnection) {
-  const mongoOptions = {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    // Connection timeout settings
-    serverSelectionTimeoutMS: 30000, // 30 seconds
-    socketTimeoutMS: 45000, // 45 seconds
-    connectTimeoutMS: 30000, // 30 seconds
-    // Buffer settings to prevent timeout errors
-    bufferMaxEntries: 0, // Disable mongoose buffering
-    bufferCommands: false, // Disable mongoose buffering
-    // Connection pool settings
-    maxPoolSize: 10, // Maintain up to 10 socket connections
-    minPoolSize: 5, // Maintain a minimum of 5 socket connections
-    maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
-    // Retry settings
-    retryWrites: true,
-    retryReads: true
-  };
+// MongoDB connection optimized for serverless environments
+const connectDB = async () => {
+  try {
+    // Check if already connected
+    if (mongoose.connection.readyState === 1) {
+      return;
+    }
 
-  global._mongooseConnection = mongoose
-    .connect(process.env.MONGO_URI || 'mongodb://localhost:27017/farmy', mongoOptions)
-    .then(() => {
-      console.log('MongoDB connected successfully');
-      console.log('Connection options:', {
-        serverSelectionTimeoutMS: mongoOptions.serverSelectionTimeoutMS,
-        socketTimeoutMS: mongoOptions.socketTimeoutMS,
-        bufferCommands: mongoOptions.bufferCommands
-      });
-    })
-    .catch(err => {
-      console.error('MongoDB connection error:', err);
-      process.exit(1); // Exit process on connection failure
-    });
-}
+    const mongoOptions = {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      // Serverless-optimized settings
+      serverSelectionTimeoutMS: 5000, // 5 seconds for serverless
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000, // 10 seconds for serverless
+      // Disable buffering for serverless
+      bufferMaxEntries: 0,
+      bufferCommands: false,
+      // Optimized pool settings for serverless
+      maxPoolSize: 1, // Single connection for serverless
+      minPoolSize: 0, // No minimum for serverless
+      maxIdleTimeMS: 10000, // Close quickly in serverless
+      // Retry settings
+      retryWrites: true,
+      retryReads: true
+    };
+
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/farmy', mongoOptions);
+    console.log('MongoDB connected successfully');
+  } catch (err) {
+    console.error('MongoDB connection error:', err);
+    // Don't exit process in serverless - let the function handle the error
+    throw err;
+  }
+};
+
+// Connect to MongoDB
+connectDB().catch(console.error);
 
 const app = express();
 
@@ -53,6 +55,22 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(morgan('dev'));
+
+// Middleware to ensure DB connection in serverless
+app.use(async (req, res, next) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      await connectDB();
+    }
+    next();
+  } catch (err) {
+    console.error('Database connection middleware error:', err);
+    res.status(503).json({ 
+      message: 'Database connection failed',
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Service unavailable'
+    });
+  }
+});
 
 // Routes
 const auth = require('./src/middleware/auth');
@@ -76,7 +94,12 @@ const dailyStockController = require('./src/stocks/controllers/dailyStockControl
 
 // Healthcheck (public)
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+  res.status(200).json({ 
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    vercel: !!process.env.VERCEL
+  });
 });
 
 // Database health check (public)
