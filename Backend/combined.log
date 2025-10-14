@@ -8172,3 +8172,7 @@
 {"level":"info","message":"Fetched daily reports","timestamp":"2025-10-13T21:14:00.893Z"}
 {"level":"info","message":"All loadings fetched","timestamp":"2025-10-13T21:14:01.215Z"}
 {"level":"info","message":"Fetched all employee users","timestamp":"2025-10-13T21:14:02.128Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-13T21:24:11.011Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-13T21:24:11.463Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-13T21:24:11.942Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-13T21:24:12.246Z"}

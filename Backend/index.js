@@ -9,10 +9,39 @@ dotenv.config();
 
 // Ensure a single MongoDB connection across serverless invocations
 if (!global._mongooseConnection) {
+  const mongoOptions = {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    // Connection timeout settings
+    serverSelectionTimeoutMS: 30000, // 30 seconds
+    socketTimeoutMS: 45000, // 45 seconds
+    connectTimeoutMS: 30000, // 30 seconds
+    // Buffer settings to prevent timeout errors
+    bufferMaxEntries: 0, // Disable mongoose buffering
+    bufferCommands: false, // Disable mongoose buffering
+    // Connection pool settings
+    maxPoolSize: 10, // Maintain up to 10 socket connections
+    minPoolSize: 5, // Maintain a minimum of 5 socket connections
+    maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
+    // Retry settings
+    retryWrites: true,
+    retryReads: true
+  };
+
   global._mongooseConnection = mongoose
-    .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => console.log('MongoDB connected'))
-    .catch(err => console.error('MongoDB connection error:', err));
+    .connect(process.env.MONGO_URI || 'mongodb://localhost:27017/farmy', mongoOptions)
+    .then(() => {
+      console.log('MongoDB connected successfully');
+      console.log('Connection options:', {
+        serverSelectionTimeoutMS: mongoOptions.serverSelectionTimeoutMS,
+        socketTimeoutMS: mongoOptions.socketTimeoutMS,
+        bufferCommands: mongoOptions.bufferCommands
+      });
+    })
+    .catch(err => {
+      console.error('MongoDB connection error:', err);
+      process.exit(1); // Exit process on connection failure
+    });
 }
 
 const app = express();
@@ -48,6 +77,41 @@ const dailyStockController = require('./src/stocks/controllers/dailyStockControl
 // Healthcheck (public)
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
+});
+
+// Database health check (public)
+app.get('/api/health/db', async (req, res) => {
+  try {
+    const connectionState = mongoose.connection.readyState;
+    const states = {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting'
+    };
+    
+    if (connectionState === 1) {
+      // Test a simple query to ensure database is responsive
+      await mongoose.connection.db.admin().ping();
+      res.status(200).json({ 
+        status: 'ok', 
+        database: 'connected',
+        connectionState: states[connectionState]
+      });
+    } else {
+      res.status(503).json({ 
+        status: 'error', 
+        database: 'disconnected',
+        connectionState: states[connectionState]
+      });
+    }
+  } catch (err) {
+    res.status(503).json({ 
+      status: 'error', 
+      database: 'error',
+      message: err.message
+    });
+  }
 });
 
 // Public routes
