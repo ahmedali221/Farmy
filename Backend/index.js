@@ -72,25 +72,35 @@ app.use(async (req, res, next) => {
   }
 });
 
-// Routes
-const auth = require('./src/middleware/auth');
-const authController = require('./src/managers/controllers/authController');
-const managerController = require('./src/managers/controllers/managerController');
-const managerRoutes = require('./src/managers/routes/managerRoutes');
-const orderRoutes = require('./src/orders/routes/orderRoutes');
-const deliveryRoutes = require('./src/deliveries/routes/deliveryRoutes');
-const employeeRoutes = require('./src/employees/routes/employeeRoutes');
-const customerRoutes = require('./src/customers/routes/customerRoutes');
-const financeRoutes = require('./src/finances/routes/financeRoutes');
-const paymentRoutes = require('./src/payments/routes/paymentRoutes');
-const expenseRoutes = require('./src/expenses/routes/expenseRoutes');
-const loadingRoutes = require('./src/loadings/routes/loadingRoutes');
-const supplierRoutes = require('./src/suppliers/routes/supplierRoutes');
-const employeeExpenseRoutes = require('./src/employeeExpenses/routes/employeeExpenseRoutes');
-const transferRoutes = require('./src/transfers/routes/transferRoutes');
-const distributionRoutes = require('./src/distributions/routes/distributionRoutes');
-const wasteRoutes = require('./src/waste/routes/wasteRoutes');
-const dailyStockController = require('./src/stocks/controllers/dailyStockController');
+// Routes - with error handling for serverless
+let auth, authController, managerController, managerRoutes, orderRoutes, deliveryRoutes;
+let employeeRoutes, customerRoutes, financeRoutes, paymentRoutes, expenseRoutes;
+let loadingRoutes, supplierRoutes, employeeExpenseRoutes, transferRoutes;
+let distributionRoutes, wasteRoutes, dailyStockController;
+
+try {
+  auth = require('./src/middleware/auth');
+  authController = require('./src/managers/controllers/authController');
+  managerController = require('./src/managers/controllers/managerController');
+  managerRoutes = require('./src/managers/routes/managerRoutes');
+  orderRoutes = require('./src/orders/routes/orderRoutes');
+  deliveryRoutes = require('./src/deliveries/routes/deliveryRoutes');
+  employeeRoutes = require('./src/employees/routes/employeeRoutes');
+  customerRoutes = require('./src/customers/routes/customerRoutes');
+  financeRoutes = require('./src/finances/routes/financeRoutes');
+  paymentRoutes = require('./src/payments/routes/paymentRoutes');
+  expenseRoutes = require('./src/expenses/routes/expenseRoutes');
+  loadingRoutes = require('./src/loadings/routes/loadingRoutes');
+  supplierRoutes = require('./src/suppliers/routes/supplierRoutes');
+  employeeExpenseRoutes = require('./src/employeeExpenses/routes/employeeExpenseRoutes');
+  transferRoutes = require('./src/transfers/routes/transferRoutes');
+  distributionRoutes = require('./src/distributions/routes/distributionRoutes');
+  wasteRoutes = require('./src/waste/routes/wasteRoutes');
+  dailyStockController = require('./src/stocks/controllers/dailyStockController');
+} catch (err) {
+  console.error('Error loading routes:', err.message);
+  // Continue with basic functionality
+}
 
 // Healthcheck (public)
 app.get('/api/health', (req, res) => {
@@ -99,6 +109,16 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     vercel: !!process.env.VERCEL
+  });
+});
+
+// Simple test endpoint (no dependencies)
+app.get('/api/test', (req, res) => {
+  res.status(200).json({ 
+    message: 'Serverless function is working',
+    timestamp: new Date().toISOString(),
+    method: req.method,
+    url: req.url
   });
 });
 
@@ -138,36 +158,45 @@ app.get('/api/health/db', async (req, res) => {
 });
 
 // Public routes
-app.post('/api/login', authController.login);
-app.post('/api/signup', authController.signup);
+if (authController) {
+  app.post('/api/login', authController.login);
+  app.post('/api/signup', authController.signup);
+}
 
 // Protected routes
-app.get('/api/validate', auth(['manager', 'employee']), authController.validate);
-app.post('/api/logout', auth(['manager', 'employee']), authController.logout);
+if (auth && authController) {
+  app.get('/api/validate', auth(['manager', 'employee']), authController.validate);
+  app.post('/api/logout', auth(['manager', 'employee']), authController.logout);
+}
 
 // Shared routes (accessible by both managers and employees)
-app.get('/api/chicken-types', auth(['manager', 'employee']), managerController.getAllChickenTypes);
+if (auth && managerController) {
+  app.get('/api/chicken-types', auth(['manager', 'employee']), managerController.getAllChickenTypes);
+}
 
-// Protected routes
-app.use('/api/managers', auth(['manager']), managerRoutes);
-app.use('/api/orders', auth(['manager', 'employee']), orderRoutes);
-app.use('/api/deliveries', auth(['manager', 'employee']), deliveryRoutes);
-app.use('/api/employees', auth(['manager', 'employee']), employeeRoutes);
-app.use('/api/customers', auth(['manager', 'employee']), customerRoutes);
-app.use('/api/finances', auth(['manager']), financeRoutes);
-app.use('/api/payments', auth(['manager', 'employee']), paymentRoutes);
-app.use('/api/expenses', auth(['manager', 'employee']), expenseRoutes);
-app.use('/api/loadings', auth(['manager', 'employee']), loadingRoutes);
-app.use('/api/suppliers', auth(['manager', 'employee']), supplierRoutes);
-app.use('/api/employee-expenses', auth(['manager', 'employee']), employeeExpenseRoutes);
-app.use('/api/transfers', auth(['manager']), transferRoutes);
-app.use('/api/distributions', auth(['manager', 'employee']), distributionRoutes);
-app.use('/api/waste', wasteRoutes);
+// Protected routes - only register if modules are loaded
+if (auth && managerRoutes) app.use('/api/managers', auth(['manager']), managerRoutes);
+if (auth && orderRoutes) app.use('/api/orders', auth(['manager', 'employee']), orderRoutes);
+if (auth && deliveryRoutes) app.use('/api/deliveries', auth(['manager', 'employee']), deliveryRoutes);
+if (auth && employeeRoutes) app.use('/api/employees', auth(['manager', 'employee']), employeeRoutes);
+if (auth && customerRoutes) app.use('/api/customers', auth(['manager', 'employee']), customerRoutes);
+if (auth && financeRoutes) app.use('/api/finances', auth(['manager']), financeRoutes);
+if (auth && paymentRoutes) app.use('/api/payments', auth(['manager', 'employee']), paymentRoutes);
+if (auth && expenseRoutes) app.use('/api/expenses', auth(['manager', 'employee']), expenseRoutes);
+if (auth && loadingRoutes) app.use('/api/loadings', auth(['manager', 'employee']), loadingRoutes);
+if (auth && supplierRoutes) app.use('/api/suppliers', auth(['manager', 'employee']), supplierRoutes);
+if (auth && employeeExpenseRoutes) app.use('/api/employee-expenses', auth(['manager', 'employee']), employeeExpenseRoutes);
+if (auth && transferRoutes) app.use('/api/transfers', auth(['manager']), transferRoutes);
+if (auth && distributionRoutes) app.use('/api/distributions', auth(['manager', 'employee']), distributionRoutes);
+if (wasteRoutes) app.use('/api/waste', wasteRoutes);
+
 // Stocks endpoints
-app.get('/api/stocks/week', auth(['manager']), dailyStockController.getWeek);
-app.get('/api/stocks/by-date', auth(['manager']), dailyStockController.getByDate);
-app.post('/api/stocks/upsert', auth(['manager']), dailyStockController.upsertForDate);
-app.get('/api/stocks/profit', auth(['manager']), dailyStockController.getDailyProfit);
+if (auth && dailyStockController) {
+  app.get('/api/stocks/week', auth(['manager']), dailyStockController.getWeek);
+  app.get('/api/stocks/by-date', auth(['manager']), dailyStockController.getByDate);
+  app.post('/api/stocks/upsert', auth(['manager']), dailyStockController.upsertForDate);
+  app.get('/api/stocks/profit', auth(['manager']), dailyStockController.getDailyProfit);
+}
 
 app.use(errorHandler);
 
@@ -183,3 +212,6 @@ if (process.env.VERCEL) {
     console.log(`Accessible from: http://[YOUR_IP]:${PORT} (network)`);
   });
 }
+
+// Export for Vercel (alternative approach)
+module.exports = app;

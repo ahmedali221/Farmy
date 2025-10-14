@@ -2,22 +2,22 @@
   "version": 2,
   "builds": [
     {
-      "src": "index.js",
+      "src": "index-minimal.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/index.js"
+      "dest": "/index-minimal.js"
     },
     {
       "src": "/(.*)",
-      "dest": "/index.js"
+      "dest": "/index-minimal.js"
     }
   ],
   "functions": {
-    "index.js": {
+    "index-minimal.js": {
       "maxDuration": 30
     }
   },
