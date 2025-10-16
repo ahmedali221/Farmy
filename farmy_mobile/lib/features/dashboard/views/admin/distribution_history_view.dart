@@ -707,6 +707,7 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
     );
     final customerName = distribution['customer']?['name'] ?? 'غير معروف';
     final userName = distribution['user']?['username'] ?? 'غير معروف';
+    final chickenTypeName = distribution['chickenType']?['name'] ?? 'غير محدد';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -787,6 +788,17 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
               ),
               dense: true,
             ),
+          ),
+          const Divider(height: 1),
+
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.amber.withOpacity(0.1),
+              child: const Icon(Icons.pets, color: Colors.amber, size: 20),
+            ),
+            title: const Text('نوع الفراخ'),
+            subtitle: Text(chickenTypeName),
+            dense: true,
           ),
           const Divider(height: 1),
 
