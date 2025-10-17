@@ -659,7 +659,27 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('تأكيد الحذف'),
-        content: const Text('هل تريد حذف سجل التوزيع هذا؟'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('هل تريد حذف سجل التوزيع هذا؟'),
+            const SizedBox(height: 8),
+            Text(
+              'العميل: ${d['customer']?['name'] ?? 'غير معروف'}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text(
+              'المبلغ: ${(d['totalAmount'] ?? 0).toStringAsFixed(0)} ج.م',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'تحذير: لا يمكن التراجع عن هذا الإجراء',
+              style: TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -667,28 +687,75 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('حذف'),
           ),
         ],
       ),
     );
     if (confirmed != true) return;
+
+    // Show loading indicator
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('جاري الحذف...'),
+          ],
+        ),
+      ),
+    );
+
     try {
       final String id = (d['_id'] ?? '').toString();
       if (id.isEmpty) throw Exception('معرّف غير صالح');
+
+      debugPrint('[DistributionHistory] Deleting distribution with ID: $id');
       await _distributionService.deleteDistribution(id);
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
       if (!mounted) return;
       setState(() {
         _distributions.removeWhere((x) => x['_id'] == id);
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تم حذف سجل التوزيع')));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('تم حذف سجل التوزيع بنجاح'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('فشل الحذف: $e')));
+
+      String errorMessage = 'فشل الحذف';
+      if (e.toString().contains('404')) {
+        errorMessage = 'سجل التوزيع غير موجود';
+      } else if (e.toString().contains('400')) {
+        errorMessage = 'معرّف غير صالح';
+      } else if (e.toString().contains('500')) {
+        errorMessage = 'خطأ في الخادم، حاول مرة أخرى';
+      } else {
+        errorMessage = 'فشل الحذف: $e';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 

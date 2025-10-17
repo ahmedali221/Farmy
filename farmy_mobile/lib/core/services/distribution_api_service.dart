@@ -230,11 +230,18 @@ class DistributionApiService {
   /// Delete distribution by ID
   Future<void> deleteDistribution(String id) async {
     try {
+      print('[DistributionApiService] Deleting distribution with ID: $id');
+
       final headers = await _getAuthHeaders();
       final response = await http.delete(
         Uri.parse('$baseUrl/distributions/$id'),
         headers: headers,
       );
+
+      print(
+        '[DistributionApiService] Delete response status: ${response.statusCode}',
+      );
+      print('[DistributionApiService] Delete response body: ${response.body}');
 
       if (response.statusCode != 200 && response.statusCode != 204) {
         final errorData = json.decode(response.body);
@@ -243,7 +250,10 @@ class DistributionApiService {
           statusCode: response.statusCode,
         );
       }
+
+      print('[DistributionApiService] Distribution deleted successfully');
     } catch (e) {
+      print('[DistributionApiService] Delete error: $e');
       if (e is ApiException) rethrow;
       throw ApiException(message: 'Network error: $e', statusCode: 0);
     }

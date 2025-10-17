@@ -341,34 +341,99 @@ exports.updateDistribution = async (req, res) => {
 exports.deleteDistribution = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Validate ID format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      logger.error(`Invalid distribution ID format: ${id}`);
+      return res.status(400).json({ message: 'Invalid distribution ID format' });
+    }
+
+    // Find distribution first
     const distribution = await Distribution.findById(id);
     if (!distribution) {
+      logger.error(`Distribution not found: ${id}`);
       return res.status(404).json({ message: 'Distribution not found' });
     }
 
-    // Restore quantities to source loading
-    const sourceLoadingDoc = await Loading.findById(distribution.sourceLoading);
-    if (sourceLoadingDoc) {
-      sourceLoadingDoc.distributedQuantity = Math.max(0, sourceLoadingDoc.distributedQuantity - distribution.quantity);
-      sourceLoadingDoc.distributedNetWeight = Math.max(0, sourceLoadingDoc.distributedNetWeight - distribution.netWeight);
-      await sourceLoadingDoc.save();
+    logger.info(`Starting deletion of distribution ${id} by user: ${req.user?.id || 'unknown'}`);
+
+    // Start transaction for data consistency
+    const session = await mongoose.startSession();
+    
+    try {
+      await session.startTransaction();
+
+      // Restore quantities to source loading
+      if (distribution.sourceLoading) {
+        const sourceLoadingDoc = await Loading.findById(distribution.sourceLoading).session(session);
+        if (sourceLoadingDoc) {
+          const oldDistributedQty = sourceLoadingDoc.distributedQuantity || 0;
+          const oldDistributedWeight = sourceLoadingDoc.distributedNetWeight || 0;
+          
+          sourceLoadingDoc.distributedQuantity = Math.max(0, oldDistributedQty - (distribution.quantity || 0));
+          sourceLoadingDoc.distributedNetWeight = Math.max(0, oldDistributedWeight - (distribution.netWeight || 0));
+          
+          await sourceLoadingDoc.save({ session });
+          logger.info(`Restored quantities to source loading ${distribution.sourceLoading}: qty=${distribution.quantity}, weight=${distribution.netWeight}`);
+        } else {
+          logger.warn(`Source loading not found for distribution ${id}: ${distribution.sourceLoading}`);
+        }
+      }
+
+      // Decrease customer's outstanding debts by totalAmount
+      if (distribution.customer) {
+        const customerDoc = await Customer.findById(distribution.customer).session(session);
+        if (customerDoc) {
+          const current = Number(customerDoc.outstandingDebts || 0);
+          const delta = Number(distribution.totalAmount || 0);
+          customerDoc.outstandingDebts = Math.max(0, current - delta);
+          await customerDoc.save({ session });
+          logger.info(`Updated customer ${distribution.customer} outstanding debts: ${current} -> ${customerDoc.outstandingDebts}`);
+        } else {
+          logger.warn(`Customer not found for distribution ${id}: ${distribution.customer}`);
+        }
+      }
+
+      // Delete the distribution
+      const deleteResult = await Distribution.findByIdAndDelete(id).session(session);
+      if (!deleteResult) {
+        throw new Error('Failed to delete distribution document');
+      }
+
+      // Commit transaction
+      await session.commitTransaction();
+      
+      logger.warn(`Distribution deleted successfully: ${id} by user: ${req.user?.id || 'unknown'}`);
+      return res.status(200).json({ message: 'Distribution deleted successfully', id });
+      
+    } catch (transactionError) {
+      // Rollback transaction on error
+      await session.abortTransaction();
+      logger.error(`Transaction error deleting distribution ${id}: ${transactionError.message}`);
+      throw transactionError;
+    } finally {
+      await session.endSession();
     }
 
-    // Decrease customer's outstanding debts by totalAmount
-    const customerDoc = await Customer.findById(distribution.customer);
-    if (customerDoc) {
-      const current = Number(customerDoc.outstandingDebts || 0);
-      const delta = Number(distribution.totalAmount || 0);
-      customerDoc.outstandingDebts = Math.max(0, current - delta);
-      await customerDoc.save();
-    }
-
-    await distribution.deleteOne();
-    logger.warn(`Distribution deleted: ${id} by user: ${req.user?.id || 'unknown'}`);
-    return res.status(200).json({ message: 'Distribution deleted', id });
   } catch (err) {
-    logger.error(`Error deleting distribution: ${err.message}`);
-    return res.status(500).json({ message: 'Server error' });
+    logger.error(`Error deleting distribution ${req.params.id}: ${err.message}`);
+    logger.error(`Error stack: ${err.stack}`);
+    
+    // Provide more specific error messages
+    if (err.name === 'CastError') {
+      return res.status(400).json({ message: 'Invalid distribution ID format' });
+    }
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({ message: 'Validation error: ' + err.message });
+    }
+    if (err.message.includes('Transaction')) {
+      return res.status(500).json({ message: 'Database transaction failed' });
+    }
+    if (err.message.includes('connection')) {
+      return res.status(500).json({ message: 'Database connection error' });
+    }
+    
+    return res.status(500).json({ message: 'Server error: Failed to delete distribution' });
   }
 };
 

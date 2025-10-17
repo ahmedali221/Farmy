@@ -1,3 +1,4 @@
+const Order = require('../models/Order');
 const ChickenType = require('../../managers/models/ChickenType');
 const Customer = require('../../customers/models/Customer');
 const Joi = require('joi');
