@@ -98,7 +98,7 @@ if (process.env.VERCEL) {
   module.exports = app;
 } else {
   // Local development server
-  const PORT = process.env.PORT || 3000;
+  const PORT = process.env.PORT || 6000;
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
     console.log(`Accessible from: http://127.0.0.1:${PORT} (localhost)`);
