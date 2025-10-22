@@ -5,6 +5,7 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/payment_api_service.dart';
 import '../../../../core/services/employee_expense_api_service.dart';
 import '../../../../core/services/customer_api_service.dart';
+import '../../../../core/services/transfer_api_service.dart';
 import '../../../authentication/cubit/auth_cubit.dart';
 
 class EmployeeFinancialView extends StatefulWidget {
@@ -17,6 +18,7 @@ class EmployeeFinancialView extends StatefulWidget {
 class _EmployeeFinancialViewState extends State<EmployeeFinancialView> {
   late final PaymentApiService _paymentService;
   late final EmployeeExpenseApiService _employeeExpenseService;
+  late final TransferApiService _transferService;
   final Map<String, String> _customerNameCache = {};
 
   bool _loading = true;
@@ -27,11 +29,19 @@ class _EmployeeFinancialViewState extends State<EmployeeFinancialView> {
   double _netBalance = 0.0;
   List<Map<String, dynamic>> _dailyCollections = [];
 
+  // Transfer variables
+  List<Map<String, dynamic>> _transfers = [];
+  double _totalTransfersOut = 0.0;
+  double _totalTransfersIn = 0.0;
+  double _netTransfers = 0.0;
+  double _finalBalance = 0.0;
+
   @override
   void initState() {
     super.initState();
     _paymentService = serviceLocator<PaymentApiService>();
     _employeeExpenseService = serviceLocator<EmployeeExpenseApiService>();
+    _transferService = serviceLocator<TransferApiService>();
     _loadData();
   }
 
@@ -76,6 +86,34 @@ class _EmployeeFinancialViewState extends State<EmployeeFinancialView> {
       );
 
       _netBalance = _totalCollected - _totalExpenses;
+
+      // Load transfers for current user
+      _transfers = await _transferService.listTransfers(userId: employeeId);
+
+      // Calculate transfer totals
+      _totalTransfersOut = _transfers
+          .where(
+            (transfer) =>
+                transfer['fromUser']?['_id']?.toString() == employeeId,
+          )
+          .fold<double>(
+            0.0,
+            (sum, transfer) =>
+                sum + ((transfer['amount'] ?? 0) as num).toDouble(),
+          );
+
+      _totalTransfersIn = _transfers
+          .where(
+            (transfer) => transfer['toUser']?['_id']?.toString() == employeeId,
+          )
+          .fold<double>(
+            0.0,
+            (sum, transfer) =>
+                sum + ((transfer['amount'] ?? 0) as num).toDouble(),
+          );
+
+      _netTransfers = _totalTransfersIn - _totalTransfersOut;
+      _finalBalance = _netBalance + _netTransfers;
 
       setState(() {
         _loading = false;
@@ -351,6 +389,13 @@ class _EmployeeFinancialViewState extends State<EmployeeFinancialView> {
                         Icons.account_balance,
                         _netBalance >= 0 ? Colors.blue : Colors.red,
                       ),
+                      const SizedBox(height: 12),
+                      _buildSummaryCard(
+                        'الرصيد النهائي (بعد التحويلات)',
+                        _finalBalance,
+                        Icons.account_balance_wallet,
+                        _finalBalance >= 0 ? Colors.green : Colors.red,
+                      ),
                       const SizedBox(height: 24),
 
                       // Daily Collections History
@@ -410,6 +455,59 @@ class _EmployeeFinancialViewState extends State<EmployeeFinancialView> {
                           final expense = entry.value;
                           return _buildExpenseCard(index, expense);
                         }),
+
+                      const SizedBox(height: 24),
+
+                      // Transfers Section
+                      Text(
+                        'التحويلات المالية',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Transfer Summary Cards
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildSummaryCard(
+                              'التحويلات المرسلة',
+                              _totalTransfersOut,
+                              Icons.send,
+                              Colors.red,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildSummaryCard(
+                              'التحويلات المستلمة',
+                              _totalTransfersIn,
+                              Icons.call_received,
+                              Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSummaryCard(
+                        'صافي التحويلات',
+                        _netTransfers,
+                        Icons.swap_horiz,
+                        _netTransfers >= 0 ? Colors.blue : Colors.red,
+                      ),
+                      const SizedBox(height: 16),
+
+                      if (_transfers.isEmpty)
+                        _buildEmptyState(
+                          Icons.swap_horiz,
+                          'لا توجد تحويلات',
+                          'لم يتم تسجيل أي تحويلات مالية بعد',
+                        )
+                      else
+                        ..._transfers.map(
+                          (transfer) => _buildTransferCard(transfer),
+                        ),
                     ],
                   ),
                 ),
@@ -604,6 +702,86 @@ class _EmployeeFinancialViewState extends State<EmployeeFinancialView> {
         trailing: IconButton(
           icon: const Icon(Icons.delete, color: Colors.red),
           onPressed: () => _showDeleteConfirmation(index),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransferCard(Map<String, dynamic> transfer) {
+    final authCubit = context.read<AuthCubit>();
+    final currentUser = authCubit.currentUser;
+    final employeeId = currentUser?.id ?? '';
+
+    final amount = ((transfer['amount'] ?? 0) as num).toDouble();
+    final note = transfer['note'] ?? '';
+    final createdAt = transfer['createdAt'] ?? '';
+    final fromUser = transfer['fromUser'];
+    final toUser = transfer['toUser'];
+
+    // Determine if this is an outgoing or incoming transfer
+    final isOutgoing = fromUser?['_id']?.toString() == employeeId;
+    final otherUser = isOutgoing ? toUser : fromUser;
+    final otherUserName = otherUser?['username'] ?? 'غير معروف';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: isOutgoing
+              ? Colors.red.withOpacity(0.1)
+              : Colors.green.withOpacity(0.1),
+          child: Icon(
+            isOutgoing ? Icons.send : Icons.call_received,
+            color: isOutgoing ? Colors.red : Colors.green,
+          ),
+        ),
+        title: Text(
+          isOutgoing ? 'تحويل إلى: $otherUserName' : 'تحويل من: $otherUserName',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${isOutgoing ? '-' : '+'} ج.م ${amount.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: isOutgoing ? Colors.red : Colors.green,
+              ),
+            ),
+            if (note.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                note,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+            if (createdAt.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                _formatDate(createdAt),
+                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+              ),
+            ],
+          ],
+        ),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: isOutgoing
+                ? Colors.red.withOpacity(0.1)
+                : Colors.green.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            isOutgoing ? 'مرسل' : 'مستلم',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: isOutgoing ? Colors.red : Colors.green,
+            ),
+          ),
         ),
       ),
     );

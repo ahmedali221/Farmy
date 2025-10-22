@@ -144,13 +144,12 @@ exports.getByDate = async (req, res) => {
 };
 
 // Daily profit:
-// الربح اليومي = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل − إجمالي المصروفات - مصروفات التحميل - تكلفة الهالك
+// الربح اليومي = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل − إجمالي المصروفات - إجمالي الخصومات
 // Where:
 // - مبلغ إجمالي الوجبات: sum of distributions totalAmount for the day
 // - مبلغ إجمالي التحميل: sum of loadings totalLoading for the day
-// - إجمالي ما تم خصمه: sum of payments.discount for the day
-// - مصروفات التحميل: sum of employeeExpenses.value for the day
-// - تكلفة الهالك: sum of waste netWeight * average price for the day
+// - إجمالي المصروفات: sum of employeeExpenses.value for the day
+// - إجمالي الخصومات: sum of payments.discount for the day
 exports.getDailyProfit = async (req, res) => {
   try {
     const { date } = req.query;
@@ -183,36 +182,17 @@ exports.getDailyProfit = async (req, res) => {
     ]);
     const expensesTotal = (expAgg[0]?.total) || 0;
 
-    // Sum of loading prices for the day (مصروفات التحميل)
-    const loadPriceAgg = await Loading.aggregate([
+    // Sum of discounts for the day (إجمالي الخصومات)
+    const discountAgg = await Payment.aggregate([
       { $match: { $or: [
-        { loadingDate: { $gte: d, $lt: nextDay } },
-        { $and: [ { loadingDate: { $exists: false } }, { createdAt: { $gte: d, $lt: nextDay } } ] },
+        { paymentDate: { $gte: d, $lt: nextDay } },
+        { $and: [ { paymentDate: { $exists: false } }, { createdAt: { $gte: d, $lt: nextDay } } ] },
       ] } },
-      { $group: { _id: null, totalPrice: { $sum: { $ifNull: ['$loadingPrice', 0] } } } },
+      { $group: { _id: null, totalDiscount: { $sum: { $ifNull: ['$discount', 0] } } } },
     ]);
-    const loadingPricesSum = (loadPriceAgg[0]?.totalPrice) || 0;
+    const discountsTotal = (discountAgg[0]?.totalDiscount) || 0;
 
-    // Calculate waste cost for the day
-    let wasteCost = 0;
-    try {
-      const wasteData = await DailyWaste.find({
-        date: { $gte: d, $lt: nextDay }
-      }).populate('chickenType', 'price');
-
-      for (const waste of wasteData) {
-        if (waste.chickenType && waste.totalWasteNetWeight > 0) {
-          // Calculate cost based on chicken type price per kg
-          const pricePerKg = waste.chickenType.price || 0;
-          wasteCost += waste.totalWasteNetWeight * pricePerKg;
-        }
-      }
-    } catch (wasteError) {
-      logger.warn(`Failed to calculate waste cost: ${wasteError.message}`);
-      // Continue without waste cost if calculation fails
-    }
-
-    const profit = distributionsTotal - loadingsTotal - expensesTotal - loadingPricesSum - wasteCost;
+    const profit = distributionsTotal - loadingsTotal - expensesTotal - discountsTotal;
 
     return res.json({
       date: d,
@@ -220,10 +200,86 @@ exports.getDailyProfit = async (req, res) => {
       distributionsTotal,
       loadingsTotal,
       expensesTotal,
-      loadingPricesSum,
-      wasteCost,
+      discountsTotal,
     });
   } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// Get total profit history (sum of all daily profits)
+exports.getTotalProfitHistory = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    // If no date range provided, calculate from all time
+    let matchQuery = {};
+    if (startDate && endDate) {
+      const start = normalizeDate(startDate);
+      const end = normalizeDate(endDate);
+      const endNextDay = new Date(end);
+      endNextDay.setDate(end.getDate() + 1);
+      
+      matchQuery = {
+        $or: [
+          { distributionDate: { $gte: start, $lt: endNextDay } },
+          { $and: [ { distributionDate: { $exists: false } }, { createdAt: { $gte: start, $lt: endNextDay } } ] },
+        ]
+      };
+    }
+
+    // Calculate total distributions
+    const distAgg = await Distribution.aggregate([
+      { $match: matchQuery },
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$totalAmount', 0] } } } },
+    ]);
+    const totalDistributions = (distAgg[0]?.total) || 0;
+
+    // Calculate total loadings
+    const loadAgg = await Loading.aggregate([
+      { $match: matchQuery },
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$totalLoading', 0] } } } },
+    ]);
+    const totalLoadings = (loadAgg[0]?.total) || 0;
+
+    // Calculate total expenses
+    const expMatchQuery = startDate && endDate ? {
+      createdAt: { 
+        $gte: normalizeDate(startDate), 
+        $lt: new Date(normalizeDate(endDate).getTime() + 24 * 60 * 60 * 1000)
+      }
+    } : {};
+    const expAgg = await EmployeeExpense.aggregate([
+      { $match: expMatchQuery },
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$value', 0] } } } },
+    ]);
+    const totalExpenses = (expAgg[0]?.total) || 0;
+
+    // Calculate total discounts
+    const discountMatchQuery = startDate && endDate ? {
+      $or: [
+        { paymentDate: { $gte: normalizeDate(startDate), $lt: new Date(normalizeDate(endDate).getTime() + 24 * 60 * 60 * 1000) } },
+        { $and: [ { paymentDate: { $exists: false } }, { createdAt: { $gte: normalizeDate(startDate), $lt: new Date(normalizeDate(endDate).getTime() + 24 * 60 * 60 * 1000) } } ] },
+      ]
+    } : {};
+    const discountAgg = await Payment.aggregate([
+      { $match: discountMatchQuery },
+      { $group: { _id: null, totalDiscount: { $sum: { $ifNull: ['$discount', 0] } } } },
+    ]);
+    const totalDiscounts = (discountAgg[0]?.totalDiscount) || 0;
+
+    const totalProfit = totalDistributions - totalLoadings - totalExpenses - totalDiscounts;
+
+    return res.json({
+      totalProfit,
+      totalDistributions,
+      totalLoadings,
+      totalExpenses,
+      totalDiscounts,
+      dateRange: startDate && endDate ? { startDate, endDate } : 'all-time',
+    });
+  } catch (err) {
+    logger.error(`Error calculating total profit history: ${err.message}`);
     return res.status(500).json({ message: 'Server error' });
   }
 };

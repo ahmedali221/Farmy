@@ -46,3 +46,4 @@
 {"level":"error","message":"Login error: Operation `users.findOne()` buffering timed out after 10000ms","timestamp":"2025-09-25T07:33:06.121Z"}
 {"level":"error","message":"Login error: Operation `users.findOne()` buffering timed out after 10000ms","timestamp":"2025-09-25T07:36:07.875Z"}
 {"level":"error","message":"Login error: Operation `users.findOne()` buffering timed out after 10000ms","timestamp":"2025-09-25T07:36:36.808Z"}
+{"level":"error","message":"Invalid distribution ID format: all","timestamp":"2025-10-22T18:26:02.656Z"}

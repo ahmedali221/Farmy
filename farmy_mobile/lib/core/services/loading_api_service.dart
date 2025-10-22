@@ -26,12 +26,12 @@ class LoadingApiService {
   /// - chickenType: ID of the chicken type (النوع)
   /// - supplier: ID of the supplier (المورد)
   /// - quantity: Number of units (العدد)
-  /// - grossWeight: Gross weight in kg (الوزن القائم)
+  /// - netWeight: Net weight in kg entered by user (الوزن الصافي)
   /// - loadingPrice: Price per kg entered by user (سعر التحميل)
   /// - notes: Optional notes (ملاحظات)
   ///
   /// Auto calculated fields:
-  /// - netWeight: Net weight = grossWeight - (quantity * 8)
+  /// - emptyWeight: Empty weight = quantity * 8
   /// - totalLoading: Total loading = netWeight * loadingPrice
   Future<Map<String, dynamic>> createLoading(
     Map<String, dynamic> loadingData,

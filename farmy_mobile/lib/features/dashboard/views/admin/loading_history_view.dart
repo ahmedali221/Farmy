@@ -164,9 +164,6 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
     final qtyCtrl = TextEditingController(
       text: (m['quantity'] ?? 0).toString(),
     );
-    final grossCtrl = TextEditingController(
-      text: (m['grossWeight'] ?? 0).toString(),
-    );
     final priceCtrl = TextEditingController(
       text: (m['loadingPrice'] ?? 0).toString(),
     );
@@ -228,17 +225,6 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
                   ),
                   const SizedBox(height: 12),
                   TextField(
-                    controller: grossCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'وزن القائم (كجم)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
                     controller: priceCtrl,
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
@@ -272,9 +258,6 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
         if (id.isEmpty) throw Exception('معرّف غير صالح');
         final updated = await _loadingService.updateLoading(id, {
           'quantity': int.tryParse(qtyCtrl.text) ?? m['quantity'] ?? 0,
-          'grossWeight':
-              double.tryParse(grossCtrl.text) ??
-              (m['grossWeight'] ?? 0).toDouble(),
           'loadingPrice':
               double.tryParse(priceCtrl.text) ??
               (m['loadingPrice'] ?? 0).toDouble(),
@@ -705,7 +688,6 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
     // Pre-calculate values to avoid repeated calculations
     final netWeight = (loading['netWeight'] ?? 0) as num;
     final totalLoading = (loading['totalLoading'] ?? 0) as num;
-    final grossWeight = (loading['grossWeight'] ?? 0) as num;
     final quantity = (loading['quantity'] ?? 0) as num;
     final loadingPrice = (loading['loadingPrice'] ?? 0) as num;
 
@@ -713,6 +695,7 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
     final createdAt = _formatDateTime(loading['createdAt']);
     final chickenType = loading['chickenType']?['name'] ?? 'غير معروف';
     final supplierName = loading['supplier']?['name'] ?? 'غير معروف';
+    final userName = loading['user']?['username'] ?? 'غير معروف';
     final notes = loading['notes']?.toString();
 
     return Card(
@@ -804,6 +787,19 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
 
           ListTile(
             leading: CircleAvatar(
+              backgroundColor: Colors.blue.withOpacity(0.1),
+              child: const Icon(Icons.person, color: Colors.blue, size: 20),
+            ),
+            title: const Text('المستخدم'),
+            subtitle: Text(
+              '$userName${loading['user']?['role'] == 'employee' ? ' (موظف)' : ''}',
+            ),
+            dense: true,
+          ),
+          const Divider(height: 1),
+
+          ListTile(
+            leading: CircleAvatar(
               backgroundColor: Colors.purple.withOpacity(0.1),
               child: const Icon(
                 Icons.inventory,
@@ -813,17 +809,6 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
             ),
             title: const Text('الكمية'),
             subtitle: Text('${quantity.toInt()} وحدة'),
-            dense: true,
-          ),
-          const Divider(height: 1),
-
-          ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.red.withOpacity(0.1),
-              child: const Icon(Icons.scale, color: Colors.red, size: 20),
-            ),
-            title: const Text('الوزن القائم'),
-            subtitle: Text('${grossWeight.toDouble().toStringAsFixed(1)} كجم'),
             dense: true,
           ),
           const Divider(height: 1),
@@ -895,13 +880,13 @@ class _LoadingDetailsPage extends StatelessWidget {
   String _buildLoadingHtml() {
     final netWeight = (loading['netWeight'] ?? 0) as num;
     final totalLoading = (loading['totalLoading'] ?? 0) as num;
-    final grossWeight = (loading['grossWeight'] ?? 0) as num;
     final quantity = (loading['quantity'] ?? 0) as num;
     final loadingPrice = (loading['loadingPrice'] ?? 0) as num;
     final orderId = loading['_id']?.toString().substring(0, 8) ?? 'غير معروف';
     final createdAt = _formatDateTime(loading['createdAt']);
     final chickenType = loading['chickenType']?['name'] ?? 'غير معروف';
     final supplierName = loading['supplier']?['name'] ?? 'غير معروف';
+    final userName = loading['user']?['username'] ?? 'غير معروف';
     final notes = loading['notes']?.toString() ?? '';
 
     return '''
@@ -927,6 +912,10 @@ class _LoadingDetailsPage extends StatelessWidget {
               <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>نوع الدجاج:</strong></td>
               <td style="padding: 8px; border-bottom: 1px solid #ddd;">$chickenType</td>
             </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>المستخدم:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">$userName${loading['user']?['role'] == 'employee' ? ' (موظف)' : ''}</td>
+            </tr>
           </table>
         </div>
 
@@ -936,10 +925,6 @@ class _LoadingDetailsPage extends StatelessWidget {
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>الكمية:</strong></td>
               <td style="padding: 8px; border-bottom: 1px solid #ddd;">${quantity.toInt()} وحدة</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>الوزن القائم:</strong></td>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${grossWeight.toDouble().toStringAsFixed(1)} كجم</td>
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>الوزن الصافي:</strong></td>

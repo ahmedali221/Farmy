@@ -304,163 +304,58 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
                   size: 28,
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'حالة المديونية',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.customer['name'] ?? 'غير معروف',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isDebtFree
-                            ? Colors.green.shade700
-                            : Colors.grey.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDebtInfoCard(
-                  'إجمالي التوزيعات',
-                  '${totalDistributionValue.toStringAsFixed(2)} ج.م',
-                  Icons.outbound,
-                  Colors.orange,
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: (isDebtFree ? Colors.green : Colors.grey).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: (isDebtFree ? Colors.green : Colors.grey).withOpacity(
+                  0.3,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildDebtInfoCard(
-                  'إجمالي المدفوعات',
-                  '${totalPaidValue.toStringAsFixed(2)} ج.م',
-                  Icons.payment,
-                  Colors.green,
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  isDebtFree ? Icons.check_circle : Icons.warning,
+                  color: isDebtFree ? Colors.green : Colors.grey,
+                  size: 32,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDebtInfoCard(
-                  'إجمالي الخصومات',
-                  '${totalDiscount.toStringAsFixed(2)} ج.م',
-                  Icons.percent,
-                  Colors.deepOrange,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: (isDebtFree ? Colors.green : Colors.grey)
-                        .withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: (isDebtFree ? Colors.green : Colors.grey)
-                          .withOpacity(0.3),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        isDebtFree ? Icons.check_circle : Icons.warning,
-                        color: isDebtFree ? Colors.green : Colors.grey,
-                        size: 24,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'المديونية الحالية',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${currentDebt.toStringAsFixed(2)} ج.م',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isDebtFree ? Colors.green : Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        isDebtFree ? 'مدفوع بالكامل' : 'مطلوب الدفع',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: isDebtFree
-                              ? Colors.green.shade600
-                              : Colors.grey.shade600,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 12),
+                Text(
+                  'المديونية الحالية',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700],
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDebtInfoCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
+                const SizedBox(height: 8),
+                Text(
+                  '${currentDebt.toStringAsFixed(2)} ج.م',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: isDebtFree ? Colors.green : Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  isDebtFree ? 'مدفوع بالكامل' : 'مطلوب الدفع',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDebtFree
+                        ? Colors.green.shade600
+                        : Colors.grey.shade600,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),

@@ -46,16 +46,17 @@ exports.createDistribution = async (req, res) => {
     const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
     const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
-    // Find available loadings for the same day and chicken type
+    // Find available loadings for the same day AND previous days with remaining quantities
+    // This allows remaining inventory from previous days to be available for distribution
     const availableLoadings = await Loading.find({
-      loadingDate: { $gte: startOfDay, $lt: endOfDay },
+      loadingDate: { $lte: endOfDay }, // Include all loadings up to and including the target date
       chickenType: chickenTypeDoc._id,
       remainingQuantity: { $gt: 0 }
     }).populate('chickenType');
 
     if (availableLoadings.length === 0) {
       return res.status(400).json({ 
-        message: `No available loadings found for chicken type "${chickenTypeDoc.name}" on ${targetDate.toDateString()}` 
+        message: `No available loadings found for chicken type "${chickenTypeDoc.name}" (including previous days' remaining inventory)` 
       });
     }
 
@@ -479,7 +480,7 @@ exports.getDistributionsByDate = async (req, res) => {
   }
 };
 
-// Get available loadings for distribution (same day, same chicken type)
+// Get available loadings for distribution (same day + previous days with remaining quantities)
 exports.getAvailableLoadings = async (req, res) => {
   try {
     const { date, chickenType } = req.query;
@@ -492,9 +493,10 @@ exports.getAvailableLoadings = async (req, res) => {
     const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
     const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
-    // Find loadings for the same day and chicken type that have remaining quantities
+    // Find loadings for the same day AND previous days that have remaining quantities
+    // This allows remaining inventory from previous days to be available for distribution
     const loadings = await Loading.find({
-      loadingDate: { $gte: startOfDay, $lt: endOfDay },
+      loadingDate: { $lte: endOfDay }, // Include all loadings up to and including the target date
       chickenType: chickenType,
       remainingQuantity: { $gt: 0 }
     })
@@ -510,7 +512,7 @@ exports.getAvailableLoadings = async (req, res) => {
   }
 };
 
-// Get chicken types that have loadings on a specific date
+// Get chicken types that have loadings on a specific date (including previous days' remaining inventory)
 exports.getAvailableChickenTypes = async (req, res) => {
   try {
     const { date } = req.query;
@@ -523,9 +525,10 @@ exports.getAvailableChickenTypes = async (req, res) => {
     const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
     const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
-    // Find distinct chicken types that have loadings on the specified date with remaining quantities
+    // Find distinct chicken types that have loadings up to and including the specified date with remaining quantities
+    // This allows remaining inventory from previous days to be available for distribution
     const loadings = await Loading.find({
-      loadingDate: { $gte: startOfDay, $lt: endOfDay },
+      loadingDate: { $lte: endOfDay }, // Include all loadings up to and including the target date
       remainingQuantity: { $gt: 0 }
     })
     .populate('chickenType', 'name')
@@ -556,9 +559,10 @@ exports.getAvailableQuantities = async (req, res) => {
     const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
     const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
-    // Find loadings for the same day and chicken type that have remaining quantities
+    // Find loadings for the same day AND previous days that have remaining quantities
+    // This allows remaining inventory from previous days to be available for distribution
     const loadings = await Loading.find({
-      loadingDate: { $gte: startOfDay, $lt: endOfDay },
+      loadingDate: { $lte: endOfDay }, // Include all loadings up to and including the target date
       chickenType: chickenType,
       remainingQuantity: { $gt: 0 }
     })

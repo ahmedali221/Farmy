@@ -875,7 +875,9 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
               child: const Icon(Icons.person, color: Colors.blue, size: 20),
             ),
             title: const Text('المستخدم'),
-            subtitle: Text(userName),
+            subtitle: Text(
+              '$userName${distribution['user']?['role'] == 'employee' ? ' (موظف)' : ''}',
+            ),
             dense: true,
           ),
           const Divider(height: 1),
@@ -993,7 +995,7 @@ class _DistributionDetailsPage extends StatelessWidget {
             </tr>
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>المستخدم:</strong></td>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd;">$userName</td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">$userName${distribution['user']?['role'] == 'employee' ? ' (موظف)' : ''}</td>
             </tr>
           </table>
         </div>

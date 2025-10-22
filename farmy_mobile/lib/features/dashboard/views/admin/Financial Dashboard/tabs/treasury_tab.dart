@@ -5,6 +5,7 @@ import '../../../../../../core/services/employee_api_service.dart';
 import '../../../../../../core/services/employee_expense_api_service.dart';
 import '../../../../../../core/services/loading_api_service.dart';
 import '../../../../../../core/services/finance_api_service.dart';
+import '../../../../../../core/services/distribution_api_service.dart';
 
 class TreasuryTab extends StatefulWidget {
   const TreasuryTab({super.key});
@@ -19,6 +20,7 @@ class _TreasuryTabState extends State<TreasuryTab> {
   late final EmployeeExpenseApiService _employeeExpenseService;
   late final LoadingApiService _loadingService;
   late final FinanceApiService _financeService;
+  late final DistributionApiService _distributionService;
 
   bool _loading = true;
   String? _error;
@@ -30,6 +32,12 @@ class _TreasuryTabState extends State<TreasuryTab> {
   List<Map<String, dynamic>> _externalRevenueHistory = [];
   double _totalWithdrawals = 0.0;
   List<Map<String, dynamic>> _withdrawalsHistory = [];
+  double _totalDistributions = 0.0;
+  double _previousDayTreasury = 0.0;
+
+  // Daily filter variables
+  DateTime _selectedDate = DateTime.now();
+  bool _isDailyFilter = false;
 
   @override
   void initState() {
@@ -39,6 +47,27 @@ class _TreasuryTabState extends State<TreasuryTab> {
     _employeeExpenseService = serviceLocator<EmployeeExpenseApiService>();
     _loadingService = serviceLocator<LoadingApiService>();
     _financeService = serviceLocator<FinanceApiService>();
+    _distributionService = serviceLocator<DistributionApiService>();
+    _loadData();
+  }
+
+  Future<void> _pickDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+      _loadData();
+    }
+  }
+
+  void _toggleDailyFilter() {
+    setState(() {
+      _isDailyFilter = !_isDailyFilter;
+    });
     _loadData();
   }
 
@@ -54,24 +83,142 @@ class _TreasuryTabState extends State<TreasuryTab> {
         _paymentService.getUserCollectionsSummary(),
         _loadingService.getAllLoadings(),
         _financeService.getDailyFinancialReports(),
+        _distributionService.getAllDistributions(),
       ]);
 
       final list = results[0];
       final allLoadings = results[1];
       final financeReports = results[2];
+      final allDistributions = results[3];
+
+      // Apply daily filter if enabled
+      List<Map<String, dynamic>> filteredLoadings = allLoadings;
+      List<Map<String, dynamic>> filteredFinanceReports = financeReports;
+      List<Map<String, dynamic>> filteredDistributions = allDistributions;
+
+      if (_isDailyFilter) {
+        final targetDate = _selectedDate;
+        final startOfDay = DateTime(
+          targetDate.year,
+          targetDate.month,
+          targetDate.day,
+        );
+        final endOfDay = DateTime(
+          targetDate.year,
+          targetDate.month,
+          targetDate.day + 1,
+        );
+
+        // Filter loadings by date
+        filteredLoadings = allLoadings.where((loading) {
+          final createdAt = DateTime.parse(loading['createdAt'] ?? '');
+          return createdAt.isAfter(startOfDay) && createdAt.isBefore(endOfDay);
+        }).toList();
+
+        // Filter finance reports by date
+        filteredFinanceReports = financeReports.where((report) {
+          final reportDate = DateTime.parse(report['date'] ?? '');
+          return reportDate.isAfter(startOfDay) &&
+              reportDate.isBefore(endOfDay);
+        }).toList();
+
+        // Filter distributions by date
+        filteredDistributions = allDistributions.where((distribution) {
+          final createdAt = DateTime.parse(distribution['createdAt'] ?? '');
+          return createdAt.isAfter(startOfDay) && createdAt.isBefore(endOfDay);
+        }).toList();
+      }
 
       // Calculate total loading amount
-      final totalLoading = allLoadings.fold<double>(0.0, (sum, loading) {
+      final totalLoading = filteredLoadings.fold<double>(0.0, (sum, loading) {
         final num totalLoadingAmount = (loading['totalLoading'] ?? 0) as num;
         return sum + totalLoadingAmount.toDouble();
       });
+
+      // Calculate total distributions amount
+      final totalDistributions = filteredDistributions.fold<double>(0.0, (
+        sum,
+        distribution,
+      ) {
+        final num totalAmount = (distribution['totalAmount'] ?? 0) as num;
+        return sum + totalAmount.toDouble();
+      });
+
+      // Calculate previous day treasury (only for daily filter)
+      double previousDayTreasury = 0.0;
+      if (_isDailyFilter) {
+        final previousDay = DateTime(
+          _selectedDate.year,
+          _selectedDate.month,
+          _selectedDate.day - 1,
+        );
+        final previousDayStart = DateTime(
+          previousDay.year,
+          previousDay.month,
+          previousDay.day,
+        );
+        final previousDayEnd = DateTime(
+          previousDay.year,
+          previousDay.month,
+          previousDay.day + 1,
+        );
+
+        // Calculate previous day's treasury using the same logic
+        final previousDayLoadings = allLoadings.where((loading) {
+          final createdAt = DateTime.parse(loading['createdAt'] ?? '');
+          return createdAt.isAfter(previousDayStart) &&
+              createdAt.isBefore(previousDayEnd);
+        }).toList();
+
+        final previousDayDistributions = allDistributions.where((distribution) {
+          final createdAt = DateTime.parse(distribution['createdAt'] ?? '');
+          return createdAt.isAfter(previousDayStart) &&
+              createdAt.isBefore(previousDayEnd);
+        }).toList();
+
+        final previousDayFinanceReports = financeReports.where((report) {
+          final reportDate = DateTime.parse(report['date'] ?? '');
+          return reportDate.isAfter(previousDayStart) &&
+              reportDate.isBefore(previousDayEnd);
+        }).toList();
+
+        final prevLoading = previousDayLoadings.fold<double>(0.0, (
+          sum,
+          loading,
+        ) {
+          final num totalLoadingAmount = (loading['totalLoading'] ?? 0) as num;
+          return sum + totalLoadingAmount.toDouble();
+        });
+
+        final prevDistributions = previousDayDistributions.fold<double>(0.0, (
+          sum,
+          distribution,
+        ) {
+          final num totalAmount = (distribution['totalAmount'] ?? 0) as num;
+          return sum + totalAmount.toDouble();
+        });
+
+        double prevWithdrawals = 0.0;
+        for (final rec in previousDayFinanceReports) {
+          final bool hasEmployee =
+              rec['employee'] != null && rec['employee'].toString().isNotEmpty;
+          if (hasEmployee) continue;
+          final num expenses = (rec['expenses'] ?? 0) as num;
+          if (expenses > 0) {
+            prevWithdrawals += expenses.toDouble();
+          }
+        }
+
+        // Previous day treasury calculation (simplified - you might need to adjust this)
+        previousDayTreasury = prevDistributions - prevLoading - prevWithdrawals;
+      }
 
       // External revenue and withdrawals (no employee)
       final List<Map<String, dynamic>> externalList = [];
       final List<Map<String, dynamic>> withdrawalsList = [];
       double external = 0.0;
       double withdrawals = 0.0;
-      for (final rec in financeReports) {
+      for (final rec in filteredFinanceReports) {
         final bool hasEmployee =
             rec['employee'] != null && rec['employee'].toString().isNotEmpty;
         if (hasEmployee) continue;
@@ -111,6 +258,8 @@ class _TreasuryTabState extends State<TreasuryTab> {
       setState(() {
         _employeeCollections = list;
         _totalLoadingAmount = totalLoading;
+        _totalDistributions = totalDistributions;
+        _previousDayTreasury = previousDayTreasury;
         _totalExternalRevenue = external;
         _externalRevenueHistory = externalList;
         _totalWithdrawals = withdrawals;
@@ -317,12 +466,19 @@ class _TreasuryTabState extends State<TreasuryTab> {
 
     final double total = _totalCollected();
     final double totalOther = _sumAllOtherExpenses();
-    final double net =
-        total +
-        _totalExternalRevenue -
-        _totalLoadingAmount -
-        totalOther -
-        _totalWithdrawals;
+
+    // Apply different calculation logic based on filter type
+    final double net = _isDailyFilter
+        ? _previousDayTreasury +
+              _totalDistributions -
+              _totalLoadingAmount -
+              totalOther -
+              _totalWithdrawals
+        : total +
+              _totalExternalRevenue -
+              _totalLoadingAmount -
+              totalOther -
+              _totalWithdrawals;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -332,6 +488,71 @@ class _TreasuryTabState extends State<TreasuryTab> {
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             children: [
+              // Daily Filter Controls
+              Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.filter_list,
+                          color: Theme.of(context).primaryColor,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'تصفية البيانات',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Spacer(),
+                        Switch(
+                          value: _isDailyFilter,
+                          onChanged: (value) => _toggleDailyFilter(),
+                          activeColor: Theme.of(context).primaryColor,
+                        ),
+                      ],
+                    ),
+                    if (_isDailyFilter) ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _pickDate,
+                              icon: const Icon(Icons.calendar_today),
+                              label: Text(
+                                '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            onPressed: _loadData,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('تحديث'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
               // Header Card
               Container(
                 width: double.infinity,
@@ -363,9 +584,11 @@ class _TreasuryTabState extends State<TreasuryTab> {
                       size: 64,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'الخزنة المالية',
-                      style: TextStyle(
+                    Text(
+                      _isDailyFilter
+                          ? 'الخزنة المالية - ${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}'
+                          : 'الخزنة المالية',
+                      style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,

@@ -24,7 +24,7 @@ const loadingSchema = new mongoose.Schema({
     required: true,
     min: 1
   },
-  grossWeight: {
+  netWeight: {
     type: Number,
     required: true,
     min: 0
@@ -37,11 +37,6 @@ const loadingSchema = new mongoose.Schema({
   
   // الحقول المحسوبة تلقائياً
   emptyWeight: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  netWeight: {
     type: Number,
     required: true,
     min: 0
@@ -159,10 +154,10 @@ loadingSchema.pre('save', function(next) {
   // حساب الوزن الفارغ
   this.emptyWeight = this.quantity * 8;
   
-  // حساب الوزن الصافي
-  this.netWeight = Math.max(0, this.grossWeight - this.emptyWeight);
+  // الوزن الصافي يأتي من المستخدم (مدخل يدوي)
+  // لا نحسبه تلقائياً
   
-  // حساب إجمالي التحميل
+  // حساب إجمالي التحميل باستخدام الوزن الصافي المدخل
   this.totalLoading = this.netWeight * this.loadingPrice;
   
   // حساب الكميات المتبقية

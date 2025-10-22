@@ -10,7 +10,7 @@ const loadingSchema = Joi.object({
   chickenType: Joi.string().required(),
   supplier: Joi.string().required(),
   quantity: Joi.number().min(1).required(),
-  grossWeight: Joi.number().min(0).required(),
+  netWeight: Joi.number().min(0).required(),
   loadingPrice: Joi.number().min(0).required(),
   notes: Joi.string().allow('', null),
   loadingDate: Joi.date().default(Date.now)
@@ -18,20 +18,19 @@ const loadingSchema = Joi.object({
 
 // Helper function to calculate loading values
 const calculateLoadingValues = (loadingData) => {
-  const { grossWeight, quantity, loadingPrice } = loadingData;
+  const { quantity, netWeight, loadingPrice } = loadingData;
   
   // الوزن الفارغ = العدد × 8
   const emptyWeight = quantity * 8;
   
-  // الوزن الصافي = الوزن القائم - الوزن الفارغ
-  const netWeight = Math.max(0, grossWeight - emptyWeight);
+  // الوزن الصافي يأتي من المستخدم (مدخل يدوي)
+  // لا نحسبه تلقائياً
   
   // إجمالي التحميل = الوزن الصافي × سعر التحميل
   const totalLoading = netWeight * loadingPrice;
   
   return {
     emptyWeight,
-    netWeight,
     totalLoading
   };
 };
@@ -46,7 +45,7 @@ exports.createLoading = async (req, res) => {
     
     const loadingData = {
       ...req.body,
-      ...calculatedValues, // Add calculated netWeight and totalLoading
+      ...calculatedValues, // Add calculated emptyWeight and totalLoading
       user: req.user.id // Current logged-in user (manager or employee)
     };
 
@@ -197,12 +196,12 @@ exports.updateLoading = async (req, res) => {
       updateData.chickenType = chickenType._id;
     }
 
-    // If any of quantity/grossWeight/loadingPrice changes, recalc fields
-    const willRecalc = ['quantity', 'grossWeight', 'loadingPrice'].some(k => updateData[k] !== undefined);
+    // If any of quantity/netWeight/loadingPrice changes, recalc fields
+    const willRecalc = ['quantity', 'netWeight', 'loadingPrice'].some(k => updateData[k] !== undefined);
     if (willRecalc) {
       const base = {
         quantity: updateData.quantity !== undefined ? Number(updateData.quantity) : existing.quantity,
-        grossWeight: updateData.grossWeight !== undefined ? Number(updateData.grossWeight) : existing.grossWeight,
+        netWeight: updateData.netWeight !== undefined ? Number(updateData.netWeight) : existing.netWeight,
         loadingPrice: updateData.loadingPrice !== undefined ? Number(updateData.loadingPrice) : existing.loadingPrice
       };
       const calculated = calculateLoadingValues(base);

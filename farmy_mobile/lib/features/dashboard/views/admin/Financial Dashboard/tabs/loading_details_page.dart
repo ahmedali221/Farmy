@@ -25,6 +25,7 @@ class _LoadingDetailsPageState extends State<LoadingDetailsPage> {
   List<Map<String, dynamic>> _loadings = [];
   Map<String, num> _chickenTypeTotals = {};
   num _totalRemainingWeight = 0;
+  num _totalMoneySpent = 0;
 
   @override
   void initState() {
@@ -40,20 +41,24 @@ class _LoadingDetailsPageState extends State<LoadingDetailsPage> {
       // Calculate totals by chicken type
       final Map<String, num> chickenTypeTotals = {};
       num totalRemainingWeight = 0;
+      num totalMoneySpent = 0;
 
       for (final loading in loadings) {
         final chickenType = loading['chickenType']?['name'] ?? 'غير محدد';
         final remainingWeight = (loading['remainingNetWeight'] ?? 0) as num;
+        final moneySpent = (loading['totalLoading'] ?? 0) as num;
 
         chickenTypeTotals[chickenType] =
             (chickenTypeTotals[chickenType] ?? 0) + remainingWeight;
         totalRemainingWeight += remainingWeight;
+        totalMoneySpent += moneySpent;
       }
 
       setState(() {
         _loadings = loadings;
         _chickenTypeTotals = chickenTypeTotals;
         _totalRemainingWeight = totalRemainingWeight;
+        _totalMoneySpent = totalMoneySpent;
       });
     } catch (e) {
       if (!mounted) return;
@@ -113,6 +118,19 @@ class _LoadingDetailsPageState extends State<LoadingDetailsPage> {
                                   title: 'الوزن المتبقي',
                                   value: _totalRemainingWeight,
                                   color: Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _SummaryTile(
+                                  title: 'إجمالي المبلغ المنفق',
+                                  value: _totalMoneySpent,
+                                  color: Colors.red,
+                                  isMoney: true,
                                 ),
                               ),
                             ],
@@ -205,11 +223,13 @@ class _SummaryTile extends StatelessWidget {
   final String title;
   final num value;
   final Color color;
+  final bool isMoney;
 
   const _SummaryTile({
     required this.title,
     required this.value,
     required this.color,
+    this.isMoney = false,
   });
 
   @override
@@ -230,7 +250,9 @@ class _SummaryTile extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '${NumberFormat('#,##0.###').format(value)} كجم',
+            isMoney
+                ? '${NumberFormat('#,##0.###').format(value)} ج.م'
+                : '${NumberFormat('#,##0.###').format(value)} كجم',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: color,
               fontWeight: FontWeight.bold,
@@ -258,6 +280,7 @@ class _LoadingCard extends StatelessWidget {
     final netWeight = (loading['netWeight'] ?? 0) as num;
     final remainingWeight = (loading['remainingNetWeight'] ?? 0) as num;
     final distributedWeight = netWeight - remainingWeight;
+    final totalLoading = (loading['totalLoading'] ?? 0) as num;
     final loadingDate = loading['loadingDate']?.toString() ?? '';
 
     DateTime? parsedDate;
@@ -352,6 +375,30 @@ class _LoadingCard extends StatelessWidget {
                 ),
               ],
             ),
+            // Money spent section
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.red.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.money_off, color: Colors.red, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'المبلغ المنفق: ${NumberFormat('#,##0.###').format(totalLoading)} ج.م',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             if (distributedWeight > 0) ...[
               const SizedBox(height: 8),
               Container(

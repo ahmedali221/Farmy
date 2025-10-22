@@ -6,6 +6,7 @@ import '../../../../../../core/services/inventory_api_service.dart';
 import '../../../../../../core/services/payment_api_service.dart';
 import '../../../../../../core/services/distribution_api_service.dart';
 import '../../../../../../core/services/waste_api_service.dart';
+import '../../../../../../core/services/loading_api_service.dart';
 import 'loading_details_page.dart';
 import 'distribution_details_page.dart';
 
@@ -30,6 +31,7 @@ class _InventoryTabState extends State<InventoryTab> {
   num _discountsTotal = 0;
   Map<String, dynamic>? _shortageData;
   Map<String, dynamic>? _wasteData;
+  Map<String, dynamic>? _totalProfitData;
 
   final TextEditingController _adjController = TextEditingController();
 
@@ -66,6 +68,14 @@ class _InventoryTabState extends State<InventoryTab> {
       final String dateStr = _formatDate(_selectedDate);
       final data = await _inventoryApi.getDailyInventoryByDate(dateStr);
       final profit = await _inventoryApi.getDailyProfit(dateStr);
+
+      // Load total profit history
+      Map<String, dynamic>? totalProfitData;
+      try {
+        totalProfitData = await _inventoryApi.getTotalProfitHistory();
+      } catch (e) {
+        debugPrint('[InventoryTab] Failed to load total profit data: $e');
+      }
 
       // Load shortage data
       Map<String, dynamic>? shortageData;
@@ -123,11 +133,11 @@ class _InventoryTabState extends State<InventoryTab> {
           'loadingsTotal': profit['loadingsTotal'],
           'expensesTotal': profit['expensesTotal'],
           'loadingPricesSum': profit['loadingPricesSum'],
-          'wasteCost': profit['wasteCost'] ?? 0,
         };
         _discountsTotal = discountsTotal;
         _shortageData = shortageData;
         _wasteData = wasteData;
+        _totalProfitData = totalProfitData;
         // If backend has a saved adjustment, reflect it; otherwise start from 0
         final num backendAdj = (data['adminAdjustment'] ?? 0) as num;
         _adjController.text = backendAdj.toString();
@@ -233,7 +243,6 @@ class _InventoryTabState extends State<InventoryTab> {
     final num loadingsTotal = (_data?['loadingsTotal'] ?? 0) as num;
     final num expensesTotal = (_data?['expensesTotal'] ?? 0) as num;
     final num loadingPricesSum = (_data?['loadingPricesSum'] ?? 0) as num;
-    final num wasteCost = (_data?['wasteCost'] ?? 0) as num;
     final num profit = (_data?['profit'] ?? 0) as num;
 
     return Directionality(
@@ -267,6 +276,74 @@ class _InventoryTabState extends State<InventoryTab> {
               const SizedBox(height: 16),
               if (_loading) const LinearProgressIndicator(),
               const SizedBox(height: 12),
+
+              // Total Profit Placeholder
+              if (_totalProfitData != null) ...[
+                Card(
+                  color: Colors.green[50],
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.trending_up, color: Colors.green[700]),
+                            const SizedBox(width: 8),
+                            Text(
+                              'إجمالي الربح من جميع الأيام',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green[700],
+                                fontSize: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'إجمالي الربح: ${NumberFormat('#,##0.###').format(_totalProfitData!['totalProfit'])} ج.م',
+                          style: TextStyle(
+                            color: Colors.green[600],
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'إجمالي التوزيعات: ${NumberFormat('#,##0.###').format(_totalProfitData!['totalDistributions'])} ج.م',
+                          style: TextStyle(
+                            color: Colors.green[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          'إجمالي التحميل: ${NumberFormat('#,##0.###').format(_totalProfitData!['totalLoadings'])} ج.م',
+                          style: TextStyle(
+                            color: Colors.green[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          'إجمالي المصروفات: ${NumberFormat('#,##0.###').format(_totalProfitData!['totalExpenses'])} ج.م',
+                          style: TextStyle(
+                            color: Colors.green[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          'إجمالي الخصومات: ${NumberFormat('#,##0.###').format(_totalProfitData!['totalDiscounts'])} ج.م',
+                          style: TextStyle(
+                            color: Colors.green[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               Card(
                 child: Padding(
@@ -406,14 +483,13 @@ class _InventoryTabState extends State<InventoryTab> {
                                 expensesTotal: expensesTotal,
                                 loadingPricesSum: loadingPricesSum,
                                 discountsTotal: _discountsTotal,
-                                wasteCost: wasteCost,
                               ),
                             ),
                           );
                         },
                         child: _MetricTile(
                           label:
-                              'الربح = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل - إجمالي المصروفات - مصروفات التحميل - تكلفة الهالك',
+                              'الربح = إجمالي التوزيعات - إجمالي التحميل - إجمالي المصروفات - إجمالي الخصومات',
                           value: profit,
                           color: Colors.teal,
                         ),
@@ -568,7 +644,7 @@ class _MetricTile extends StatelessWidget {
   }
 }
 
-class _DailyProfitDetailsPage extends StatelessWidget {
+class _DailyProfitDetailsPage extends StatefulWidget {
   final String date;
   final num profit;
   final num distributionsTotal;
@@ -576,7 +652,6 @@ class _DailyProfitDetailsPage extends StatelessWidget {
   final num expensesTotal;
   final num loadingPricesSum;
   final num discountsTotal;
-  final num wasteCost;
 
   const _DailyProfitDetailsPage({
     required this.date,
@@ -586,89 +661,296 @@ class _DailyProfitDetailsPage extends StatelessWidget {
     required this.expensesTotal,
     required this.loadingPricesSum,
     required this.discountsTotal,
-    required this.wasteCost,
   });
+
+  @override
+  State<_DailyProfitDetailsPage> createState() =>
+      _DailyProfitDetailsPageState();
+}
+
+class _DailyProfitDetailsPageState extends State<_DailyProfitDetailsPage> {
+  final DistributionApiService _distributionApi =
+      serviceLocator<DistributionApiService>();
+  final LoadingApiService _loadingApi = serviceLocator<LoadingApiService>();
+
+  List<Map<String, dynamic>> _distributions = [];
+  List<Map<String, dynamic>> _loadings = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _loading = true);
+    try {
+      final targetDate = DateTime.parse(widget.date);
+
+      // Load distributions for the selected date
+      final allDistributions = await _distributionApi.getAllDistributions();
+      final filteredDistributions = allDistributions.where((distribution) {
+        final createdAt = DateTime.parse(distribution['createdAt'] ?? '');
+        return createdAt.year == targetDate.year &&
+            createdAt.month == targetDate.month &&
+            createdAt.day == targetDate.day;
+      }).toList();
+
+      // Load loadings for the selected date
+      final allLoadings = await _loadingApi.getAllLoadings();
+      final filteredLoadings = allLoadings.where((loading) {
+        final createdAt = DateTime.parse(loading['createdAt'] ?? '');
+        return createdAt.year == targetDate.year &&
+            createdAt.month == targetDate.month &&
+            createdAt.day == targetDate.day;
+      }).toList();
+
+      setState(() {
+        _distributions = filteredDistributions;
+        _loadings = filteredLoadings;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() => _loading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل تحميل البيانات: $e')));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: Text('تفاصيل الربح - $date')),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
+        appBar: AppBar(
+          title: Text('تفاصيل الربح - ${widget.date}'),
+          actions: [
+            IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
+          ],
+        ),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  // إجمالي الربح
+                  _MetricTile(
+                    label:
+                        'الربح الإجمالي = إجمالي التوزيعات - إجمالي التحميل - إجمالي المصروفات - إجمالي الخصومات',
+                    value: widget.profit,
+                    color: Colors.teal,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ملخص الإجماليات
+                  Card(
+                    elevation: 0,
+                    color: Colors.teal.withOpacity(0.02),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          dense: true,
+                          leading: const Icon(
+                            Icons.receipt_long,
+                            color: Colors.teal,
+                          ),
+                          title: const Text('إجمالي التوزيعات'),
+                          trailing: Text(
+                            NumberFormat(
+                              '#,##0.###',
+                            ).format(widget.distributionsTotal),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          dense: true,
+                          leading: const Icon(
+                            Icons.local_shipping,
+                            color: Colors.orange,
+                          ),
+                          title: const Text('إجمالي التحميل'),
+                          trailing: Text(
+                            NumberFormat(
+                              '#,##0.###',
+                            ).format(widget.loadingsTotal),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          dense: true,
+                          leading: const Icon(
+                            Icons.money_off,
+                            color: Colors.redAccent,
+                          ),
+                          title: const Text('إجمالي الخصومات'),
+                          trailing: Text(
+                            NumberFormat(
+                              '#,##0.###',
+                            ).format(widget.discountsTotal),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          dense: true,
+                          leading: const Icon(
+                            Icons.price_change,
+                            color: Colors.purple,
+                          ),
+                          title: const Text('إجمالي المصروفات'),
+                          trailing: Text(
+                            NumberFormat(
+                              '#,##0.###',
+                            ).format(widget.expensesTotal),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // تفاصيل التوزيعات
+                  if (_distributions.isNotEmpty) ...[
+                    Text(
+                      'تفاصيل التوزيعات (${_distributions.length} طلب)',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Colors.teal,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ..._distributions.map(
+                      (distribution) =>
+                          _DistributionProfitCard(distribution: distribution),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // تفاصيل التحميلات
+                  if (_loadings.isNotEmpty) ...[
+                    Text(
+                      'تفاصيل التحميلات (${_loadings.length} طلب)',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ..._loadings.map(
+                      (loading) => _LoadingProfitCard(loading: loading),
+                    ),
+                  ],
+
+                  // رسالة إذا لم توجد طلبات
+                  if (_distributions.isEmpty && _loadings.isEmpty)
+                    Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.inbox, size: 64, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(
+                            'لا توجد طلبات في هذا التاريخ',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _DistributionProfitCard extends StatelessWidget {
+  final Map<String, dynamic> distribution;
+
+  const _DistributionProfitCard({required this.distribution});
+
+  @override
+  Widget build(BuildContext context) {
+    final customerName = distribution['customer']?['name'] ?? 'غير محدد';
+    final chickenTypeName = distribution['chickenType']?['name'] ?? 'غير محدد';
+    final quantity = (distribution['quantity'] ?? 0) as num;
+    final totalAmount = (distribution['totalAmount'] ?? 0) as num;
+    final createdAt = DateTime.parse(distribution['createdAt'] ?? '');
+    final timeStr =
+        '${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _MetricTile(
-              label:
-                  'الربح = مبلغ إجمالي الوجبات - مبلغ إجمالي التحميل - إجمالي المصروفات - مصروفات التحميل - تكلفة الهالك',
-              value: profit,
-              color: Colors.teal,
+            Row(
+              children: [
+                Icon(Icons.outbound, color: Colors.teal, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'توزيع للعميل: $customerName',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                Text(
+                  timeStr,
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
-            Card(
-              elevation: 0,
-              color: Colors.teal.withOpacity(0.02),
-              child: Column(
+            Row(
+              children: [
+                Expanded(
+                  child: _InfoTile(
+                    label: 'نوع الفراخ',
+                    value: chickenTypeName,
+                    color: Colors.blue,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _InfoTile(
+                    label: 'الكمية',
+                    value: '${quantity.toInt()} وجبة',
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.teal.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.teal.withOpacity(0.3)),
+              ),
+              child: Row(
                 children: [
-                  ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.receipt_long, color: Colors.teal),
-                    title: const Text('مبلغ إجمالي الوجبات'),
-                    trailing: Text(
-                      NumberFormat('#,##0.###').format(distributionsTotal),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    dense: true,
-                    leading: const Icon(
-                      Icons.local_shipping,
-                      color: Colors.orange,
-                    ),
-                    title: const Text('مبلغ إجمالي التحميل'),
-                    trailing: Text(
-                      NumberFormat('#,##0.###').format(loadingsTotal),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    dense: true,
-                    leading: const Icon(
-                      Icons.money_off,
-                      color: Colors.redAccent,
-                    ),
-                    title: const Text('إجمالي ما تم خصمه'),
-                    trailing: Text(
-                      NumberFormat('#,##0.###').format(discountsTotal),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    dense: true,
-                    leading: const Icon(
-                      Icons.price_change,
-                      color: Colors.purple,
-                    ),
-                    title: const Text('مصروفات التحميل (مجموع أسعار التحميل)'),
-                    trailing: Text(
-                      NumberFormat('#,##0.###').format(loadingPricesSum),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    dense: true,
-                    leading: const Icon(
-                      Icons.delete_outline,
-                      color: Colors.orange,
-                    ),
-                    title: const Text('تكلفة الهالك'),
-                    trailing: Text(
-                      NumberFormat('#,##0.###').format(wasteCost),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                  Icon(Icons.attach_money, color: Colors.teal, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'المبلغ: ${NumberFormat('#,##0.###').format(totalAmount)} ج.م',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.teal,
                     ),
                   ),
                 ],
@@ -676,6 +958,143 @@ class _DailyProfitDetailsPage extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LoadingProfitCard extends StatelessWidget {
+  final Map<String, dynamic> loading;
+
+  const _LoadingProfitCard({required this.loading});
+
+  @override
+  Widget build(BuildContext context) {
+    final supplierName = loading['supplier']?['name'] ?? 'غير محدد';
+    final chickenTypeName = loading['chickenType']?['name'] ?? 'غير محدد';
+    final quantity = (loading['quantity'] ?? 0) as num;
+    final totalLoading = (loading['totalLoading'] ?? 0) as num;
+    final createdAt = DateTime.parse(loading['createdAt'] ?? '');
+    final timeStr =
+        '${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.local_shipping, color: Colors.orange, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'تحميل من المورد: $supplierName',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                Text(
+                  timeStr,
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _InfoTile(
+                    label: 'نوع الفراخ',
+                    value: chickenTypeName,
+                    color: Colors.blue,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _InfoTile(
+                    label: 'الكمية',
+                    value: '${quantity.toInt()} وحدة',
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.money_off, color: Colors.orange, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'المصروف: ${NumberFormat('#,##0.###').format(totalLoading)} ج.م',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _InfoTile({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

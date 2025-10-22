@@ -119,6 +119,52 @@ class InventoryApiService {
     }
   }
 
+  /// Get total profit history (sum of all daily profits)
+  /// [startDate] and [endDate] are optional - if not provided, calculates from all time
+  Future<Map<String, dynamic>> getTotalProfitHistory({
+    String? startDate,
+    String? endDate,
+  }) async {
+    try {
+      final headers = await _getAuthHeaders();
+      String url = '$baseUrl/stocks/total-profit';
+
+      // Add query parameters if provided
+      final queryParams = <String, String>{};
+      if (startDate != null) queryParams['startDate'] = startDate;
+      if (endDate != null) queryParams['endDate'] = endDate;
+
+      if (queryParams.isNotEmpty) {
+        url +=
+            '?${queryParams.entries.map((e) => '${e.key}=${e.value}').join('&')}';
+      }
+
+      final response = await http.get(Uri.parse(url), headers: headers);
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else {
+        try {
+          final errorData = json.decode(response.body);
+          throw ApiException(
+            message:
+                errorData['message'] ?? 'Failed to load total profit history',
+            statusCode: response.statusCode,
+          );
+        } catch (_) {
+          throw ApiException(
+            message:
+                'HTTP ${response.statusCode}: ${response.reasonPhrase ?? 'Unexpected response'}',
+            statusCode: response.statusCode,
+          );
+        }
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
   /// Upsert daily inventory values using admin inputs
   /// Calculates result using: (netLoadingWeight - netDistributionWeight) - adminAdjustment
   Future<Map<String, dynamic>> upsertDailyInventory({

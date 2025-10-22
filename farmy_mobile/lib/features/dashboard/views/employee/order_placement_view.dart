@@ -41,7 +41,6 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
   final _quantityController = TextEditingController();
   final _totalPriceController = TextEditingController();
   // التحميل controllers
-  final _grossWeightController = TextEditingController();
   final _emptyWeightController = TextEditingController();
   final _netWeightController = TextEditingController();
   final _loadingPriceController = TextEditingController();
@@ -54,9 +53,9 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
   void initState() {
     super.initState();
     _loadData();
-    _grossWeightController.addListener(_calculateLoadingValues);
     _quantityController.addListener(_calculateLoadingValues);
     _loadingPriceController.addListener(_calculateLoadingValues);
+    _netWeightController.addListener(_calculateLoadingValues);
     _quantityController.addListener(_onQuantityChanged);
   }
 
@@ -65,7 +64,6 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
     _supplierNameController.dispose();
     _quantityController.dispose();
     _totalPriceController.dispose();
-    _grossWeightController.dispose();
     _emptyWeightController.dispose();
     _netWeightController.dispose();
     _loadingPriceController.dispose();
@@ -80,30 +78,28 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
   }
 
   void _calculateLoadingValues() {
-    final gross = double.tryParse(_grossWeightController.text);
     final count = double.tryParse(_quantityController.text);
     final loadingPrice = double.tryParse(_loadingPriceController.text);
+    final netWeight = double.tryParse(_netWeightController.text);
 
     // Only calculate if all required values are provided
-    if (gross != null && count != null && loadingPrice != null) {
+    if (count != null && loadingPrice != null) {
       // الوزن الفارغ = العدد × 8
       final emptyWeight = count * 8;
       _emptyWeightController.text = emptyWeight.toStringAsFixed(2);
 
-      // الوزن الصافي = الوزن القائم - الوزن الفارغ
-      final netWeight = gross - emptyWeight;
-      _netWeightController.text = netWeight.toStringAsFixed(2);
-
-      // إجمالي التحميل = الوزن الصافي × سعر التحميل
-      final totalLoading = netWeight * loadingPrice;
-      _totalLoadingController.text = totalLoading.toStringAsFixed(2);
-
-      // Update legacy fields for backward compatibility
-      _totalPriceController.text = totalLoading.toStringAsFixed(2);
+      // إجمالي التحميل = الوزن الصافي × سعر التحميل (إذا كان الوزن الصافي مدخل)
+      if (netWeight != null) {
+        final totalLoading = netWeight * loadingPrice;
+        _totalLoadingController.text = totalLoading.toStringAsFixed(2);
+        _totalPriceController.text = totalLoading.toStringAsFixed(2);
+      } else {
+        _totalLoadingController.clear();
+        _totalPriceController.clear();
+      }
     } else {
       // Clear calculated fields if any required value is missing
       _emptyWeightController.clear();
-      _netWeightController.clear();
       _totalLoadingController.clear();
       _totalPriceController.clear();
     }
@@ -187,7 +183,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
         'chickenType': selectedChickenTypeId,
         'supplier': selectedSupplierId,
         'quantity': double.parse(_quantityController.text),
-        'grossWeight': double.tryParse(_grossWeightController.text) ?? 0,
+        'netWeight': double.tryParse(_netWeightController.text) ?? 0,
         'loadingPrice': double.tryParse(_loadingPriceController.text) ?? 0,
         // Use the user-selected date (can be an old date)
         'loadingDate': _selectedDate.toIso8601String(),
@@ -245,7 +241,6 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
       _supplierNameController.clear();
       _quantityController.clear();
       _totalPriceController.clear();
-      _grossWeightController.clear();
       _emptyWeightController.clear();
       _netWeightController.clear();
       _loadingPriceController.clear();
@@ -264,7 +259,6 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
 
       final now = DateTime.now();
       final qty = _quantityController.text;
-      final gross = _grossWeightController.text;
       final empty = _emptyWeightController.text;
       final net = _netWeightController.text;
       final price = _loadingPriceController.text;
@@ -283,7 +277,6 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
   </div>
   <table style="width:100%;border-collapse:collapse;margin-top:8px;">
     <tr><td style="border:1px solid #e0e0e0;padding:8px;width:40%;">العدد</td><td style="border:1px solid #e0e0e0;padding:8px;">$qty</td></tr>
-    <tr><td style="border:1px solid #e0e0e0;padding:8px;">وزن القائم (كجم)</td><td style="border:1px solid #e0e0e0;padding:8px;">$gross</td></tr>
     <tr><td style="border:1px solid #e0e0e0;padding:8px;">الوزن الفارغ (كجم)</td><td style="border:1px solid #e0e0e0;padding:8px;">$empty</td></tr>
     <tr><td style="border:1px solid #e0e0e0;padding:8px;">الوزن الصافي (كجم)</td><td style="border:1px solid #e0e0e0;padding:8px;">$net</td></tr>
     <tr><td style="border:1px solid #e0e0e0;padding:8px;">سعر التحميل (ج.م/كجم)</td><td style="border:1px solid #e0e0e0;padding:8px;">$price</td></tr>
@@ -691,26 +684,6 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                           const SizedBox(height: 12),
 
                                           _NumField(
-                                            label: 'الوزن القائم (كيلو)',
-                                            controller: _grossWeightController,
-                                            validator: (value) {
-                                              if (value == null ||
-                                                  value.isEmpty) {
-                                                return 'يرجى إدخال الوزن القائم';
-                                              }
-                                              final weight = double.tryParse(
-                                                value,
-                                              );
-                                              if (weight == null ||
-                                                  weight <= 0) {
-                                                return 'يرجى إدخال وزن صحيح';
-                                              }
-                                              return null;
-                                            },
-                                          ),
-                                          const SizedBox(height: 12),
-
-                                          _NumField(
                                             label: 'سعر التحميل (EGP/كيلو)',
                                             controller: _loadingPriceController,
                                             validator: (value) {
@@ -738,10 +711,22 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                           const SizedBox(height: 12),
 
                                           _NumField(
-                                            label:
-                                                'الوزن الصافي (يحسب تلقائياً)',
+                                            label: 'الوزن الصافي (كيلو)',
                                             controller: _netWeightController,
-                                            enabled: false,
+                                            validator: (value) {
+                                              if (value == null ||
+                                                  value.isEmpty) {
+                                                return 'يرجى إدخال الوزن الصافي';
+                                              }
+                                              final weight = double.tryParse(
+                                                value,
+                                              );
+                                              if (weight == null ||
+                                                  weight <= 0) {
+                                                return 'يرجى إدخال وزن صحيح';
+                                              }
+                                              return null;
+                                            },
                                           ),
                                           const SizedBox(height: 12),
 

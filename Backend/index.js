@@ -90,6 +90,7 @@ app.get('/api/stocks/week', auth(['manager']), dailyStockController.getWeek);
 app.get('/api/stocks/by-date', auth(['manager']), dailyStockController.getByDate);
 app.post('/api/stocks/upsert', auth(['manager']), dailyStockController.upsertForDate);
 app.get('/api/stocks/profit', auth(['manager']), dailyStockController.getDailyProfit);
+app.get('/api/stocks/total-profit', auth(['manager']), dailyStockController.getTotalProfitHistory);
 
 app.use(errorHandler);
 

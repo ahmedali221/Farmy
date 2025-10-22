@@ -28,6 +28,7 @@ class _DistributionDetailsPageState extends State<DistributionDetailsPage> {
   Map<String, num> _chickenTypeTotals = {};
   Map<String, num> _customerTotals = {};
   num _totalDistributedWeight = 0;
+  num _totalMoneyGained = 0;
 
   @override
   void initState() {
@@ -46,16 +47,19 @@ class _DistributionDetailsPageState extends State<DistributionDetailsPage> {
       final Map<String, num> chickenTypeTotals = {};
       final Map<String, num> customerTotals = {};
       num totalDistributedWeight = 0;
+      num totalMoneyGained = 0;
 
       for (final distribution in distributions) {
         final chickenType = distribution['chickenType']?['name'] ?? 'غير محدد';
         final customer = distribution['customer']?['name'] ?? 'غير محدد';
         final netWeight = (distribution['netWeight'] ?? 0) as num;
+        final totalAmount = (distribution['totalAmount'] ?? 0) as num;
 
         chickenTypeTotals[chickenType] =
             (chickenTypeTotals[chickenType] ?? 0) + netWeight;
         customerTotals[customer] = (customerTotals[customer] ?? 0) + netWeight;
         totalDistributedWeight += netWeight;
+        totalMoneyGained += totalAmount;
       }
 
       setState(() {
@@ -63,6 +67,7 @@ class _DistributionDetailsPageState extends State<DistributionDetailsPage> {
         _chickenTypeTotals = chickenTypeTotals;
         _customerTotals = customerTotals;
         _totalDistributedWeight = totalDistributedWeight;
+        _totalMoneyGained = totalMoneyGained;
       });
     } catch (e) {
       if (!mounted) return;
@@ -124,6 +129,19 @@ class _DistributionDetailsPageState extends State<DistributionDetailsPage> {
                                     title: 'عدد التوزيعات',
                                     value: _distributions.length.toDouble(),
                                     color: Colors.purple,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _SummaryTile(
+                                    title: 'إجمالي المبلغ المحصل',
+                                    value: _totalMoneyGained,
+                                    color: Colors.green,
+                                    isMoney: true,
                                   ),
                                 ),
                               ],
@@ -324,11 +342,13 @@ class _SummaryTile extends StatelessWidget {
   final String title;
   final num value;
   final Color color;
+  final bool isMoney;
 
   const _SummaryTile({
     required this.title,
     required this.value,
     required this.color,
+    this.isMoney = false,
   });
 
   @override
@@ -349,7 +369,9 @@ class _SummaryTile extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            title.contains('عدد')
+            isMoney
+                ? '${NumberFormat('#,##0.###').format(value)} ج.م'
+                : title.contains('عدد')
                 ? '${NumberFormat('#,##0').format(value)}'
                 : '${NumberFormat('#,##0.###').format(value)} كجم',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(

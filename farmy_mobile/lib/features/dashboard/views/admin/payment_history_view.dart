@@ -733,7 +733,7 @@ class _PaymentDetailsPage extends StatelessWidget {
             ${collectorName.isNotEmpty ? '''
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>القائم بالتحصيل:</strong></td>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd;">$collectorName</td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">$collectorName${payment['user']?['role'] == 'employee' ? ' (موظف)' : ''}</td>
             </tr>
             ''' : ''}
             <tr>
@@ -999,7 +999,9 @@ class _PaymentDetailsPage extends StatelessWidget {
                     ),
                     title: const Text('القائم بالتحصيل'),
                     subtitle: Text(
-                      collectorName.isNotEmpty ? collectorName : 'غير محدد',
+                      collectorName.isNotEmpty
+                          ? '$collectorName${payment['user']?['role'] == 'employee' ? ' (موظف)' : ''}'
+                          : 'غير محدد',
                     ),
                     dense: true,
                   ),
