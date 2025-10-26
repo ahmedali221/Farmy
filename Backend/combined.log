@@ -8707,3 +8707,104 @@
 {"level":"info","message":"Fetched all customers","timestamp":"2025-10-22T19:13:47.220Z"}
 {"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-22T19:13:47.353Z"}
 {"level":"info","message":"Fetched chicken types","timestamp":"2025-10-22T19:13:47.474Z"}
+{"level":"info","message":"User admin logged in successfully","timestamp":"2025-10-26T19:32:03.751Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:32:04.425Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:32:04.682Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:32:05.110Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:32:05.256Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:32:11.256Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:32:13.722Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:32:14.359Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:32:14.425Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:32:14.763Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:32:14.930Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:32:21.818Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:32:21.932Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:32:22.040Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:32:22.178Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-10-26T19:32:26.104Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-10-26T19:32:26.107Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:32:27.084Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:32:27.957Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:32:33.983Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:32:34.652Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:32:34.785Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:32:34.899Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:32:34.985Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-10-26T19:32:47.481Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-10-26T19:32:47.482Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:32:47.898Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:32:49.656Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:32:52.754Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-10-26T19:32:54.072Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-10-26T19:32:54.078Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:32:54.509Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:33:04.734Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:33:45.918Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:33:46.072Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:33:46.162Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:33:46.262Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:33:47.720Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:33:52.267Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:33:52.598Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:33:52.801Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:33:52.932Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-10-26T19:34:04.434Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-10-26T19:34:04.771Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:34:05.377Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:34:26.338Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:35:21.538Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:35:21.666Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:35:21.767Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:35:21.872Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-10-26T19:35:26.689Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-10-26T19:35:26.707Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:35:29.415Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:36:46.239Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:36:49.187Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:36:49.929Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:36:50.091Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:38:18.941Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:38:19.939Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:38:20.336Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:38:20.514Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:38:29.824Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:38:30.720Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:38:31.349Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:38:33.344Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-10-26T19:38:57.494Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-10-26T19:38:57.536Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:38:58.194Z"}
+{"level":"info","message":"Created new financial record","timestamp":"2025-10-26T19:39:14.063Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:43:40.984Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:43:41.282Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:43:41.459Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:43:41.605Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:43:45.352Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:43:55.690Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:43:56.498Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:43:56.965Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:44:12.459Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:44:13.184Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:44:13.670Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:44:13.914Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-10-26T19:44:24.172Z"}
+{"level":"info","message":"DailyStock read window 2025-10-25T22:00:00.000Z..2025-10-26T22:00:00.000Z loadings=0 netLoading=0","timestamp":"2025-10-26T19:44:24.449Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:44:29.113Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:46:38.112Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:46:38.952Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-26T19:46:39.040Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:46:39.198Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:46:39.236Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:46:39.374Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:46:40.038Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-26T19:46:40.144Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:48:03.698Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:48:16.867Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-26T19:48:25.345Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:49:15.784Z"}
+{"level":"info","message":"DailyStock read window 2025-10-25T22:00:00.000Z..2025-10-26T22:00:00.000Z loadings=0 netLoading=0","timestamp":"2025-10-26T19:50:06.368Z"}
+{"level":"info","message":"Loading created: 68fe7b6e7b2587c3be9f96c0 by user: 68d3f7bfcdaa488e65909b16","timestamp":"2025-10-26T19:50:07.226Z"}
+{"level":"info","message":"DailyStock read window 2025-10-25T22:00:00.000Z..2025-10-26T22:00:00.000Z loadings=1 netLoading=10","timestamp":"2025-10-26T19:50:07.448Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:50:07.776Z"}
+{"level":"info","message":"User 68d3f7bfcdaa488e65909b16 logged out","timestamp":"2025-10-26T19:50:21.827Z"}

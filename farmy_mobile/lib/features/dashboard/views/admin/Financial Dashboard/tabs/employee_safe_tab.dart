@@ -821,11 +821,7 @@ class _TransferDialogState extends State<_TransferDialog> {
       final users = await employeeService.getAllEmployeeUsers();
       setState(() {
         _availableUsers = users
-            .where(
-              (user) =>
-                  user['_id']?.toString() != widget.fromUserId &&
-                  user['role']?.toString() == 'employee',
-            )
+            .where((user) => user['_id']?.toString() != widget.fromUserId)
             .toList();
         _loadingUsers = false;
       });

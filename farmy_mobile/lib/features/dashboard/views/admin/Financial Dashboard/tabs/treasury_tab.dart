@@ -477,6 +477,7 @@ class _TreasuryTabState extends State<TreasuryTab> {
         : total +
               _totalExternalRevenue -
               _totalLoadingAmount -
+              _totalDistributions -
               totalOther -
               _totalWithdrawals;
 
