@@ -320,7 +320,6 @@ exports.getLoadingStats = async (req, res) => {
           _id: null,
           totalLoadings: { $sum: 1 },
           totalQuantity: { $sum: '$quantity' },
-          totalGrossWeight: { $sum: '$grossWeight' },
           totalNetWeight: { $sum: '$netWeight' },
           totalLoadingAmount: { $sum: '$totalLoading' },
           averageLoadingPrice: { $avg: '$loadingPrice' }
@@ -332,7 +331,6 @@ exports.getLoadingStats = async (req, res) => {
     res.json(stats[0] || {
       totalLoadings: 0,
       totalQuantity: 0,
-      totalGrossWeight: 0,
       totalNetWeight: 0,
       totalLoadingAmount: 0,
       averageLoadingPrice: 0

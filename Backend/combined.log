@@ -8808,3 +8808,64 @@
 {"level":"info","message":"DailyStock read window 2025-10-25T22:00:00.000Z..2025-10-26T22:00:00.000Z loadings=1 netLoading=10","timestamp":"2025-10-26T19:50:07.448Z"}
 {"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-26T19:50:07.776Z"}
 {"level":"info","message":"User 68d3f7bfcdaa488e65909b16 logged out","timestamp":"2025-10-26T19:50:21.827Z"}
+{"level":"info","message":"User admin logged in successfully","timestamp":"2025-10-27T20:44:23.525Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-27T20:44:24.024Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-27T20:44:24.236Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-27T20:44:24.385Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-27T20:44:24.494Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-27T20:46:39.349Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-27T20:46:39.485Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-27T20:46:39.633Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-27T20:46:39.731Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-27T20:47:01.514Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-27T20:47:02.296Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-27T20:47:02.511Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-27T20:47:02.673Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-27T20:49:36.993Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-27T20:49:37.270Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-27T20:49:37.430Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-27T20:49:37.574Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-27T20:49:44.962Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-27T20:49:45.388Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-27T20:49:45.600Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-27T20:49:45.729Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-27T20:49:49.703Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-27T20:49:50.308Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-27T20:49:50.584Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-27T20:49:50.974Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-27T20:50:02.463Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-27T20:50:03.448Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-27T20:50:03.879Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-27T20:50:04.239Z"}
+{"level":"error","message":"Error deleting payment: Cast to ObjectId failed for value \"all\" (type string) at path \"_id\" for model \"Payment\"","timestamp":"2025-10-27T20:50:48.038Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-27T20:51:39.204Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-27T20:51:40.399Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-27T20:51:40.713Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-27T20:51:41.109Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-27T20:51:50.919Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-27T20:51:51.752Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-27T20:51:52.002Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-27T20:51:52.222Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-27T20:52:14.788Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-27T20:52:15.642Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-27T20:52:15.877Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-27T20:52:15.992Z"}
+{"level":"error","message":"Error deleting payment: Cast to ObjectId failed for value \"all\" (type string) at path \"_id\" for model \"Payment\"","timestamp":"2025-10-27T20:52:36.565Z"}
+{"level":"info","message":"All payments deleted successfully","timestamp":"2025-10-27T20:53:00.557Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-10-27T20:53:05.369Z"}
+{"level":"info","message":"Fetched daily reports","timestamp":"2025-10-27T20:53:05.378Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-27T20:53:05.782Z"}
+{"level":"info","message":"Fetched all employee users","timestamp":"2025-10-27T20:53:43.874Z"}
+{"level":"info","message":"Fetched all customers","timestamp":"2025-10-27T20:53:44.014Z"}
+{"level":"info","message":"All suppliers fetched - count: 8","timestamp":"2025-10-27T20:53:44.134Z"}
+{"level":"info","message":"Fetched chicken types","timestamp":"2025-10-27T20:53:44.297Z"}
+{"level":"info","message":"All loadings fetched","timestamp":"2025-10-27T20:53:46.587Z"}
+{"level":"info","message":"DailyStock read window 2025-10-26T22:00:00.000Z..2025-10-27T22:00:00.000Z loadings=0 netLoading=0","timestamp":"2025-10-27T20:53:46.799Z"}
+{"level":"info","message":"DailyStock read window 2025-10-26T22:00:00.000Z..2025-10-27T22:00:00.000Z loadings=0 netLoading=0","timestamp":"2025-10-27T20:53:49.550Z"}
+{"level":"info","message":"DailyStock read window 2025-10-26T22:00:00.000Z..2025-10-27T22:00:00.000Z loadings=0 netLoading=0","timestamp":"2025-10-27T20:57:55.474Z"}
+{"level":"info","message":"DailyStock read window 2025-10-25T22:00:00.000Z..2025-10-26T22:00:00.000Z loadings=0 netLoading=0","timestamp":"2025-10-27T20:57:59.204Z"}
+{"level":"info","message":"DailyStock read window 2025-10-24T21:00:00.000Z..2025-10-25T22:00:00.000Z loadings=0 netLoading=0","timestamp":"2025-10-27T20:58:04.889Z"}
+{"level":"info","message":"DailyStock read window 2025-10-23T21:00:00.000Z..2025-10-24T21:00:00.000Z loadings=0 netLoading=0","timestamp":"2025-10-27T20:58:07.867Z"}
+{"level":"error","message":"Invalid distribution ID format: all","timestamp":"2025-10-27T20:58:12.782Z"}
+{"level":"warn","message":"All distributions deleted. count=99","timestamp":"2025-10-27T20:59:25.785Z"}
+{"level":"info","message":"DailyStock read window 2025-10-23T21:00:00.000Z..2025-10-24T21:00:00.000Z loadings=0 netLoading=0","timestamp":"2025-10-27T20:59:26.134Z"}

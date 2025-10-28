@@ -47,3 +47,6 @@
 {"level":"error","message":"Login error: Operation `users.findOne()` buffering timed out after 10000ms","timestamp":"2025-09-25T07:36:07.875Z"}
 {"level":"error","message":"Login error: Operation `users.findOne()` buffering timed out after 10000ms","timestamp":"2025-09-25T07:36:36.808Z"}
 {"level":"error","message":"Invalid distribution ID format: all","timestamp":"2025-10-22T18:26:02.656Z"}
+{"level":"error","message":"Error deleting payment: Cast to ObjectId failed for value \"all\" (type string) at path \"_id\" for model \"Payment\"","timestamp":"2025-10-27T20:50:48.038Z"}
+{"level":"error","message":"Error deleting payment: Cast to ObjectId failed for value \"all\" (type string) at path \"_id\" for model \"Payment\"","timestamp":"2025-10-27T20:52:36.565Z"}
+{"level":"error","message":"Invalid distribution ID format: all","timestamp":"2025-10-27T20:58:12.782Z"}

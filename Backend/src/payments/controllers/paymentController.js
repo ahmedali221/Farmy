@@ -10,6 +10,7 @@ const EmployeeExpense = require('../../employeeExpenses/models/EmployeeExpense')
 
 // Validation schemas
 const paymentSchema = Joi.object({
+  order: Joi.string().optional(),
   customer: Joi.string().required(),
   totalPrice: Joi.number().min(0).required(),
   paidAmount: Joi.number().min(0).required(),
@@ -276,6 +277,40 @@ exports.getPaymentsByUser = async (req, res) => {
 };
 
 // Summary of total collected per user including transfers in/out and net
+// Delete all payments
+exports.deleteAllPayments = async (req, res) => {
+  try {
+    // Get all payments to update customer outstanding debts
+    const payments = await Payment.find().populate('customer');
+    
+    // Group payments by customer to calculate final outstanding
+    const customerDebts = {};
+    payments.forEach(payment => {
+      if (payment.customer) {
+        const customerId = payment.customer._id.toString();
+        if (!customerDebts[customerId]) {
+          customerDebts[customerId] = payment.customer;
+        }
+      }
+    });
+
+    // Delete all payments
+    await Payment.deleteMany({});
+
+    // Reset all affected customers' outstanding debts to 0
+    for (const customer of Object.values(customerDebts)) {
+      customer.outstandingDebts = 0;
+      await customer.save();
+    }
+
+    logger.info('All payments deleted successfully');
+    res.status(200).json({ message: 'All payments deleted successfully' });
+  } catch (err) {
+    logger.error(`Error deleting all payments: ${err.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 exports.getUserCollectionSummary = async (req, res) => {
   try {
     const collected = await Payment.aggregate([
