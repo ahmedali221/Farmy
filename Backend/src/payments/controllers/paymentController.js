@@ -336,22 +336,39 @@ exports.getUserCollectionSummary = async (req, res) => {
 
     const expMap = toMap(expenses, 'totalExpenses');
 
-    const result = collected.map(row => {
-      const id = String(row._id);
-      const totalIn = inMap[id] || 0;
-      const totalOut = outMap[id] || 0;
-      const totalExpenses = expMap[id] || 0;
-      const net = (row.totalCollected || 0) + totalIn - totalOut;
+    // Create a map for collected payments
+    const collectedMap = {};
+    collected.forEach(row => {
+      collectedMap[String(row._id)] = {
+        totalCollected: row.totalCollected || 0,
+        count: row.count || 0
+      };
+    });
+
+    // Collect all unique user IDs from payments, transfers, and expenses
+    const allUserIds = new Set();
+    collected.forEach(row => allUserIds.add(String(row._id)));
+    transfersIn.forEach(row => allUserIds.add(String(row._id)));
+    transfersOut.forEach(row => allUserIds.add(String(row._id)));
+    expenses.forEach(row => allUserIds.add(String(row._id)));
+
+    // Build result for all users (including those with only transfers)
+    const result = Array.from(allUserIds).map(userId => {
+      const collectedData = collectedMap[userId] || { totalCollected: 0, count: 0 };
+      const totalIn = inMap[userId] || 0;
+      const totalOut = outMap[userId] || 0;
+      const totalExpenses = expMap[userId] || 0;
+      const net = collectedData.totalCollected + totalIn - totalOut;
       const netAfterExpenses = net - totalExpenses;
       return {
-        userId: row._id,
-        totalCollected: row.totalCollected || 0,
+        userId: userId,
+        totalCollected: collectedData.totalCollected,
         transfersIn: totalIn,
         transfersOut: totalOut,
         totalExpenses,
         netAvailable: net,
         netAfterExpenses,
-        count: row.count || 0
+        count: collectedData.count
       };
     }).sort((a, b) => b.netAvailable - a.netAvailable);
 

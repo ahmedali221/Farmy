@@ -14,7 +14,7 @@ const loadingSchema = Joi.object({
   loadingPrice: Joi.number().min(0).required(),
   notes: Joi.string().allow('', null),
   loadingDate: Joi.date().default(Date.now)
-});
+}).unknown(true); // Allow unknown fields (like grossWeight) to be stripped without error
 
 // Helper function to calculate loading values
 const calculateLoadingValues = (loadingData) => {
@@ -36,15 +36,26 @@ const calculateLoadingValues = (loadingData) => {
 };
 
 exports.createLoading = async (req, res) => {
-  const { error } = loadingSchema.validate(req.body);
+  // Validate and strip unknown fields (like grossWeight)
+  const { error, value } = loadingSchema.validate(req.body, { 
+    stripUnknown: true,
+    abortEarly: false 
+  });
   if (error) return res.status(400).json({ message: error.details[0].message });
 
   try {
+    // Use validated and stripped value from Joi (grossWeight will be removed)
+    // Explicitly remove grossWeight if it still exists as a safety measure
+    const { grossWeight, ...bodyWithoutGrossWeight } = value;
+    if (grossWeight !== undefined || req.body.grossWeight !== undefined) {
+      logger.warn('grossWeight was included in request but is not used. It has been removed.');
+    }
+    
     // Calculate auto-calculated fields
-    const calculatedValues = calculateLoadingValues(req.body);
+    const calculatedValues = calculateLoadingValues(bodyWithoutGrossWeight);
     
     const loadingData = {
-      ...req.body,
+      ...bodyWithoutGrossWeight,
       ...calculatedValues, // Add calculated emptyWeight and totalLoading
       user: req.user.id // Current logged-in user (manager or employee)
     };
@@ -73,7 +84,20 @@ exports.createLoading = async (req, res) => {
     }
 
     const loading = new Loading(loadingData);
-    await loading.save();
+    
+    // Better error handling for validation errors
+    try {
+      await loading.save();
+    } catch (saveError) {
+      // If it's a Mongoose validation error about grossWeight, provide helpful message
+      if (saveError.message && saveError.message.includes('grossWeight')) {
+        logger.error(`Mongoose validation error about grossWeight: ${saveError.message}`);
+        return res.status(500).json({ 
+          message: 'Server validation error: grossWeight is not a valid field for loading. Please restart the server or contact support.' 
+        });
+      }
+      throw saveError; // Re-throw if it's a different error
+    }
 
     // Decrement stock of the chicken type based on requested quantity
     try {
@@ -177,10 +201,20 @@ exports.updateLoading = async (req, res) => {
 
     // Allow partial updates; validate only provided keys
     const partialSchema = loadingSchema.fork(Object.keys(loadingSchema.describe().keys), (s) => s.optional());
-    const { error } = partialSchema.validate(req.body);
+    // Validate and strip unknown fields (like grossWeight)
+    const { error, value } = partialSchema.validate(req.body, { 
+      stripUnknown: true,
+      abortEarly: false 
+    });
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    const updateData = { ...req.body };
+    // Explicitly remove grossWeight if it still exists (should not be sent)
+    const { grossWeight, ...bodyWithoutGrossWeight } = value;
+    if (grossWeight !== undefined || req.body.grossWeight !== undefined) {
+      logger.warn('grossWeight was included in update request but is not used. It has been removed.');
+    }
+    
+    const updateData = { ...bodyWithoutGrossWeight };
 
     // Handle chicken type lookup if provided
     if (updateData.chickenType) {
