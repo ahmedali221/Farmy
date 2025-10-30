@@ -389,15 +389,23 @@ class _PaymentHistoryViewState extends State<PaymentHistoryView> {
                       );
                       return;
                     }
-                    // NOTE: Payment deletion endpoint not present here; implement when backend supports
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'ميزة حذف جميع المدفوعات غير مفعلة حالياً',
+                    try {
+                      await _paymentService.deleteAllPayments();
+                      if (!mounted) return;
+                      setState(() {
+                        _payments = [];
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('تم حذف جميع سجلات المدفوعات بنجاح'),
                         ),
-                      ),
-                    );
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('فشل حذف المدفوعات: $e')),
+                      );
+                    }
                   }
                 },
               ),

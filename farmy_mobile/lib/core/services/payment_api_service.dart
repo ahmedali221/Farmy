@@ -281,4 +281,28 @@ class PaymentApiService {
       throw ApiException(message: 'Network error: $e', statusCode: 0);
     }
   }
+
+  /// Delete all payments
+  Future<void> deleteAllPayments() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.delete(
+        Uri.parse('$baseUrl/payments/all'),
+        headers: headers,
+      );
+
+      if (response.statusCode != 200) {
+        final dynamic errorData = json.decode(response.body);
+        throw ApiException(
+          message: (errorData is Map<String, dynamic>)
+              ? (errorData['message'] ?? 'Failed to delete all payments')
+              : 'Failed to delete all payments',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
 }

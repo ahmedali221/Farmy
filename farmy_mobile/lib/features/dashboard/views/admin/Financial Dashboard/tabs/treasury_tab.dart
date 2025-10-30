@@ -35,6 +35,14 @@ class _TreasuryTabState extends State<TreasuryTab> {
   double _totalDistributions = 0.0;
   double _previousDayTreasury = 0.0;
 
+  // Unfiltered values for total treasury calculation
+  double _totalCollectedUnfiltered = 0.0;
+  double _totalExternalRevenueUnfiltered = 0.0;
+  double _totalLoadingAmountUnfiltered = 0.0;
+  double _totalDistributionsUnfiltered = 0.0;
+  double _totalOtherExpensesUnfiltered = 0.0;
+  double _totalWithdrawalsUnfiltered = 0.0;
+
   // Daily filter variables
   DateTime _selectedDate = DateTime.now();
   bool _isDailyFilter = false;
@@ -80,13 +88,16 @@ class _TreasuryTabState extends State<TreasuryTab> {
     try {
       // Load all data in parallel
       final results = await Future.wait([
-        _paymentService.getUserCollectionsSummary(),
+        _isDailyFilter
+            ? _paymentService
+                  .getAllPayments() // Get all payments for filtering
+            : _paymentService.getUserCollectionsSummary(),
         _loadingService.getAllLoadings(),
         _financeService.getDailyFinancialReports(),
         _distributionService.getAllDistributions(),
       ]);
 
-      final list = results[0];
+      final dynamic listOrPayments = results[0];
       final allLoadings = results[1];
       final financeReports = results[2];
       final allDistributions = results[3];
@@ -129,14 +140,93 @@ class _TreasuryTabState extends State<TreasuryTab> {
         }).toList();
       }
 
-      // Calculate total loading amount
+      // Process payments: filter and group by user if daily filter is enabled
+      List<Map<String, dynamic>> list = [];
+      if (_isDailyFilter) {
+        // Filter payments by date and group by user
+        final allPayments = listOrPayments as List<Map<String, dynamic>>;
+        final targetDate = _selectedDate;
+        final startOfDay = DateTime(
+          targetDate.year,
+          targetDate.month,
+          targetDate.day,
+        );
+        final endOfDay = DateTime(
+          targetDate.year,
+          targetDate.month,
+          targetDate.day + 1,
+        );
+
+        final filteredPayments = allPayments.where((payment) {
+          final paymentDateStr =
+              payment['paymentDate'] ?? payment['createdAt'] ?? '';
+          if (paymentDateStr.toString().isEmpty) return false;
+          try {
+            final paymentDate = DateTime.parse(paymentDateStr.toString());
+            return paymentDate.isAfter(startOfDay) &&
+                paymentDate.isBefore(endOfDay);
+          } catch (_) {
+            return false;
+          }
+        }).toList();
+
+        // Group filtered payments by user
+        final Map<String, Map<String, dynamic>> collectionMap = {};
+        for (final payment in filteredPayments) {
+          final userId = (payment['user'] is Map)
+              ? (payment['user']['_id'] ?? payment['user']['id'] ?? '')
+                    .toString()
+              : (payment['user'] ?? '').toString();
+          if (userId.isEmpty) continue;
+
+          if (!collectionMap.containsKey(userId)) {
+            collectionMap[userId] = {
+              'userId': userId,
+              'totalCollected': 0.0,
+              'count': 0,
+            };
+          }
+
+          final num paidAmount = (payment['paidAmount'] ?? 0) as num;
+          collectionMap[userId]!['totalCollected'] =
+              ((collectionMap[userId]!['totalCollected'] as num) +
+                      paidAmount.toDouble())
+                  .toDouble();
+          collectionMap[userId]!['count'] =
+              ((collectionMap[userId]!['count'] as int) + 1);
+        }
+        list = collectionMap.values.toList();
+      } else {
+        // When not filtering, use the summary directly
+        list = listOrPayments as List<Map<String, dynamic>>;
+      }
+
+      // Calculate total loading amount (filtered for display)
       final totalLoading = filteredLoadings.fold<double>(0.0, (sum, loading) {
         final num totalLoadingAmount = (loading['totalLoading'] ?? 0) as num;
         return sum + totalLoadingAmount.toDouble();
       });
 
-      // Calculate total distributions amount
+      // Calculate total loading amount (unfiltered for total treasury)
+      final totalLoadingUnfiltered = allLoadings.fold<double>(0.0, (
+        sum,
+        loading,
+      ) {
+        final num totalLoadingAmount = (loading['totalLoading'] ?? 0) as num;
+        return sum + totalLoadingAmount.toDouble();
+      });
+
+      // Calculate total distributions amount (filtered for display)
       final totalDistributions = filteredDistributions.fold<double>(0.0, (
+        sum,
+        distribution,
+      ) {
+        final num totalAmount = (distribution['totalAmount'] ?? 0) as num;
+        return sum + totalAmount.toDouble();
+      });
+
+      // Calculate total distributions amount (unfiltered for total treasury)
+      final totalDistributionsUnfiltered = allDistributions.fold<double>(0.0, (
         sum,
         distribution,
       ) {
@@ -213,7 +303,7 @@ class _TreasuryTabState extends State<TreasuryTab> {
         previousDayTreasury = prevDistributions - prevLoading - prevWithdrawals;
       }
 
-      // External revenue and withdrawals (no employee)
+      // External revenue and withdrawals (no employee) - filtered for display
       final List<Map<String, dynamic>> externalList = [];
       final List<Map<String, dynamic>> withdrawalsList = [];
       double external = 0.0;
@@ -234,6 +324,23 @@ class _TreasuryTabState extends State<TreasuryTab> {
         }
       }
 
+      // External revenue and withdrawals (unfiltered for total treasury)
+      double externalUnfiltered = 0.0;
+      double withdrawalsUnfiltered = 0.0;
+      for (final rec in financeReports) {
+        final bool hasEmployee =
+            rec['employee'] != null && rec['employee'].toString().isNotEmpty;
+        if (hasEmployee) continue;
+        final num revenue = (rec['revenue'] ?? 0) as num;
+        final num expenses = (rec['expenses'] ?? 0) as num;
+        if (revenue > 0) {
+          externalUnfiltered += revenue.toDouble();
+        }
+        if (expenses > 0) {
+          withdrawalsUnfiltered += expenses.toDouble();
+        }
+      }
+
       try {
         final users = await _employeeService.getAllEmployeeUsers();
         _employeeIdToName.clear();
@@ -245,14 +352,127 @@ class _TreasuryTabState extends State<TreasuryTab> {
       } catch (_) {}
 
       final Map<String, List<Map<String, dynamic>>> serverExpenses = {};
-      for (final it in list) {
-        final String empId = (it['userId'] ?? '').toString();
-        if (empId.isEmpty) continue;
-        try {
-          final items = await _employeeExpenseService.listByEmployee(empId);
-          serverExpenses[empId] = items;
-        } catch (_) {}
+      final Map<String, List<Map<String, dynamic>>> serverExpensesUnfiltered =
+          {};
+
+      // Get all employee IDs for calculating unfiltered values
+      final Set<String> allEmployeeIds = {};
+      if (_isDailyFilter) {
+        // Get all payments to find all employees
+        final allPayments = listOrPayments as List<Map<String, dynamic>>;
+        for (final payment in allPayments) {
+          final userId = (payment['user'] is Map)
+              ? (payment['user']['_id'] ?? payment['user']['id'] ?? '')
+                    .toString()
+              : (payment['user'] ?? '').toString();
+          if (userId.isNotEmpty) allEmployeeIds.add(userId);
+        }
+      } else {
+        for (final it in list) {
+          final String empId = (it['userId'] ?? '').toString();
+          if (empId.isNotEmpty) allEmployeeIds.add(empId);
+        }
       }
+
+      if (_isDailyFilter) {
+        // Filter expenses by date
+        final targetDate = _selectedDate;
+        final startOfDay = DateTime(
+          targetDate.year,
+          targetDate.month,
+          targetDate.day,
+        );
+        final endOfDay = DateTime(
+          targetDate.year,
+          targetDate.month,
+          targetDate.day + 1,
+        );
+
+        for (final it in list) {
+          final String empId = (it['userId'] ?? '').toString();
+          if (empId.isEmpty) continue;
+          try {
+            final allItems = await _employeeExpenseService.listByEmployee(
+              empId,
+            );
+            // Filter expenses by date
+            final filteredItems = allItems.where((expense) {
+              final createdAtStr = expense['createdAt'] ?? '';
+              if (createdAtStr.toString().isEmpty) return false;
+              try {
+                final createdAt = DateTime.parse(createdAtStr.toString());
+                return createdAt.isAfter(startOfDay) &&
+                    createdAt.isBefore(endOfDay);
+              } catch (_) {
+                return false;
+              }
+            }).toList();
+            serverExpenses[empId] = filteredItems;
+            serverExpensesUnfiltered[empId] = allItems;
+          } catch (_) {}
+        }
+
+        // Also get expenses for employees not in filtered list (for unfiltered calculation)
+        for (final empId in allEmployeeIds) {
+          if (!serverExpensesUnfiltered.containsKey(empId)) {
+            try {
+              final allItems = await _employeeExpenseService.listByEmployee(
+                empId,
+              );
+              serverExpensesUnfiltered[empId] = allItems;
+            } catch (_) {}
+          }
+        }
+      } else {
+        // When not filtering, get all expenses
+        for (final it in list) {
+          final String empId = (it['userId'] ?? '').toString();
+          if (empId.isEmpty) continue;
+          try {
+            final items = await _employeeExpenseService.listByEmployee(empId);
+            serverExpenses[empId] = items;
+            serverExpensesUnfiltered[empId] = items;
+          } catch (_) {}
+        }
+      }
+
+      // Calculate unfiltered total collected (includes transfers)
+      double totalCollectedUnfiltered = 0.0;
+      if (_isDailyFilter) {
+        // Get all payments and sum them (we need to get summary for transfers)
+        // For now, use payments only, but ideally should fetch summary
+        final allPayments = listOrPayments;
+        totalCollectedUnfiltered = (allPayments as List<Map<String, dynamic>>)
+            .fold<double>(0.0, (sum, payment) {
+              final num paidAmount = (payment['paidAmount'] ?? 0) as num;
+              return sum + paidAmount.toDouble();
+            });
+        // TODO: Add transfers calculation for unfiltered total
+        // This requires fetching all transfers or using summary API
+      } else {
+        // Use netAvailable which includes transfers
+        totalCollectedUnfiltered = list.fold<double>(0.0, (sum, item) {
+          final double collected = ((item['totalCollected'] ?? 0) as num)
+              .toDouble();
+          final double transfersIn = ((item['transfersIn'] ?? 0) as num)
+              .toDouble();
+          final double transfersOut = ((item['transfersOut'] ?? 0) as num)
+              .toDouble();
+          final double netAvailable = item['netAvailable'] != null
+              ? ((item['netAvailable'] ?? 0) as num).toDouble()
+              : collected + transfersIn - transfersOut;
+          return sum + netAvailable;
+        });
+      }
+
+      // Calculate unfiltered total other expenses
+      double totalOtherExpensesUnfiltered = 0.0;
+      serverExpensesUnfiltered.forEach((_, expenseList) {
+        for (final expense in expenseList) {
+          final num v = (expense['value'] ?? 0) as num;
+          totalOtherExpensesUnfiltered += v.toDouble();
+        }
+      });
 
       if (!mounted) return;
       setState(() {
@@ -267,6 +487,14 @@ class _TreasuryTabState extends State<TreasuryTab> {
         _otherExpensesByEmployee
           ..clear()
           ..addAll(serverExpenses);
+
+        // Store unfiltered values for total treasury calculation
+        _totalCollectedUnfiltered = totalCollectedUnfiltered;
+        _totalExternalRevenueUnfiltered = externalUnfiltered;
+        _totalLoadingAmountUnfiltered = totalLoadingUnfiltered;
+        _totalDistributionsUnfiltered = totalDistributionsUnfiltered;
+        _totalOtherExpensesUnfiltered = totalOtherExpensesUnfiltered;
+        _totalWithdrawalsUnfiltered = withdrawalsUnfiltered;
       });
     } catch (e) {
       if (mounted) {
@@ -284,8 +512,16 @@ class _TreasuryTabState extends State<TreasuryTab> {
 
   double _totalCollected() {
     return _employeeCollections.fold(0.0, (sum, item) {
-      final num v = (item['totalCollected'] ?? 0) as num;
-      return sum + v.toDouble();
+      // Use netAvailable which includes transfers
+      final double collected = ((item['totalCollected'] ?? 0) as num)
+          .toDouble();
+      final double transfersIn = ((item['transfersIn'] ?? 0) as num).toDouble();
+      final double transfersOut = ((item['transfersOut'] ?? 0) as num)
+          .toDouble();
+      final double netAvailable = item['netAvailable'] != null
+          ? ((item['netAvailable'] ?? 0) as num).toDouble()
+          : collected + transfersIn - transfersOut;
+      return sum + netAvailable;
     });
   }
 
@@ -467,19 +703,24 @@ class _TreasuryTabState extends State<TreasuryTab> {
     final double total = _totalCollected();
     final double totalOther = _sumAllOtherExpenses();
 
-    // Apply different calculation logic based on filter type
-    final double net = _isDailyFilter
-        ? _previousDayTreasury +
-              _totalDistributions -
-              _totalLoadingAmount -
-              totalOther -
-              _totalWithdrawals
-        : total +
+    // Calculate total treasury using unfiltered values (always show total)
+    final double netTotal =
+        _totalCollectedUnfiltered +
+        _totalExternalRevenueUnfiltered -
+        _totalLoadingAmountUnfiltered -
+        _totalDistributionsUnfiltered -
+        _totalOtherExpensesUnfiltered -
+        _totalWithdrawalsUnfiltered;
+
+    // Calculate filtered total treasury (only for daily filter display)
+    final double netFiltered = _isDailyFilter
+        ? total +
               _totalExternalRevenue -
               _totalLoadingAmount -
               _totalDistributions -
               totalOther -
-              _totalWithdrawals;
+              _totalWithdrawals
+        : netTotal;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -631,6 +872,25 @@ class _TreasuryTabState extends State<TreasuryTab> {
                       Icons.outbox,
                     ),
                     const SizedBox(height: 20),
+                    // Daily treasury (filtered)
+                    if (_isDailyFilter)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.3),
+                          ),
+                        ),
+                        child: _summaryRow(
+                          'إجمالي الخزنة - ${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                          netFiltered,
+                          Colors.white,
+                          bold: true,
+                        ),
+                      ),
+                    // Total treasury (unfiltered)
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -641,12 +901,15 @@ class _TreasuryTabState extends State<TreasuryTab> {
                         ),
                       ),
                       child: _summaryRow(
-                        'إجمالي الخزنة',
-                        net,
+                        _isDailyFilter
+                            ? 'إجمالي الخزنة الكلية'
+                            : 'إجمالي الخزنة',
+                        netTotal,
                         Colors.white,
                         bold: true,
                       ),
                     ),
+                    if (_isDailyFilter) const SizedBox(height: 12),
                     const SizedBox(height: 20),
                     Row(
                       children: [
@@ -989,9 +1252,21 @@ class _TreasuryTabState extends State<TreasuryTab> {
                               final item = _employeeCollections[index];
                               final String employeeId = (item['userId'] ?? '')
                                   .toString();
-                              final double amount =
+                              // Use netAvailable which includes transfersIn and transfersOut
+                              final double collected =
                                   ((item['totalCollected'] ?? 0) as num)
                                       .toDouble();
+                              final double transfersIn =
+                                  ((item['transfersIn'] ?? 0) as num)
+                                      .toDouble();
+                              final double transfersOut =
+                                  ((item['transfersOut'] ?? 0) as num)
+                                      .toDouble();
+                              final double amount =
+                                  (item['netAvailable'] != null
+                                  ? ((item['netAvailable'] ?? 0) as num)
+                                        .toDouble()
+                                  : collected + transfersIn - transfersOut);
                               final int count = ((item['count'] ?? 0) as num)
                                   .toInt();
                               final displayName =
