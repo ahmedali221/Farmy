@@ -94,11 +94,11 @@ app.get('/api/stocks/total-profit', auth(['manager']), dailyStockController.getT
 
 app.use(errorHandler);
 
-// Export the app for serverless (Vercel)
-if (process.env.VERCEL) {
-  module.exports = app;
-} else {
-  // Local development server
+// Export the app (for both Vercel and potential imports)
+module.exports = app;
+
+// Start local development server (only when not on Vercel)
+if (!process.env.VERCEL) {
   const PORT = process.env.PORT || 6000;
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
