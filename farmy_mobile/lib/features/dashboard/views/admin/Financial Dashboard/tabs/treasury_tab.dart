@@ -123,20 +123,22 @@ class _TreasuryTabState extends State<TreasuryTab> {
         // Filter loadings by date
         filteredLoadings = allLoadings.where((loading) {
           final createdAt = DateTime.parse(loading['createdAt'] ?? '');
-          return createdAt.isAfter(startOfDay) && createdAt.isBefore(endOfDay);
+          return !createdAt.isBefore(startOfDay) &&
+              createdAt.isBefore(endOfDay);
         }).toList();
 
         // Filter finance reports by date
         filteredFinanceReports = financeReports.where((report) {
           final reportDate = DateTime.parse(report['date'] ?? '');
-          return reportDate.isAfter(startOfDay) &&
+          return !reportDate.isBefore(startOfDay) &&
               reportDate.isBefore(endOfDay);
         }).toList();
 
         // Filter distributions by date
         filteredDistributions = allDistributions.where((distribution) {
           final createdAt = DateTime.parse(distribution['createdAt'] ?? '');
-          return createdAt.isAfter(startOfDay) && createdAt.isBefore(endOfDay);
+          return !createdAt.isBefore(startOfDay) &&
+              createdAt.isBefore(endOfDay);
         }).toList();
       }
 
@@ -163,7 +165,7 @@ class _TreasuryTabState extends State<TreasuryTab> {
           if (paymentDateStr.toString().isEmpty) return false;
           try {
             final paymentDate = DateTime.parse(paymentDateStr.toString());
-            return paymentDate.isAfter(startOfDay) &&
+            return !paymentDate.isBefore(startOfDay) &&
                 paymentDate.isBefore(endOfDay);
           } catch (_) {
             return false;
@@ -256,19 +258,19 @@ class _TreasuryTabState extends State<TreasuryTab> {
         // Calculate previous day's treasury using the same logic
         final previousDayLoadings = allLoadings.where((loading) {
           final createdAt = DateTime.parse(loading['createdAt'] ?? '');
-          return createdAt.isAfter(previousDayStart) &&
+          return !createdAt.isBefore(previousDayStart) &&
               createdAt.isBefore(previousDayEnd);
         }).toList();
 
         final previousDayDistributions = allDistributions.where((distribution) {
           final createdAt = DateTime.parse(distribution['createdAt'] ?? '');
-          return createdAt.isAfter(previousDayStart) &&
+          return !createdAt.isBefore(previousDayStart) &&
               createdAt.isBefore(previousDayEnd);
         }).toList();
 
         final previousDayFinanceReports = financeReports.where((report) {
           final reportDate = DateTime.parse(report['date'] ?? '');
-          return reportDate.isAfter(previousDayStart) &&
+          return !reportDate.isBefore(previousDayStart) &&
               reportDate.isBefore(previousDayEnd);
         }).toList();
 
@@ -401,7 +403,7 @@ class _TreasuryTabState extends State<TreasuryTab> {
               if (createdAtStr.toString().isEmpty) return false;
               try {
                 final createdAt = DateTime.parse(createdAtStr.toString());
-                return createdAt.isAfter(startOfDay) &&
+                return !createdAt.isBefore(startOfDay) &&
                     createdAt.isBefore(endOfDay);
               } catch (_) {
                 return false;
@@ -708,7 +710,6 @@ class _TreasuryTabState extends State<TreasuryTab> {
         _totalCollectedUnfiltered +
         _totalExternalRevenueUnfiltered -
         _totalLoadingAmountUnfiltered -
-        _totalDistributionsUnfiltered -
         _totalOtherExpensesUnfiltered -
         _totalWithdrawalsUnfiltered;
 
@@ -717,7 +718,6 @@ class _TreasuryTabState extends State<TreasuryTab> {
         ? total +
               _totalExternalRevenue -
               _totalLoadingAmount -
-              _totalDistributions -
               totalOther -
               _totalWithdrawals
         : netTotal;

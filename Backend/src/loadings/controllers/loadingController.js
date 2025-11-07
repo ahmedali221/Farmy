@@ -216,6 +216,14 @@ exports.updateLoading = async (req, res) => {
     
     const updateData = { ...bodyWithoutGrossWeight };
 
+    // Validate supplier if provided
+    if (updateData.supplier) {
+      const supplierExists = await Supplier.findById(updateData.supplier);
+      if (!supplierExists) {
+        return res.status(404).json({ message: 'Supplier not found' });
+      }
+    }
+
     // Handle chicken type lookup if provided
     if (updateData.chickenType) {
       let chickenType;
@@ -230,13 +238,30 @@ exports.updateLoading = async (req, res) => {
       updateData.chickenType = chickenType._id;
     }
 
+    const coerceNumberField = (key) => {
+      if (updateData[key] === undefined) return;
+      const num = Number(updateData[key]);
+      if (!Number.isFinite(num)) {
+        throw new Error(`${key} must be a valid number`);
+      }
+      updateData[key] = num;
+    };
+
+    try {
+      coerceNumberField('quantity');
+      coerceNumberField('netWeight');
+      coerceNumberField('loadingPrice');
+    } catch (coerceErr) {
+      return res.status(400).json({ message: coerceErr.message });
+    }
+
     // If any of quantity/netWeight/loadingPrice changes, recalc fields
     const willRecalc = ['quantity', 'netWeight', 'loadingPrice'].some(k => updateData[k] !== undefined);
     if (willRecalc) {
       const base = {
-        quantity: updateData.quantity !== undefined ? Number(updateData.quantity) : existing.quantity,
-        netWeight: updateData.netWeight !== undefined ? Number(updateData.netWeight) : existing.netWeight,
-        loadingPrice: updateData.loadingPrice !== undefined ? Number(updateData.loadingPrice) : existing.loadingPrice
+        quantity: updateData.quantity !== undefined ? updateData.quantity : existing.quantity,
+        netWeight: updateData.netWeight !== undefined ? updateData.netWeight : existing.netWeight,
+        loadingPrice: updateData.loadingPrice !== undefined ? updateData.loadingPrice : existing.loadingPrice
       };
       const calculated = calculateLoadingValues(base);
       Object.assign(updateData, calculated);
@@ -247,11 +272,37 @@ exports.updateLoading = async (req, res) => {
       updateData.loadingDate = new Date(updateData.loadingDate);
     }
 
+    const oldQuantity = typeof existing.quantity === 'number' ? existing.quantity : Number(existing.quantity) || 0;
+    const oldChickenTypeId = existing.chickenType ? existing.chickenType.toString() : null;
+    const newQuantity = updateData.quantity !== undefined ? updateData.quantity : oldQuantity;
+    const newChickenTypeId = updateData.chickenType ? updateData.chickenType.toString() : oldChickenTypeId;
+
     const updated = await Loading.findByIdAndUpdate(
       id,
       updateData,
       { new: true, runValidators: true }
     ).populate('chickenType supplier user');
+
+    // Adjust chicken stock if needed
+    const adjustChickenStock = async (chickenTypeId, diff) => {
+      if (!chickenTypeId || !Number.isFinite(diff) || diff === 0) return;
+      try {
+        await ChickenType.findByIdAndUpdate(
+          chickenTypeId,
+          { $inc: { stock: diff } }
+        );
+      } catch (stockErr) {
+        logger.error(`Failed to adjust chicken stock on update: ${stockErr.message}`);
+      }
+    };
+
+    if (newChickenTypeId !== oldChickenTypeId) {
+      await adjustChickenStock(oldChickenTypeId, oldQuantity);
+      await adjustChickenStock(newChickenTypeId, -newQuantity);
+    } else {
+      const diff = oldQuantity - newQuantity;
+      await adjustChickenStock(newChickenTypeId, diff);
+    }
 
     logger.info(`Loading updated: ${id}`);
     res.json(updated);

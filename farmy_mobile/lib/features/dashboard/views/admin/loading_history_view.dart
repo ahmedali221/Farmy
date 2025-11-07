@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/loading_api_service.dart';
 import '../../../../core/services/inventory_api_service.dart';
+import '../../../../core/services/supplier_api_service.dart';
 import '../../../../core/utils/pdf_arabic_utils.dart';
 
 class LoadingHistoryView extends StatefulWidget {
@@ -19,19 +21,66 @@ class LoadingHistoryView extends StatefulWidget {
 class _LoadingHistoryViewState extends State<LoadingHistoryView> {
   late final LoadingApiService _loadingService;
   late final InventoryApiService _inventoryService;
+  late final SupplierApiService _supplierService;
   List<Map<String, dynamic>> _loadings = [];
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
   String? _error;
   String _searchQuery = '';
   Map<String, dynamic>? _dailyStock;
+  List<Map<String, dynamic>> _suppliers = [];
+  List<Map<String, dynamic>> _chickenTypes = [];
+  bool _isReferenceLoading = false;
+  String? _referenceError;
 
   @override
   void initState() {
     super.initState();
     _loadingService = serviceLocator<LoadingApiService>();
     _inventoryService = serviceLocator<InventoryApiService>();
+    _supplierService = serviceLocator<SupplierApiService>();
+    Future.microtask(_ensureReferenceData);
     _loadLoadingsForDate(_selectedDate);
+  }
+
+  Future<bool> _ensureReferenceData() async {
+    if (_suppliers.isNotEmpty && _chickenTypes.isNotEmpty) {
+      return true;
+    }
+
+    if (_isReferenceLoading) {
+      while (_isReferenceLoading && mounted) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      return _referenceError == null &&
+          _suppliers.isNotEmpty &&
+          _chickenTypes.isNotEmpty;
+    }
+
+    if (!mounted) return false;
+    setState(() {
+      _isReferenceLoading = true;
+      _referenceError = null;
+    });
+
+    try {
+      final suppliers = await _supplierService.getAllSuppliers();
+      final chickenTypes = await _inventoryService.getAllChickenTypes();
+      if (!mounted) return false;
+      setState(() {
+        _suppliers = suppliers;
+        _chickenTypes = chickenTypes;
+        _isReferenceLoading = false;
+      });
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      setState(() {
+        _referenceError = e.toString();
+        _isReferenceLoading = false;
+      });
+      return false;
+    }
   }
 
   Future<void> _loadLoadingsForDate(DateTime date) async {
@@ -161,12 +210,34 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
   }
 
   Future<void> _editLoading(Map<String, dynamic> m) async {
-    final qtyCtrl = TextEditingController(
-      text: (m['quantity'] ?? 0).toString(),
+    final bool loaded = await _ensureReferenceData();
+    if (!loaded) {
+      if (!mounted) return;
+      final message =
+          _referenceError ?? 'فشل تحميل بيانات الموردين أو أنواع الدجاج';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+      return;
+    }
+
+    String? stringifyId(dynamic value) {
+      if (value == null) return null;
+      final str = value.toString();
+      return str.isEmpty ? null : str;
+    }
+
+    final String? existingSupplierId = stringifyId(
+      m['supplier'] is Map<String, dynamic>
+          ? (m['supplier']['_id'] ?? m['supplier']['id'])
+          : m['supplier'],
     );
-    final priceCtrl = TextEditingController(
-      text: (m['loadingPrice'] ?? 0).toString(),
+    final String? existingChickenTypeId = stringifyId(
+      m['chickenType'] is Map<String, dynamic>
+          ? (m['chickenType']['_id'] ?? m['chickenType']['id'])
+          : m['chickenType'],
     );
+
     DateTime selectedDate;
     try {
       final raw = (m['loadingDate'] ?? m['createdAt'] ?? m['date'])?.toString();
@@ -175,108 +246,106 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
       selectedDate = DateTime.now();
     }
 
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: AlertDialog(
-            title: const Text('تعديل سجل التحميل'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Date selector
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_today, size: 18),
-                      const SizedBox(width: 8),
-                      const Text('تاريخ التحميل:'),
-                      const Spacer(),
-                      StatefulBuilder(
-                        builder: (context, setInner) => OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today, size: 16),
-                          label: Text(
-                            '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                          ),
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: selectedDate,
-                              firstDate: DateTime(2024, 1, 1),
-                              lastDate: DateTime.now(),
-                            );
-                            if (picked != null) {
-                              setInner(() => selectedDate = picked);
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: qtyCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'الكمية',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: priceCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'سعر التحميل (ج.م/كجم)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('إلغاء'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('حفظ'),
-              ),
-            ],
-          ),
-        );
-      },
+    String? selectedSupplierId =
+        (existingSupplierId != null && existingSupplierId.isNotEmpty)
+        ? existingSupplierId
+        : null;
+    String? selectedChickenTypeId =
+        (existingChickenTypeId != null && existingChickenTypeId.isNotEmpty)
+        ? existingChickenTypeId
+        : null;
+
+    List<Map<String, dynamic>> supplierOptions =
+        List<Map<String, dynamic>>.from(_suppliers);
+    List<Map<String, dynamic>> chickenOptions = List<Map<String, dynamic>>.from(
+      _chickenTypes,
     );
 
-    if (confirmed == true) {
-      try {
-        final String id = (m['_id'] ?? '').toString();
-        if (id.isEmpty) throw Exception('معرّف غير صالح');
-        final updated = await _loadingService.updateLoading(id, {
-          'quantity': int.tryParse(qtyCtrl.text) ?? m['quantity'] ?? 0,
-          'loadingPrice':
-              double.tryParse(priceCtrl.text) ??
-              (m['loadingPrice'] ?? 0).toDouble(),
-          'loadingDate': selectedDate.toIso8601String(),
-        });
-        if (!mounted) return;
-        setState(() {
-          final idx = _loadings.indexWhere((x) => x['_id'] == id);
-          if (idx != -1) _loadings[idx] = updated;
-        });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('تم تحديث سجل التحميل')));
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('فشل التحديث: $e')));
-      }
+    String extractId(Map<String, dynamic> item) =>
+        (item['_id'] ?? item['id'] ?? item['value'] ?? '').toString();
+
+    if (selectedSupplierId != null &&
+        selectedSupplierId.isNotEmpty &&
+        !supplierOptions.any((s) => extractId(s) == selectedSupplierId)) {
+      supplierOptions = [
+        ...supplierOptions,
+        {
+          '_id': selectedSupplierId,
+          'name': (m['supplier']?['name'] ?? 'مورد غير معروف').toString(),
+        },
+      ];
+    }
+
+    if (selectedChickenTypeId != null &&
+        selectedChickenTypeId.isNotEmpty &&
+        !chickenOptions.any((c) => extractId(c) == selectedChickenTypeId)) {
+      chickenOptions = [
+        ...chickenOptions,
+        {
+          '_id': selectedChickenTypeId,
+          'name': (m['chickenType']?['name'] ?? 'نوع غير معروف').toString(),
+        },
+      ];
+    }
+
+    if (!supplierOptions.any((s) => extractId(s) == selectedSupplierId)) {
+      selectedSupplierId = null;
+    }
+    if (!chickenOptions.any((c) => extractId(c) == selectedChickenTypeId)) {
+      selectedChickenTypeId = null;
+    }
+
+    if (supplierOptions.isEmpty || chickenOptions.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'لا توجد بيانات كافية لتعديل السجل. برجاء إضافة الموردين والأنواع أولاً.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final formResult = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _EditLoadingDialog(
+        suppliers: supplierOptions,
+        chickenTypes: chickenOptions,
+        initialSupplierId: selectedSupplierId,
+        initialChickenTypeId: selectedChickenTypeId,
+        initialQuantity: (m['quantity'] ?? 0).toString(),
+        initialNetWeight: (m['netWeight'] ?? 0).toString(),
+        initialLoadingPrice: (m['loadingPrice'] ?? 0).toString(),
+        initialNotes: (m['notes'] ?? '').toString(),
+        initialDate: selectedDate,
+      ),
+    );
+
+    if (formResult == null) return;
+
+    final String id = (m['_id'] ?? '').toString();
+    if (id.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('معرّف السجل غير صالح')));
+      return;
+    }
+
+    try {
+      await _loadingService.updateLoading(id, formResult);
+      if (!mounted) return;
+      await _loadLoadingsForDate(_selectedDate);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم تحديث سجل التحميل')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('فشل التحديث: $e')));
     }
   }
 
@@ -1204,6 +1273,274 @@ class _LoadingDetailsPage extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: _LoadingHistoryViewState()._buildLoadingCard(loading),
         ),
+      ),
+    );
+  }
+}
+
+class _EditLoadingDialog extends StatefulWidget {
+  final List<Map<String, dynamic>> suppliers;
+  final List<Map<String, dynamic>> chickenTypes;
+  final String? initialSupplierId;
+  final String? initialChickenTypeId;
+  final String initialQuantity;
+  final String initialNetWeight;
+  final String initialLoadingPrice;
+  final String initialNotes;
+  final DateTime initialDate;
+
+  const _EditLoadingDialog({
+    required this.suppliers,
+    required this.chickenTypes,
+    required this.initialSupplierId,
+    required this.initialChickenTypeId,
+    required this.initialQuantity,
+    required this.initialNetWeight,
+    required this.initialLoadingPrice,
+    required this.initialNotes,
+    required this.initialDate,
+  });
+
+  @override
+  State<_EditLoadingDialog> createState() => _EditLoadingDialogState();
+}
+
+class _EditLoadingDialogState extends State<_EditLoadingDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _quantityCtrl;
+  late final TextEditingController _netWeightCtrl;
+  late final TextEditingController _priceCtrl;
+  late final TextEditingController _notesCtrl;
+  late DateTime _selectedDate;
+  String? _selectedSupplierId;
+  String? _selectedChickenTypeId;
+
+  @override
+  void initState() {
+    super.initState();
+    _quantityCtrl = TextEditingController(text: widget.initialQuantity);
+    _netWeightCtrl = TextEditingController(text: widget.initialNetWeight);
+    _priceCtrl = TextEditingController(text: widget.initialLoadingPrice);
+    _notesCtrl = TextEditingController(text: widget.initialNotes);
+    _selectedDate = widget.initialDate;
+    _selectedSupplierId = widget.initialSupplierId;
+    _selectedChickenTypeId = widget.initialChickenTypeId;
+  }
+
+  @override
+  void dispose() {
+    _quantityCtrl.dispose();
+    _netWeightCtrl.dispose();
+    _priceCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  double? _tryParseDouble(String value) {
+    if (value.trim().isEmpty) return null;
+    return double.tryParse(value.trim().replaceAll(',', '.'));
+  }
+
+  double _safeParseDouble(String value) => _tryParseDouble(value) ?? 0;
+
+  String _extractId(Map<String, dynamic> item) {
+    return (item['_id'] ?? item['id'] ?? item['value'] ?? '').toString();
+  }
+
+  String _extractName(Map<String, dynamic> item) {
+    return (item['name'] ?? item['username'] ?? 'غير معروف').toString();
+  }
+
+  double get _totalAmount =>
+      _safeParseDouble(_netWeightCtrl.text) * _safeParseDouble(_priceCtrl.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Text('تعديل سجل التحميل'),
+        content: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: _selectedSupplierId,
+                  decoration: const InputDecoration(
+                    labelText: 'المورد',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: widget.suppliers
+                      .map(
+                        (supplier) => DropdownMenuItem<String>(
+                          value: _extractId(supplier),
+                          child: Text(_extractName(supplier)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() {
+                    _selectedSupplierId = value;
+                  }),
+                  validator: (value) =>
+                      value == null || value.isEmpty ? 'اختر المورد' : null,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _selectedChickenTypeId,
+                  decoration: const InputDecoration(
+                    labelText: 'نوع الدجاج',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: widget.chickenTypes
+                      .map(
+                        (chicken) => DropdownMenuItem<String>(
+                          value: _extractId(chicken),
+                          child: Text(_extractName(chicken)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() {
+                    _selectedChickenTypeId = value;
+                  }),
+                  validator: (value) =>
+                      value == null || value.isEmpty ? 'اختر نوع الدجاج' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _quantityCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'الكمية',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    final parsed = int.tryParse(value ?? '');
+                    if (parsed == null || parsed <= 0) {
+                      return 'أدخل كمية صحيحة (عدد صحيح)';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _netWeightCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'الوزن الصافي (كجم)',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                  validator: (value) {
+                    final parsed = _tryParseDouble(value ?? '');
+                    if (parsed == null || parsed <= 0) {
+                      return 'أدخل وزن صافي صحيح';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _priceCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'سعر التحميل (ج.م/كجم)',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                  validator: (value) {
+                    final parsed = _tryParseDouble(value ?? '');
+                    if (parsed == null || parsed < 0) {
+                      return 'أدخل سعر صحيح';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.calendar_today, size: 16),
+                    label: Text(
+                      '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                    ),
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _selectedDate,
+                        firstDate: DateTime(2024, 1, 1),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        setState(() => _selectedDate = picked);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _notesCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'ملاحظات (اختياري)',
+                    border: OutlineInputBorder(),
+                  ),
+                  minLines: 1,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                  ),
+                  child: Text(
+                    'الإجمالي التقريبي: ${_totalAmount.toStringAsFixed(2)} ج.م',
+                    style: const TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (!_formKey.currentState!.validate()) return;
+              if (_selectedSupplierId == null ||
+                  _selectedSupplierId!.isEmpty ||
+                  _selectedChickenTypeId == null ||
+                  _selectedChickenTypeId!.isEmpty) {
+                return;
+              }
+              final payload = <String, dynamic>{
+                'supplier': _selectedSupplierId,
+                'chickenType': _selectedChickenTypeId,
+                'quantity': int.parse(_quantityCtrl.text),
+                'netWeight': _safeParseDouble(_netWeightCtrl.text),
+                'loadingPrice': _safeParseDouble(_priceCtrl.text),
+                'loadingDate': _selectedDate.toIso8601String(),
+              };
+              payload['notes'] = _notesCtrl.text.trim();
+              Navigator.of(context).pop(payload);
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
       ),
     );
   }

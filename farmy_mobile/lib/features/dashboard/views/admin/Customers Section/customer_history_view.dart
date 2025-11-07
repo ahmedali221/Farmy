@@ -20,6 +20,7 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
   List<Map<String, dynamic>> _payments = [];
   List<Map<String, dynamic>> _distributions = [];
   List<_DailyHistoryGroup> _dailyGroups = [];
+  List<_TimelineEntry> _timelineEntries = [];
   bool _isLoading = true;
   String? _error;
 
@@ -85,6 +86,11 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
         }
       });
 
+      final timeline = _buildTimelineEntries(
+        customerPayments,
+        customerDistributions,
+      );
+
       setState(() {
         _payments = customerPayments;
         _distributions = customerDistributions;
@@ -92,6 +98,7 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
           customerPayments,
           customerDistributions,
         );
+        _timelineEntries = timeline;
         _isLoading = false;
       });
     } catch (e) {
@@ -193,11 +200,21 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
               ? const Center(child: CircularProgressIndicator())
               : _error != null
               ? _buildErrorWidget()
-              : Column(
-                  children: [
-                    _buildCustomerDebtSummary(),
-                    Expanded(child: _buildGroupedPaymentsList()),
-                  ],
+              : RefreshIndicator(
+                  onRefresh: _loadAllData,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildCustomerDebtSummary(),
+                        if (_timelineEntries.isNotEmpty)
+                          _buildTimelineSection(),
+                        ..._buildGroupedPaymentsWidgets(),
+                      ],
+                    ),
+                  ),
                 ),
         ),
       ),
@@ -362,6 +379,295 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
     );
   }
 
+  List<_TimelineEntry> _buildTimelineEntries(
+    List<Map<String, dynamic>> payments,
+    List<Map<String, dynamic>> distributions,
+  ) {
+    DateTime _parseTimestamp(dynamic value) {
+      if (value == null) return DateTime.fromMillisecondsSinceEpoch(0);
+      try {
+        return DateTime.parse(value.toString()).toLocal();
+      } catch (_) {
+        return DateTime.fromMillisecondsSinceEpoch(0);
+      }
+    }
+
+    double _toDouble(dynamic value) {
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
+    final events = <_TimelineEvent>[];
+
+    for (final payment in payments) {
+      final ts = _parseTimestamp(payment['createdAt']);
+      final paidAmount = _toDouble(
+        payment['paidAmount'] ?? payment['amount'] ?? 0,
+      );
+      final discount = _toDouble(payment['discount'] ?? 0);
+      final id = (payment['_id'] ?? '').toString();
+
+      events.add(
+        _TimelineEvent(
+          isDistribution: false,
+          timestamp: ts,
+          id: id,
+          primaryAmount: paidAmount,
+          secondaryAmount: discount,
+          raw: payment,
+        ),
+      );
+    }
+
+    for (final distribution in distributions) {
+      final ts = _parseTimestamp(distribution['createdAt']);
+      final totalAmount = _toDouble(distribution['totalAmount'] ?? 0);
+      final id = (distribution['_id'] ?? '').toString();
+
+      events.add(
+        _TimelineEvent(
+          isDistribution: true,
+          timestamp: ts,
+          id: id,
+          primaryAmount: totalAmount,
+          secondaryAmount: 0,
+          raw: distribution,
+        ),
+      );
+    }
+
+    events.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    double runningDebt = 0.0;
+    final timeline = <_TimelineEntry>[];
+
+    for (final event in events) {
+      final before = runningDebt;
+      final rawDelta = event.isDistribution
+          ? event.primaryAmount
+          : -(event.primaryAmount + event.secondaryAmount);
+      final provisionalAfter = before + rawDelta;
+      final adjustedAfter = provisionalAfter < 0 ? 0.0 : provisionalAfter;
+      final effectiveDelta = adjustedAfter - before;
+      runningDebt = adjustedAfter;
+
+      timeline.add(
+        _TimelineEntry(
+          isDistribution: event.isDistribution,
+          id: event.id,
+          timestamp: event.timestamp,
+          amount: event.primaryAmount,
+          discount: event.isDistribution ? 0 : event.secondaryAmount,
+          before: before,
+          after: adjustedAfter,
+          delta: effectiveDelta,
+          data: event.raw,
+        ),
+      );
+    }
+
+    return timeline;
+  }
+
+  Widget _buildTimelineSection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.blue.withOpacity(0.15)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withOpacity(0.05),
+            offset: const Offset(0, 4),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.timeline, color: Colors.blue),
+              SizedBox(width: 8),
+              Text(
+                'الترتيب الزمني للعمليات',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'يوضح الجدول التالي تسلسل كل عمليات التوزيع والتحصيل الخاصة بالعميل، مع الرصيد قبل وبعد كل عملية.',
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+          const SizedBox(height: 16),
+          Column(
+            children: _timelineEntries.reversed
+                .map(
+                  (entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _buildTimelineTile(entry),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineTile(_TimelineEntry entry) {
+    final isDistribution = entry.isDistribution;
+    final baseColor = isDistribution ? Colors.orange : Colors.green;
+    final deltaColor = entry.delta >= 0 ? Colors.red : Colors.green;
+    final title = isDistribution
+        ? 'توزيع #${entry.displayId}'
+        : 'دفعة #${entry.displayId}';
+    final subtitle = _formatDateTime(entry.timestamp.toIso8601String());
+
+    String? _additionalInfo() {
+      final data = entry.data;
+      if (isDistribution) {
+        final quantity = data['quantity'];
+        if (quantity != null) {
+          return 'الكمية: ${quantity.toString()}';
+        }
+      } else {
+        final method = data['paymentMethod']?.toString();
+        if (method != null && method.isNotEmpty) {
+          return 'طريقة الدفع: ${_getPaymentMethodText(method)}';
+        }
+      }
+      return null;
+    }
+
+    final additional = _additionalInfo();
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              leading: CircleAvatar(
+                radius: 22,
+                backgroundColor: baseColor.withOpacity(0.15),
+                child: Icon(
+                  isDistribution ? Icons.outbound : Icons.payment,
+                  color: baseColor,
+                ),
+              ),
+              title: Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    subtitle,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                  if (additional != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        additional,
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 6,
+                children: [
+                  _buildTimelineBadge(
+                    label: isDistribution ? 'قيمة التوزيع' : 'المبلغ المدفوع',
+                    value: _formatCurrency(entry.amount),
+                    color: baseColor,
+                  ),
+                  _buildTimelineBadge(
+                    label: entry.delta >= 0 ? 'زيادة على العميل' : 'تحصيل',
+                    value: _formatCurrency(entry.delta),
+                    color: deltaColor,
+                  ),
+                  if (!isDistribution && entry.discount > 0)
+                    _buildTimelineBadge(
+                      label: 'خصم',
+                      value: _formatCurrency(entry.discount),
+                      color: Colors.orange,
+                    ),
+                  _buildTimelineBadge(
+                    label: 'الرصيد قبل العملية',
+                    value: _formatCurrency(entry.before),
+                    color: Colors.blueGrey,
+                  ),
+                  _buildTimelineBadge(
+                    label: 'الرصيد بعد العملية',
+                    value: _formatCurrency(entry.after),
+                    color: baseColor,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimelineBadge({
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 10, color: color.withOpacity(0.8)),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatCurrency(double value) {
+    return 'ج.م ${value.toStringAsFixed(2)}';
+  }
+
   void _showSummaryDialog() {
     final totalPayments = _payments.length;
     final totalDistributions = _distributions.length;
@@ -399,10 +705,8 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
       return sum;
     });
 
-    final remaining = (totalDistributionValue - totalPaidValue).clamp(
-      0.0,
-      double.infinity,
-    );
+    final remaining = (totalDistributionValue - totalPaidValue - totalDiscount)
+        .clamp(0.0, double.infinity);
 
     showDialog(
       context: context,
@@ -505,31 +809,44 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
     );
   }
 
-  Widget _buildGroupedPaymentsList() {
+  List<Widget> _buildGroupedPaymentsWidgets() {
     if (_dailyGroups.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.payment, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 12),
-            Text(
-              'لا يوجد سجل لهذا العميل',
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.withOpacity(0.2)),
             ),
-          ],
+            child: Column(
+              children: const [
+                Icon(Icons.payment, size: 48, color: Colors.grey),
+                SizedBox(height: 12),
+                Text(
+                  'لا توجد عمليات مسجلة لهذا العميل حتى الآن',
+                  style: TextStyle(fontSize: 14, color: Colors.black54),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
         ),
-      );
+      ];
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _dailyGroups.length,
-      itemBuilder: (context, index) {
-        final group = _dailyGroups[index];
-        return _buildDayGroup(group);
-      },
-    );
+    return _dailyGroups
+        .map(
+          (group) => Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+            ).copyWith(bottom: 16),
+            child: _buildDayGroup(group),
+          ),
+        )
+        .toList();
   }
 
   Widget _buildDayGroup(_DailyHistoryGroup group) {
@@ -1200,6 +1517,7 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
           'الوزن الصافي',
           '${distribution['netWeight'] ?? 0} كجم',
         ),
+        _buildDetailRow('النوع', '${distribution['chickenType']['name']}'),
         _buildDetailRow('سعر الكيلو', 'ج.م ${distribution['price'] ?? 0}'),
         _buildDetailRow(
           'إجمالي المبلغ',
@@ -1248,4 +1566,51 @@ class _DailyHistoryGroup {
   final List<Map<String, dynamic>> distributions = [];
 
   _DailyHistoryGroup({required this.dateKey});
+}
+
+class _TimelineEvent {
+  final bool isDistribution;
+  final DateTime timestamp;
+  final String id;
+  final double primaryAmount;
+  final double secondaryAmount;
+  final Map<String, dynamic> raw;
+
+  _TimelineEvent({
+    required this.isDistribution,
+    required this.timestamp,
+    required this.id,
+    required this.primaryAmount,
+    required this.secondaryAmount,
+    required this.raw,
+  });
+}
+
+class _TimelineEntry {
+  final bool isDistribution;
+  final String id;
+  final DateTime timestamp;
+  final double amount;
+  final double discount;
+  final double before;
+  final double after;
+  final double delta;
+  final Map<String, dynamic> data;
+
+  _TimelineEntry({
+    required this.isDistribution,
+    required this.id,
+    required this.timestamp,
+    required this.amount,
+    required this.discount,
+    required this.before,
+    required this.after,
+    required this.delta,
+    required this.data,
+  });
+
+  String get displayId {
+    if (id.isEmpty) return 'غير معروف';
+    return id.length >= 8 ? id.substring(0, 8) : id;
+  }
 }

@@ -105,7 +105,7 @@ class _InventoryTabState extends State<InventoryTab> {
           if (createdAt.isEmpty) continue;
           DateTime dt;
           try {
-            dt = DateTime.parse(createdAt);
+            dt = DateTime.parse(createdAt).toLocal();
           } catch (_) {
             continue;
           }
@@ -691,19 +691,31 @@ class _DailyProfitDetailsPageState extends State<_DailyProfitDetailsPage> {
       // Load distributions for the selected date
       final allDistributions = await _distributionApi.getAllDistributions();
       final filteredDistributions = allDistributions.where((distribution) {
-        final createdAt = DateTime.parse(distribution['createdAt'] ?? '');
-        return createdAt.year == targetDate.year &&
-            createdAt.month == targetDate.month &&
-            createdAt.day == targetDate.day;
+        try {
+          final createdAt = DateTime.parse(
+            distribution['createdAt'] ?? '',
+          ).toLocal();
+          return createdAt.year == targetDate.year &&
+              createdAt.month == targetDate.month &&
+              createdAt.day == targetDate.day;
+        } catch (_) {
+          return false;
+        }
       }).toList();
 
       // Load loadings for the selected date
       final allLoadings = await _loadingApi.getAllLoadings();
       final filteredLoadings = allLoadings.where((loading) {
-        final createdAt = DateTime.parse(loading['createdAt'] ?? '');
-        return createdAt.year == targetDate.year &&
-            createdAt.month == targetDate.month &&
-            createdAt.day == targetDate.day;
+        try {
+          final createdAt = DateTime.parse(
+            loading['createdAt'] ?? '',
+          ).toLocal();
+          return createdAt.year == targetDate.year &&
+              createdAt.month == targetDate.month &&
+              createdAt.day == targetDate.day;
+        } catch (_) {
+          return false;
+        }
       }).toList();
 
       setState(() {
@@ -883,7 +895,7 @@ class _DistributionProfitCard extends StatelessWidget {
     final chickenTypeName = distribution['chickenType']?['name'] ?? 'غير محدد';
     final quantity = (distribution['quantity'] ?? 0) as num;
     final totalAmount = (distribution['totalAmount'] ?? 0) as num;
-    final createdAt = DateTime.parse(distribution['createdAt'] ?? '');
+    final createdAt = DateTime.parse(distribution['createdAt'] ?? '').toLocal();
     final timeStr =
         '${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}';
 
@@ -974,7 +986,7 @@ class _LoadingProfitCard extends StatelessWidget {
     final chickenTypeName = loading['chickenType']?['name'] ?? 'غير محدد';
     final quantity = (loading['quantity'] ?? 0) as num;
     final totalLoading = (loading['totalLoading'] ?? 0) as num;
-    final createdAt = DateTime.parse(loading['createdAt'] ?? '');
+    final createdAt = DateTime.parse(loading['createdAt'] ?? '').toLocal();
     final timeStr =
         '${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}';
 

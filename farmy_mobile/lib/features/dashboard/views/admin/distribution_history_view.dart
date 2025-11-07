@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/services/customer_api_service.dart';
 import '../../../../core/services/distribution_api_service.dart';
 import '../../../../core/services/inventory_api_service.dart';
 import '../../../../core/utils/pdf_arabic_utils.dart';
@@ -20,18 +21,24 @@ class DistributionHistoryView extends StatefulWidget {
 class _DistributionHistoryViewState extends State<DistributionHistoryView> {
   late final DistributionApiService _distributionService;
   late final InventoryApiService _inventoryService;
+  late final CustomerApiService _customerService;
   List<Map<String, dynamic>> _distributions = [];
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
   String? _error;
   String _searchQuery = '';
   Map<String, dynamic>? _dailyStock;
+  List<Map<String, dynamic>> _customers = [];
+  List<Map<String, dynamic>> _chickenTypes = [];
+  bool _isReferenceLoading = false;
+  String? _referenceError;
 
   @override
   void initState() {
     super.initState();
     _distributionService = serviceLocator<DistributionApiService>();
     _inventoryService = serviceLocator<InventoryApiService>();
+    _customerService = serviceLocator<CustomerApiService>();
     _loadDistributionsForDate(_selectedDate);
   }
 
@@ -52,7 +59,7 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
         if (raw == null || raw.isEmpty) return false;
         DateTime dt;
         try {
-          dt = DateTime.parse(raw);
+          dt = DateTime.parse(raw).toLocal();
         } catch (_) {
           return false;
         }
@@ -86,6 +93,66 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<bool> _ensureReferenceData() async {
+    if (_customers.isNotEmpty && _chickenTypes.isNotEmpty) {
+      return true;
+    }
+
+    if (_isReferenceLoading) {
+      while (_isReferenceLoading && mounted) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      return _referenceError == null &&
+          _customers.isNotEmpty &&
+          _chickenTypes.isNotEmpty;
+    }
+
+    if (!mounted) return false;
+    setState(() {
+      _isReferenceLoading = true;
+      _referenceError = null;
+    });
+
+    try {
+      final customers = await _customerService.getAllCustomers();
+      final chickenTypes = await _inventoryService.getAllChickenTypes();
+      if (!mounted) return false;
+      setState(() {
+        _customers = customers;
+        _chickenTypes = chickenTypes;
+        _isReferenceLoading = false;
+      });
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      setState(() {
+        _referenceError = e.toString();
+        _isReferenceLoading = false;
+      });
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchAvailableLoadings(
+    DateTime date,
+    String chickenTypeId,
+  ) async {
+    try {
+      final loadings = await _distributionService.getAvailableLoadings(
+        date,
+        chickenTypeId,
+      );
+      return loadings;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('فشل تحميل التحميلات المتاحة: $e')),
+        );
+      }
+      return [];
     }
   }
 
@@ -127,145 +194,157 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
 
   double _calculateTotalValue() {
     return _filteredDistributions.fold<double>(0.0, (sum, distribution) {
-      // Calculate the value directly from the form values
-      final grossWeight = (distribution['grossWeight'] ?? 0) as num;
-      final price = (distribution['price'] ?? 0) as num;
-      // Use the exact values as written in the form
-      return sum + (grossWeight.toDouble() * price.toDouble());
+      final totalAmount = (distribution['totalAmount'] ?? 0) as num;
+      return sum + totalAmount.toDouble();
     });
   }
 
   Future<void> _editDistribution(Map<String, dynamic> d) async {
-    final qtyCtrl = TextEditingController(
-      text: (d['quantity'] ?? 0).toString(),
+    final loaded = await _ensureReferenceData();
+    if (!loaded) {
+      if (!mounted) return;
+      final message =
+          _referenceError ?? 'فشل تحميل بيانات العملاء أو أنواع الفراخ';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+      return;
+    }
+
+    String? stringifyId(dynamic value) {
+      if (value == null) return null;
+      final str = value.toString();
+      return str.isEmpty ? null : str;
+    }
+
+    final existingCustomerId = stringifyId(
+      d['customer'] is Map<String, dynamic>
+          ? (d['customer']['_id'] ?? d['customer']['id'])
+          : d['customer'],
     );
-    final grossCtrl = TextEditingController(
-      text: (d['grossWeight'] ?? 0).toString(),
+    final existingChickenTypeId = stringifyId(
+      d['chickenType'] is Map<String, dynamic>
+          ? (d['chickenType']['_id'] ?? d['chickenType']['id'])
+          : d['chickenType'],
     );
-    final priceCtrl = TextEditingController(text: (d['price'] ?? 0).toString());
+    final existingSourceLoadingId = stringifyId(
+      d['sourceLoading'] is Map<String, dynamic>
+          ? (d['sourceLoading']['_id'] ?? d['sourceLoading']['id'])
+          : d['sourceLoading'],
+    );
+
     DateTime selectedDate;
     try {
       final raw = (d['distributionDate'] ?? d['createdAt'])?.toString();
-      selectedDate = raw != null ? DateTime.parse(raw) : DateTime.now();
+      selectedDate = raw != null
+          ? DateTime.parse(raw).toLocal()
+          : DateTime.now();
     } catch (_) {
       selectedDate = DateTime.now();
     }
 
-    final bool? confirmed = await showDialog<bool>(
+    List<Map<String, dynamic>> customerOptions =
+        List<Map<String, dynamic>>.from(_customers);
+    if (existingCustomerId != null &&
+        customerOptions.every(
+          (c) => stringifyId(c['_id']) != existingCustomerId,
+        )) {
+      final customerMap = d['customer'];
+      if (customerMap is Map<String, dynamic>) {
+        customerOptions = [
+          ...customerOptions,
+          {'_id': existingCustomerId, 'name': customerMap['name'] ?? 'عميل'},
+        ];
+      }
+    }
+
+    List<Map<String, dynamic>> chickenOptions = List<Map<String, dynamic>>.from(
+      _chickenTypes,
+    );
+    if (existingChickenTypeId != null &&
+        chickenOptions.every(
+          (c) => stringifyId(c['_id']) != existingChickenTypeId,
+        )) {
+      final chickenMap = d['chickenType'];
+      if (chickenMap is Map<String, dynamic>) {
+        chickenOptions = [
+          ...chickenOptions,
+          {
+            '_id': existingChickenTypeId,
+            'name': chickenMap['name'] ?? 'نوع غير معروف',
+          },
+        ];
+      }
+    }
+
+    List<Map<String, dynamic>> loadingOptions = [];
+    final currentLoading = d['sourceLoading'] as Map<String, dynamic>?;
+    if (currentLoading != null && existingSourceLoadingId != null) {
+      loadingOptions.add({
+        '_id': existingSourceLoadingId,
+        'supplier': currentLoading['supplier']?['name'] ?? 'غير معروف',
+        'remainingQuantity': currentLoading['remainingQuantity'],
+        'remainingNetWeight': currentLoading['remainingNetWeight'],
+        'loadingDate':
+            currentLoading['loadingDate'] ?? currentLoading['createdAt'],
+      });
+    }
+
+    if (existingChickenTypeId != null) {
+      final fetched = await _fetchAvailableLoadings(
+        selectedDate,
+        existingChickenTypeId,
+      );
+      for (final loading in fetched) {
+        final loadingId = stringifyId(loading['_id']);
+        if (loadingId == null) continue;
+        if (loadingOptions.every((l) => stringifyId(l['_id']) != loadingId)) {
+          loadingOptions.add(loading);
+        }
+      }
+    }
+
+    final formResult = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: AlertDialog(
-            title: const Text('تعديل سجل التوزيع'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Date selector
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_today, size: 18),
-                      const SizedBox(width: 8),
-                      const Text('تاريخ التوزيع:'),
-                      const Spacer(),
-                      StatefulBuilder(
-                        builder: (context, setInner) => OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today, size: 16),
-                          label: Text(
-                            '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                          ),
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: selectedDate,
-                              firstDate: DateTime(2024, 1, 1),
-                              lastDate: DateTime.now(),
-                            );
-                            if (picked != null) {
-                              setInner(() => selectedDate = picked);
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: qtyCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'الكمية',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: grossCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'وزن القائم (كجم)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: priceCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'السعر (ج.م/كجم)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('إلغاء'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('حفظ'),
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (_) => _EditDistributionDialog(
+        customers: customerOptions,
+        chickenTypes: chickenOptions,
+        initialCustomerId: existingCustomerId,
+        initialChickenTypeId: existingChickenTypeId,
+        initialLoadingId: existingSourceLoadingId,
+        initialQuantity: (d['quantity'] ?? 0).toString(),
+        initialGrossWeight: (d['grossWeight'] ?? 0).toString(),
+        initialPrice: (d['price'] ?? 0).toString(),
+        initialDate: selectedDate,
+        initialLoadingOptions: loadingOptions,
+        loadLoadings: _fetchAvailableLoadings,
+      ),
     );
 
-    if (confirmed == true) {
-      try {
-        final id = (d['_id'] ?? '').toString();
-        if (id.isEmpty) throw Exception('معرّف غير صالح');
-        final updated = await _distributionService.updateDistribution(id, {
-          'quantity': int.tryParse(qtyCtrl.text) ?? d['quantity'] ?? 0,
-          'grossWeight':
-              double.tryParse(grossCtrl.text) ??
-              (d['grossWeight'] ?? 0).toDouble(),
-          'price':
-              double.tryParse(priceCtrl.text) ?? (d['price'] ?? 0).toDouble(),
-          'distributionDate': selectedDate.toIso8601String(),
-        });
-        if (!mounted) return;
-        setState(() {
-          final idx = _distributions.indexWhere((x) => x['_id'] == id);
-          if (idx != -1) _distributions[idx] = updated;
-        });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('تم تحديث سجل التوزيع')));
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('فشل التحديث: $e')));
-      }
+    if (formResult == null) return;
+
+    final String id = (d['_id'] ?? '').toString();
+    if (id.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('معرّف التوزيع غير صالح')));
+      return;
+    }
+
+    try {
+      await _distributionService.updateDistribution(id, formResult);
+      if (!mounted) return;
+      await _loadDistributionsForDate(_selectedDate);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم تحديث سجل التوزيع')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('فشل التحديث: $e')));
     }
   }
 
@@ -276,8 +355,8 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
   String _formatDateTime(String? dateTime) {
     if (dateTime == null) return 'غير معروف';
     try {
-      final dt = DateTime.parse(dateTime);
-      return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+      final dt = DateTime.parse(dateTime).toLocal();
+      return '${dt.day}/${dt.month}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return 'تاريخ غير صحيح';
     }
@@ -411,12 +490,12 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
           ),
           body: RefreshIndicator(
             onRefresh: () => _loadDistributionsForDate(_selectedDate),
-            child: SingleChildScrollView(
+            child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              child: Column(
-                children: [
-                  // Header with date selector and search
-                  Container(
+              slivers: [
+                // Header with date selector and search
+                SliverToBoxAdapter(
+                  child: Container(
                     padding: const EdgeInsets.all(16),
                     color: Colors.grey[50],
                     child: Column(
@@ -462,10 +541,12 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
                       ],
                     ),
                   ),
+                ),
 
-                  // Summary list (more compact & readable)
-                  if (!_isLoading && _filteredDistributions.isNotEmpty) ...[
-                    Padding(
+                // Summary list (more compact & readable)
+                if (!_isLoading && _filteredDistributions.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Card(
                         elevation: 1,
@@ -508,15 +589,15 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
                         ),
                       ),
                     ),
-                  ],
-
-                  // Content
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: _buildContent(),
                   ),
                 ],
-              ),
+
+                // Content
+                SliverPadding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  sliver: SliverToBoxAdapter(child: _buildContent()),
+                ),
+              ],
             ),
           ),
         ),
@@ -578,59 +659,57 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: _filteredDistributions.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
+    return Column(
+      children: List.generate(_filteredDistributions.length, (index) {
         final d = _filteredDistributions[index];
         final String title = d['customer']?['name'] ?? 'عميل غير معروف';
         final String subtitle = _formatDateTime(
           d['createdAt'] ?? d['distributionDate'],
         );
         final num totalAmount = (d['totalAmount'] ?? 0) as num;
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: Colors.green.withOpacity(0.1),
-            child: const Icon(Icons.outbound, color: Colors.green),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.green.withOpacity(0.1),
+              child: const Icon(Icons.outbound, color: Colors.green),
+            ),
+            title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: Text(subtitle),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'تعديل هذا السجل',
+                  icon: const Icon(Icons.edit, color: Colors.blueAccent),
+                  onPressed: () => _editDistribution(d),
+                ),
+                Text(
+                  '${totalAmount.toDouble().toStringAsFixed(0)} ج.م',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'حذف هذا السجل',
+                  icon: const Icon(Icons.delete, color: Colors.redAccent),
+                  onPressed: () => _confirmAndDeleteDistribution(d),
+                ),
+              ],
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            tileColor: Colors.white,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => _DistributionDetailsPage(distribution: d),
+                ),
+              );
+            },
           ),
-          title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Text(subtitle),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                tooltip: 'تعديل هذا السجل',
-                icon: const Icon(Icons.edit, color: Colors.blueAccent),
-                onPressed: () => _editDistribution(d),
-              ),
-              Text(
-                '${totalAmount.toDouble().toStringAsFixed(0)} ج.م',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: 'حذف هذا السجل',
-                icon: const Icon(Icons.delete, color: Colors.redAccent),
-                onPressed: () => _confirmAndDeleteDistribution(d),
-              ),
-            ],
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          tileColor: Colors.white,
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => _DistributionDetailsPage(distribution: d),
-              ),
-            );
-          },
         );
-      },
+      }),
     );
   }
 
@@ -1240,6 +1319,289 @@ class _DistributionDetailsPage extends StatelessWidget {
             distribution,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _EditDistributionDialog extends StatefulWidget {
+  final List<Map<String, dynamic>> customers;
+  final List<Map<String, dynamic>> chickenTypes;
+  final List<Map<String, dynamic>> initialLoadingOptions;
+  final String? initialCustomerId;
+  final String? initialChickenTypeId;
+  final String? initialLoadingId;
+  final String initialQuantity;
+  final String initialGrossWeight;
+  final String initialPrice;
+  final DateTime initialDate;
+  final Future<List<Map<String, dynamic>>> Function(DateTime, String)
+  loadLoadings;
+
+  const _EditDistributionDialog({
+    required this.customers,
+    required this.chickenTypes,
+    required this.initialLoadingOptions,
+    required this.initialCustomerId,
+    required this.initialChickenTypeId,
+    required this.initialLoadingId,
+    required this.initialQuantity,
+    required this.initialGrossWeight,
+    required this.initialPrice,
+    required this.initialDate,
+    required this.loadLoadings,
+  });
+
+  @override
+  State<_EditDistributionDialog> createState() =>
+      _EditDistributionDialogState();
+}
+
+class _EditDistributionDialogState extends State<_EditDistributionDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _quantityCtrl;
+  late final TextEditingController _grossCtrl;
+  late final TextEditingController _priceCtrl;
+  late DateTime _selectedDate;
+  String? _selectedCustomerId;
+  String? _selectedChickenTypeId;
+  String? _selectedLoadingId;
+  List<Map<String, dynamic>> _loadingOptions = [];
+  bool _loadingLoadings = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _quantityCtrl = TextEditingController(text: widget.initialQuantity);
+    _grossCtrl = TextEditingController(text: widget.initialGrossWeight);
+    _priceCtrl = TextEditingController(text: widget.initialPrice);
+    _selectedDate = widget.initialDate;
+    _selectedCustomerId = widget.initialCustomerId;
+    _selectedChickenTypeId = widget.initialChickenTypeId;
+    _selectedLoadingId = widget.initialLoadingId;
+    _loadingOptions = List<Map<String, dynamic>>.from(
+      widget.initialLoadingOptions,
+    );
+    if (_loadingOptions.isEmpty &&
+        _selectedChickenTypeId != null &&
+        _selectedChickenTypeId!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _refreshLoadings();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _quantityCtrl.dispose();
+    _grossCtrl.dispose();
+    _priceCtrl.dispose();
+    super.dispose();
+  }
+
+  String _labelForLoading(Map<String, dynamic> loading) {
+    final supplier = loading['supplier'] ?? loading['supplierName'];
+    final remainingQty = loading['remainingQuantity'];
+    final remainingNet = loading['remainingNetWeight'];
+    return '${supplier ?? 'تحميل'} - متبقي: ${remainingQty ?? '-'} وحدة / ${(remainingNet ?? '-')} كجم';
+  }
+
+  Future<void> _refreshLoadings() async {
+    final chickenId = _selectedChickenTypeId;
+    if (chickenId == null || chickenId.isEmpty) {
+      setState(() {
+        _loadingOptions = [];
+        _selectedLoadingId = null;
+      });
+      return;
+    }
+    setState(() {
+      _loadingLoadings = true;
+    });
+    final items = await widget.loadLoadings(_selectedDate, chickenId);
+    setState(() {
+      _loadingOptions = items;
+      if (_loadingOptions.every(
+        (element) => (element['_id'] ?? '').toString() != _selectedLoadingId,
+      )) {
+        _selectedLoadingId = null;
+      }
+      _loadingLoadings = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Text('تعديل سجل التوزيع'),
+        content: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: _selectedCustomerId,
+                  decoration: const InputDecoration(
+                    labelText: 'العميل',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: widget.customers
+                      .map(
+                        (c) => DropdownMenuItem<String>(
+                          value: (c['_id'] ?? '').toString(),
+                          child: Text((c['name'] ?? 'عميل').toString()),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() {
+                    _selectedCustomerId = value;
+                  }),
+                  validator: (value) =>
+                      value == null || value.isEmpty ? 'اختر العميل' : null,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _selectedChickenTypeId,
+                  decoration: const InputDecoration(
+                    labelText: 'نوع الفراخ',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: widget.chickenTypes
+                      .map(
+                        (c) => DropdownMenuItem<String>(
+                          value: (c['_id'] ?? '').toString(),
+                          child: Text((c['name'] ?? 'نوع').toString()),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedChickenTypeId = value;
+                      _selectedLoadingId = null;
+                    });
+                    _refreshLoadings();
+                  },
+                  validator: (value) =>
+                      value == null || value.isEmpty ? 'اختر نوع الفراخ' : null,
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.calendar_today, size: 16),
+                    label: Text(
+                      '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                    ),
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _selectedDate,
+                        firstDate: DateTime(2024, 1, 1),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        setState(() => _selectedDate = picked);
+                        _refreshLoadings();
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _quantityCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'الكمية (عدد)',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'الكمية مطلوبة';
+                    }
+                    final qty = int.tryParse(value);
+                    if (qty == null || qty <= 0) {
+                      return 'أدخل كمية صحيحة';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _grossCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'الوزن القائم (كجم)',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'القيمة مطلوبة';
+                    }
+                    final gross = double.tryParse(value);
+                    if (gross == null || gross < 0) {
+                      return 'أدخل وزن صحيح';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _priceCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'السعر (ج.م/كجم)',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'القيمة مطلوبة';
+                    }
+                    final price = double.tryParse(value);
+                    if (price == null || price < 0) {
+                      return 'أدخل سعر صحيح';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (!_formKey.currentState!.validate()) return;
+              if (_selectedCustomerId == null ||
+                  _selectedChickenTypeId == null ||
+                  _selectedLoadingId == null) {
+                return;
+              }
+
+              Navigator.pop(context, {
+                'customer': _selectedCustomerId!,
+                'chickenType': _selectedChickenTypeId!,
+                'sourceLoading': _selectedLoadingId!,
+                'quantity': int.parse(_quantityCtrl.text),
+                'grossWeight': double.parse(_grossCtrl.text),
+                'price': double.parse(_priceCtrl.text),
+                'distributionDate': _selectedDate.toIso8601String(),
+              });
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
       ),
     );
   }

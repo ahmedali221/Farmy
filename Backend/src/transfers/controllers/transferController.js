@@ -82,12 +82,26 @@ exports.listTransfers = async (req, res) => {
   try {
     const { userId } = req.query;
     const filter = {};
-    if (userId) {
+
+    const requester = req.user || {};
+    const requesterId = requester.id;
+    const requesterRole = requester.role;
+
+    if (requesterRole === 'employee') {
+      if (!requesterId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      filter.$or = [
+        { fromUser: requesterId },
+        { toUser: requesterId }
+      ];
+    } else if (userId) {
       filter.$or = [
         { fromUser: userId },
         { toUser: userId }
       ];
     }
+
     const transfers = await Transfer.find(filter)
       .populate('fromUser', 'username role')
       .populate('toUser', 'username role')

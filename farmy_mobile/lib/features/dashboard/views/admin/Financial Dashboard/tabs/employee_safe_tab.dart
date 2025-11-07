@@ -16,7 +16,6 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
   late final PaymentApiService _paymentService;
   late final EmployeeApiService _employeeService;
   late final EmployeeExpenseApiService _employeeExpenseService;
-  late final TransferApiService _transferService;
 
   bool _loading = true;
   String? _error;
@@ -33,7 +32,6 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
     _paymentService = serviceLocator<PaymentApiService>();
     _employeeService = serviceLocator<EmployeeApiService>();
     _employeeExpenseService = serviceLocator<EmployeeExpenseApiService>();
-    _transferService = serviceLocator<TransferApiService>();
     _loadData();
   }
 
@@ -331,6 +329,8 @@ class _EmployeeSafeDetailsPageState extends State<_EmployeeSafeDetailsPage> {
   late final EmployeeExpenseApiService _employeeExpenseService;
   late final TransferApiService _transferService;
   late List<Map<String, dynamic>> _otherExpenses;
+  List<Map<String, dynamic>> _transfers = [];
+  bool _transfersLoading = false;
 
   @override
   void initState() {
@@ -338,6 +338,7 @@ class _EmployeeSafeDetailsPageState extends State<_EmployeeSafeDetailsPage> {
     _employeeExpenseService = serviceLocator<EmployeeExpenseApiService>();
     _transferService = serviceLocator<TransferApiService>();
     _otherExpenses = [...widget.initialOtherExpenses];
+    _loadTransfers();
   }
 
   double get _extraTotal => _otherExpenses.fold<double>(
@@ -349,6 +350,26 @@ class _EmployeeSafeDetailsPageState extends State<_EmployeeSafeDetailsPage> {
       widget.collected + widget.transfersIn - widget.transfersOut;
 
   double get _net => _netAvailable - _extraTotal;
+
+  Future<void> _loadTransfers() async {
+    setState(() => _transfersLoading = true);
+    try {
+      final list = await _transferService.listTransfers(
+        userId: widget.employeeId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _transfers = list;
+        _transfersLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _transfersLoading = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('فشل تحميل التحويلات: $e')));
+    }
+  }
 
   Future<void> _addExpense() async {
     final result = await showDialog<Map<String, dynamic>>(
@@ -416,7 +437,7 @@ class _EmployeeSafeDetailsPageState extends State<_EmployeeSafeDetailsPage> {
           context,
         ).showSnackBar(const SnackBar(content: Text('تم إجراء التحويل بنجاح')));
 
-        // Navigate back to refresh the data
+        await _loadTransfers();
         Navigator.of(context).pop();
       } catch (e) {
         if (!mounted) return;
@@ -684,6 +705,120 @@ class _EmployeeSafeDetailsPageState extends State<_EmployeeSafeDetailsPage> {
                 );
               }).toList(),
             ],
+
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.swap_horiz, color: Colors.teal, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'سجل التحويلات',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (_transfersLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (_transfers.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'لا توجد تحويلات لهذا المستخدم بعد.',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              )
+            else
+              Column(
+                children: _transfers.map((transfer) {
+                  final bool isOutgoing =
+                      transfer['fromUser']?['_id']?.toString() ==
+                      widget.employeeId;
+                  final otherUser = isOutgoing
+                      ? transfer['toUser']
+                      : transfer['fromUser'];
+                  final otherName =
+                      otherUser?['username'] ??
+                      otherUser?['name'] ??
+                      'غير معروف';
+                  final double amount = ((transfer['amount'] ?? 0) as num)
+                      .toDouble();
+                  final String note = (transfer['note'] ?? '').toString();
+                  final String createdAtStr = (transfer['createdAt'] ?? '')
+                      .toString();
+                  DateTime? createdAt;
+                  try {
+                    createdAt = DateTime.parse(createdAtStr).toLocal();
+                  } catch (_) {}
+                  final String dateLabel = createdAt != null
+                      ? '${createdAt.year}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')} ${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}'
+                      : 'تاريخ غير معروف';
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    elevation: 1,
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: isOutgoing
+                            ? Colors.red.withOpacity(0.1)
+                            : Colors.green.withOpacity(0.1),
+                        child: Icon(
+                          isOutgoing ? Icons.call_made : Icons.call_received,
+                          color: isOutgoing ? Colors.red : Colors.green,
+                        ),
+                      ),
+                      title: Text(
+                        isOutgoing
+                            ? 'تحويل إلى: $otherName'
+                            : 'تحويل من: $otherName',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            dateLabel,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.black54,
+                            ),
+                          ),
+                          if (note.isNotEmpty)
+                            Text(
+                              note,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                        ],
+                      ),
+                      trailing: Text(
+                        '${isOutgoing ? '-' : '+'}${amount.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isOutgoing ? Colors.red : Colors.green,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
           ],
         ),
       ),

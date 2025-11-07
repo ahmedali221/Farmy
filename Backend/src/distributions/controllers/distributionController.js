@@ -257,74 +257,200 @@ exports.getDailyNetWeight = async (req, res) => {
 
 // Update distribution by ID
 exports.updateDistribution = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
+    await session.startTransaction();
+
     const { id } = req.params;
 
-    const distribution = await Distribution.findById(id);
+    const distribution = await Distribution.findById(id).session(session);
     if (!distribution) {
+      await session.abortTransaction();
       return res.status(404).json({ message: 'Distribution not found' });
     }
 
-    const prevTotalAmount = Number(distribution.totalAmount || 0);
+    const prevCustomerId = distribution.customer.toString();
+    const prevChickenTypeId = distribution.chickenType.toString();
+    const prevSourceLoadingId = distribution.sourceLoading
+      ? distribution.sourceLoading.toString()
+      : null;
     const prevQuantity = Number(distribution.quantity || 0);
+    const prevGrossWeight = Number(distribution.grossWeight || 0);
     const prevNetWeight = Number(distribution.netWeight || 0);
+    const prevPrice = Number(distribution.price || 0);
+    const prevTotalAmount = Number(distribution.totalAmount || 0);
 
-    // Allow updating: quantity, grossWeight, price, distributionDate
-    const updatable = {};
-    if (req.body.quantity !== undefined) updatable.quantity = Number(req.body.quantity);
-    if (req.body.grossWeight !== undefined) updatable.grossWeight = Number(req.body.grossWeight);
-    if (req.body.price !== undefined) updatable.price = Number(req.body.price);
-    if (req.body.distributionDate) updatable.distributionDate = new Date(req.body.distributionDate);
+    // Validate and normalize customer if provided
+    let newCustomerId = prevCustomerId;
+    if (req.body.customer) {
+      const customerDoc = await Customer.findById(req.body.customer).session(session);
+      if (!customerDoc) {
+        await session.abortTransaction();
+        return res.status(404).json({ message: 'Customer not found' });
+      }
+      newCustomerId = customerDoc._id.toString();
+    }
 
-    // Apply updates to document
-    Object.assign(distribution, updatable);
+    // Validate and normalize chicken type if provided
+    let newChickenTypeId = prevChickenTypeId;
+    if (req.body.chickenType) {
+      let chickenTypeDoc;
+      if (mongoose.Types.ObjectId.isValid(req.body.chickenType)) {
+        chickenTypeDoc = await ChickenType.findById(req.body.chickenType).session(session);
+      } else {
+        chickenTypeDoc = await ChickenType.findOne({ name: req.body.chickenType }).session(session);
+      }
+      if (!chickenTypeDoc) {
+        await session.abortTransaction();
+        return res.status(404).json({ message: 'Chicken type not found' });
+      }
+      newChickenTypeId = chickenTypeDoc._id.toString();
+    }
 
-    // Recompute dependent fields similar to pre-save to be explicit
-    distribution.emptyWeight = distribution.quantity * 8;
-    distribution.netWeight = Math.max(0, distribution.grossWeight - distribution.emptyWeight);
-    distribution.totalAmount = distribution.netWeight * distribution.price;
+    // Determine numeric fields
+    const parseNumber = (value, name) => {
+      if (value === undefined) return undefined;
+      const num = Number(value);
+      if (!Number.isFinite(num)) {
+        throw new Error(`${name} must be a valid number`);
+      }
+      return num;
+    };
 
-    // Validate against source loading if quantities are being updated
-    if (req.body.quantity !== undefined || req.body.grossWeight !== undefined) {
-      const sourceLoadingDoc = await Loading.findById(distribution.sourceLoading);
-      if (sourceLoadingDoc) {
-        // Calculate the difference in quantities
-        const quantityDiff = distribution.quantity - prevQuantity;
-        const netWeightDiff = distribution.netWeight - prevNetWeight;
+    const newQuantity = parseNumber(
+      req.body.quantity !== undefined ? req.body.quantity : prevQuantity,
+      'quantity',
+    );
+    const newGrossWeight = parseNumber(
+      req.body.grossWeight !== undefined ? req.body.grossWeight : prevGrossWeight,
+      'grossWeight',
+    );
+    const newPrice = parseNumber(
+      req.body.price !== undefined ? req.body.price : prevPrice,
+      'price',
+    );
 
-        // Check if the source loading can accommodate the changes
-        if (sourceLoadingDoc.remainingQuantity < quantityDiff) {
-          return res.status(400).json({ 
-            message: `Insufficient quantity in source loading. Available: ${sourceLoadingDoc.remainingQuantity}, Additional needed: ${quantityDiff}` 
-          });
-        }
+    if (newQuantity === undefined || newQuantity <= 0) {
+      throw new Error('quantity must be greater than 0');
+    }
+    if (!Number.isInteger(newQuantity)) {
+      throw new Error('quantity must be an integer value');
+    }
+    if (newGrossWeight === undefined || newGrossWeight < 0) {
+      throw new Error('grossWeight must be >= 0');
+    }
+    if (newPrice === undefined || newPrice < 0) {
+      throw new Error('price must be >= 0');
+    }
 
-        if (sourceLoadingDoc.remainingNetWeight < netWeightDiff) {
-          return res.status(400).json({ 
-            message: `Insufficient net weight in source loading. Available: ${sourceLoadingDoc.remainingNetWeight}, Additional needed: ${netWeightDiff}` 
-          });
-        }
+    const newEmptyWeight = newQuantity * 8;
+    const newNetWeight = Math.max(0, newGrossWeight - newEmptyWeight);
+    const newTotalAmount = newNetWeight * newPrice;
 
-        // Update the source loading quantities
-        sourceLoadingDoc.distributedQuantity += quantityDiff;
-        sourceLoadingDoc.distributedNetWeight += netWeightDiff;
-        await sourceLoadingDoc.save();
+    const newDistributionDate = req.body.distributionDate
+      ? new Date(req.body.distributionDate)
+      : distribution.distributionDate;
+
+    // Validate / resolve source loading
+    let newSourceLoadingId = req.body.sourceLoading
+      ? req.body.sourceLoading.toString()
+      : prevSourceLoadingId;
+
+    if (!newSourceLoadingId) {
+      throw new Error('sourceLoading is required');
+    }
+
+    const newSourceLoading = await Loading.findById(newSourceLoadingId).session(session);
+    if (!newSourceLoading) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: 'Source loading not found' });
+    }
+
+    if (newSourceLoading.chickenType.toString() !== newChickenTypeId) {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'Selected source loading does not match the chosen chicken type' });
+    }
+
+    // Restore previous allocation on the old loading (if exists)
+    if (prevSourceLoadingId) {
+      const prevLoadingDoc = await Loading.findById(prevSourceLoadingId).session(session);
+      if (prevLoadingDoc) {
+        prevLoadingDoc.distributedQuantity = Math.max(0, (prevLoadingDoc.distributedQuantity || 0) - prevQuantity);
+        prevLoadingDoc.distributedNetWeight = Math.max(0, (prevLoadingDoc.distributedNetWeight || 0) - prevNetWeight);
+        await prevLoadingDoc.save({ session });
       }
     }
 
-    await distribution.save();
-
-    // Adjust customer's outstanding debts by the delta
-    const customerDoc = await Customer.findById(distribution.customer);
-    if (customerDoc) {
-      const current = Number(customerDoc.outstandingDebts || 0);
-      const newTotal = Number(distribution.totalAmount || 0);
-      const delta = newTotal - prevTotalAmount;
-      customerDoc.outstandingDebts = Math.max(0, current + delta);
-      await customerDoc.save();
+    // Re-fetch the target loading after potential restoration
+    const targetLoading = await Loading.findById(newSourceLoadingId).session(session);
+    if (!targetLoading) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: 'Source loading not found' });
     }
 
-    // Populate refs for consistent frontend display
+    const remainingQuantity = Math.max(0, targetLoading.quantity - (targetLoading.distributedQuantity || 0));
+    const remainingNetWeight = Math.max(0, targetLoading.netWeight - (targetLoading.distributedNetWeight || 0));
+
+    if (newQuantity > remainingQuantity) {
+      await session.abortTransaction();
+          return res.status(400).json({ 
+        message: `Insufficient quantity in source loading. Available: ${remainingQuantity}, Requested: ${newQuantity}`,
+          });
+        }
+
+    if (newNetWeight > remainingNetWeight) {
+      await session.abortTransaction();
+          return res.status(400).json({ 
+        message: `Insufficient net weight in source loading. Available: ${remainingNetWeight.toFixed(2)}, Requested: ${newNetWeight.toFixed(2)}`,
+      });
+    }
+
+    // Apply new allocation to target loading
+    targetLoading.distributedQuantity = (targetLoading.distributedQuantity || 0) + newQuantity;
+    targetLoading.distributedNetWeight = (targetLoading.distributedNetWeight || 0) + newNetWeight;
+    await targetLoading.save({ session });
+
+    // Update distribution document fields
+    distribution.customer = new mongoose.Types.ObjectId(newCustomerId);
+    distribution.chickenType = new mongoose.Types.ObjectId(newChickenTypeId);
+    distribution.sourceLoading = new mongoose.Types.ObjectId(newSourceLoadingId);
+    distribution.quantity = newQuantity;
+    distribution.grossWeight = newGrossWeight;
+    distribution.price = newPrice;
+    distribution.emptyWeight = newEmptyWeight;
+    distribution.netWeight = newNetWeight;
+    distribution.totalAmount = newTotalAmount;
+    distribution.distributionDate = newDistributionDate;
+
+    await distribution.save({ session });
+
+    // Adjust customer outstanding debts
+    if (newCustomerId !== prevCustomerId) {
+      const prevCustomer = await Customer.findById(prevCustomerId).session(session);
+      if (prevCustomer) {
+        const current = Number(prevCustomer.outstandingDebts || 0);
+        prevCustomer.outstandingDebts = Math.max(0, current - prevTotalAmount);
+        await prevCustomer.save({ session });
+      }
+
+      const newCustomer = await Customer.findById(newCustomerId).session(session);
+      if (newCustomer) {
+        const current = Number(newCustomer.outstandingDebts || 0);
+        newCustomer.outstandingDebts = Math.max(0, current + newTotalAmount);
+        await newCustomer.save({ session });
+      }
+    } else {
+      const customerDoc = await Customer.findById(newCustomerId).session(session);
+    if (customerDoc) {
+      const current = Number(customerDoc.outstandingDebts || 0);
+        const delta = newTotalAmount - prevTotalAmount;
+      customerDoc.outstandingDebts = Math.max(0, current + delta);
+        await customerDoc.save({ session });
+      }
+    }
+
+    await session.commitTransaction();
+
     await distribution.populate('customer', 'name contactInfo');
     await distribution.populate('chickenType', 'name');
     await distribution.populate('sourceLoading', 'quantity netWeight remainingQuantity remainingNetWeight');
@@ -333,8 +459,14 @@ exports.updateDistribution = async (req, res) => {
     logger.info(`Distribution updated: ${id} by user: ${req.user?.id || 'unknown'}`);
     return res.status(200).json(distribution);
   } catch (err) {
+    await session.abortTransaction().catch(() => {});
     logger.error(`Error updating distribution: ${err.message}`);
+    if (err.message && err.message.includes('must be')) {
+      return res.status(400).json({ message: err.message });
+    }
     return res.status(500).json({ message: 'Server error' });
+  } finally {
+    session.endSession().catch(() => {});
   }
 };
 
