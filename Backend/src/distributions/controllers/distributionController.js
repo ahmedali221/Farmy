@@ -391,11 +391,13 @@ exports.updateDistribution = async (req, res) => {
     }
 
     // Restore previous allocation on the old loading (if exists)
+    // Allow negative values for over-distribution tracking
     if (prevSourceLoadingId) {
       const prevLoadingDoc = await Loading.findById(prevSourceLoadingId).session(session);
       if (prevLoadingDoc) {
-        prevLoadingDoc.distributedQuantity = Math.max(0, (prevLoadingDoc.distributedQuantity || 0) - prevQuantity);
-        prevLoadingDoc.distributedNetWeight = Math.max(0, (prevLoadingDoc.distributedNetWeight || 0) - prevNetWeight);
+        // Remove Math.max(0, ...) to allow negative remaining quantities
+        prevLoadingDoc.distributedQuantity = (prevLoadingDoc.distributedQuantity || 0) - prevQuantity;
+        prevLoadingDoc.distributedNetWeight = (prevLoadingDoc.distributedNetWeight || 0) - prevNetWeight;
         await prevLoadingDoc.save({ session });
       }
     }
@@ -536,14 +538,16 @@ exports.deleteDistribution = async (req, res) => {
       await session.startTransaction();
 
       // Restore quantities to source loading
+      // Allow negative values for over-distribution tracking
       if (distribution.sourceLoading) {
         const sourceLoadingDoc = await Loading.findById(distribution.sourceLoading).session(session);
         if (sourceLoadingDoc) {
           const oldDistributedQty = sourceLoadingDoc.distributedQuantity || 0;
           const oldDistributedWeight = sourceLoadingDoc.distributedNetWeight || 0;
           
-          sourceLoadingDoc.distributedQuantity = Math.max(0, oldDistributedQty - (distribution.quantity || 0));
-          sourceLoadingDoc.distributedNetWeight = Math.max(0, oldDistributedWeight - (distribution.netWeight || 0));
+          // Remove Math.max(0, ...) to allow negative remaining quantities
+          sourceLoadingDoc.distributedQuantity = oldDistributedQty - (distribution.quantity || 0);
+          sourceLoadingDoc.distributedNetWeight = oldDistributedWeight - (distribution.netWeight || 0);
           
           await sourceLoadingDoc.save({ session });
           logger.info(`Restored quantities to source loading ${distribution.sourceLoading}: qty=${distribution.quantity}, weight=${distribution.netWeight}`);

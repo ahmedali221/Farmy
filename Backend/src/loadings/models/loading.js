@@ -113,13 +113,27 @@ const loadingSchema = new mongoose.Schema({
   },
   remainingQuantity: {
     type: Number,
-    default: function() { return this.quantity; }
-    // Removed min: 0 to allow negative values for over-distribution tracking
+    default: function() { return this.quantity; },
+    // Allow negative values for over-distribution tracking
+    validate: {
+      validator: function(v) {
+        // Allow any number (including negative) for over-distribution
+        return v !== null && v !== undefined && !isNaN(v);
+      },
+      message: 'remainingQuantity must be a number'
+    }
   },
   remainingNetWeight: {
     type: Number,
-    default: function() { return this.netWeight; }
-    // Removed min: 0 to allow negative values for over-distribution tracking
+    default: function() { return this.netWeight; },
+    // Allow negative values for over-distribution tracking
+    validate: {
+      validator: function(v) {
+        // Allow any number (including negative) for over-distribution
+        return v !== null && v !== undefined && !isNaN(v);
+      },
+      message: 'remainingNetWeight must be a number'
+    }
   },
   
   // بيانات المراجعة (اختيارية)
