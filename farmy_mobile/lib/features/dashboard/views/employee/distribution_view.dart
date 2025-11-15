@@ -207,6 +207,49 @@ class _DistributionViewState extends State<DistributionView> {
     });
   }
 
+  // Calculate over-distribution (excess quantity/weight)
+  Map<String, dynamic>? _calculateOverDistribution() {
+    if (_availableQuantities == null || _selectedChickenType == null) {
+      return null;
+    }
+
+    final requestedQuantity = int.tryParse(_quantityCtrl.text) ?? 0;
+    final requestedNetWeight = double.tryParse(_netWeightCtrl.text) ?? 0.0;
+    
+    final availableQuantity = (_availableQuantities!['totalAvailableQuantity'] as num?)?.toInt() ?? 0;
+    final availableNetWeight = (_availableQuantities!['totalAvailableNetWeight'] as num?)?.toDouble() ?? 0.0;
+
+    final quantityExcess = requestedQuantity > availableQuantity 
+        ? requestedQuantity - availableQuantity 
+        : 0;
+    final netWeightExcess = requestedNetWeight > availableNetWeight 
+        ? requestedNetWeight - availableNetWeight 
+        : 0.0;
+
+    if (quantityExcess > 0 || netWeightExcess > 0) {
+      return {
+        'quantityExcess': quantityExcess,
+        'netWeightExcess': netWeightExcess,
+        'availableQuantity': availableQuantity,
+        'availableNetWeight': availableNetWeight,
+      };
+    }
+
+    return null;
+  }
+
+  bool _isAdminOrManager() {
+    try {
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthAuthenticated) {
+        return authState.user.role == 'manager' || authState.user.role == 'employee';
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<void> _generateAndPrintPdf({
     required double oldOutstanding,
     required double mealAccount,
@@ -826,6 +869,64 @@ class _DistributionViewState extends State<DistributionView> {
                                             ),
                                           ],
                                         ),
+                                        // Over-distribution warning
+                                        if (_calculateOverDistribution() != null && _isAdminOrManager()) ...[
+                                          const SizedBox(height: 12),
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange[50],
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: Colors.orange[300]!,
+                                                width: 2,
+                                              ),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.warning_amber_rounded,
+                                                      color: Colors.orange[700],
+                                                      size: 20,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      'توزيع زائد عن المتاح',
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Colors.orange[900],
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 8),
+                                                if (_calculateOverDistribution()!['quantityExcess'] > 0)
+                                                  Text(
+                                                    'الزيادة في العدد: ${_calculateOverDistribution()!['quantityExcess']} (المتاح: ${_calculateOverDistribution()!['availableQuantity']})',
+                                                    style: TextStyle(
+                                                      color: Colors.orange[800],
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                if (_calculateOverDistribution()!['netWeightExcess'] > 0) ...[
+                                                  if (_calculateOverDistribution()!['quantityExcess'] > 0)
+                                                    const SizedBox(height: 4),
+                                                  Text(
+                                                    'الزيادة في الوزن الصافي: ${(_calculateOverDistribution()!['netWeightExcess'] as num).toStringAsFixed(2)} كجم (المتاح: ${(_calculateOverDistribution()!['availableNetWeight'] as num).toStringAsFixed(2)} كجم)',
+                                                    style: TextStyle(
+                                                      color: Colors.orange[800],
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                         if ((_availableQuantities!['loadings']
                                                 as List)
                                             .isNotEmpty) ...[
@@ -841,43 +942,61 @@ class _DistributionViewState extends State<DistributionView> {
                                           ...(_availableQuantities!['loadings']
                                                   as List)
                                               .map(
-                                                (loading) => Container(
-                                                  margin: const EdgeInsets.only(
-                                                    bottom: 4,
-                                                  ),
-                                                  padding: const EdgeInsets.all(
-                                                    8,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          4,
-                                                        ),
-                                                    border: Border.all(
-                                                      color: Colors.grey[300]!,
+                                                (loading) {
+                                                  final remainingQty = (loading['remainingQuantity'] as num?)?.toInt() ?? 0;
+                                                  final remainingWeight = (loading['remainingNetWeight'] as num?)?.toDouble() ?? 0.0;
+                                                  final isNegative = remainingQty < 0 || remainingWeight < 0;
+                                                  
+                                                  return Container(
+                                                    margin: const EdgeInsets.only(
+                                                      bottom: 4,
                                                     ),
-                                                  ),
-                                                  child: Row(
-                                                    children: [
-                                                      Icon(
-                                                        Icons.local_shipping,
-                                                        size: 16,
-                                                        color: Colors.grey[600],
+                                                    padding: const EdgeInsets.all(
+                                                      8,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: isNegative ? Colors.red[50] : Colors.white,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            4,
+                                                          ),
+                                                      border: Border.all(
+                                                        color: isNegative 
+                                                            ? Colors.red[300]! 
+                                                            : Colors.grey[300]!,
+                                                        width: isNegative ? 1.5 : 1,
                                                       ),
-                                                      const SizedBox(width: 8),
-                                                      Expanded(
-                                                        child: Text(
-                                                          '${loading['supplier']} - ${loading['remainingQuantity']} عدد - ${(loading['remainingNetWeight'] as num).toStringAsFixed(2)} كجم',
-                                                          style:
-                                                              const TextStyle(
-                                                                fontSize: 12,
-                                                              ),
+                                                    ),
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(
+                                                          isNegative 
+                                                              ? Icons.warning_amber_rounded 
+                                                              : Icons.local_shipping,
+                                                          size: 16,
+                                                          color: isNegative 
+                                                              ? Colors.red[600] 
+                                                              : Colors.grey[600],
                                                         ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
+                                                        const SizedBox(width: 8),
+                                                        Expanded(
+                                                          child: Text(
+                                                            '${loading['supplier']} - ${remainingQty} عدد - ${remainingWeight.toStringAsFixed(2)} كجم${isNegative ? ' (توزيع زائد)' : ''}',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              color: isNegative 
+                                                                  ? Colors.red[700] 
+                                                                  : null,
+                                                              fontWeight: isNegative 
+                                                                  ? FontWeight.bold 
+                                                                  : null,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                },
                                               )
                                               .toList(),
                                         ],
@@ -898,6 +1017,7 @@ class _DistributionViewState extends State<DistributionView> {
                               onChanged: (value) {
                                 print('Quantity changed: $value');
                                 _recalculate();
+                                setState(() {}); // Refresh to show over-distribution warning
                               },
                               validator: (v) {
                                 final n = int.tryParse(v ?? '');
@@ -920,6 +1040,7 @@ class _DistributionViewState extends State<DistributionView> {
                               onChanged: (value) {
                                 print('Gross weight changed: $value');
                                 _recalculate();
+                                setState(() {}); // Refresh to show over-distribution warning
                               },
                               validator: (v) {
                                 final d = double.tryParse(v ?? '');

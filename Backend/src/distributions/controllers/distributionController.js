@@ -46,13 +46,22 @@ exports.createDistribution = async (req, res) => {
     const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
     const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
+    // Check if user is admin (manager) or employee - they can over-distribute
+    const isAdminOrEmployee = req.user && (req.user.role === 'manager' || req.user.role === 'employee');
+
     // Find available loadings for the same day AND previous days with remaining quantities
     // This allows remaining inventory from previous days to be available for distribution
-    const availableLoadings = await Loading.find({
+    // For admin/employee: include all loadings (even with negative remaining quantities for over-distribution)
+    const loadingQuery = {
       loadingDate: { $lte: endOfDay }, // Include all loadings up to and including the target date
-      chickenType: chickenTypeDoc._id,
-      remainingQuantity: { $gt: 0 }
-    }).populate('chickenType');
+      chickenType: chickenTypeDoc._id
+    };
+    
+    if (!isAdminOrEmployee) {
+      loadingQuery.remainingQuantity = { $gt: 0 };
+    }
+    
+    const availableLoadings = await Loading.find(loadingQuery).populate('chickenType');
 
     if (availableLoadings.length === 0) {
       return res.status(400).json({ 
@@ -65,17 +74,22 @@ exports.createDistribution = async (req, res) => {
     const totalAvailableNetWeight = availableLoadings.reduce((sum, loading) => sum + loading.remainingNetWeight, 0);
 
     // Find the loading with the most remaining quantity (prefer the largest one)
+    // For admin/employee: this can include loadings with negative remaining quantities
     let sourceLoadingDoc = availableLoadings.reduce((max, loading) => 
       loading.remainingQuantity > max.remainingQuantity ? loading : max
     );
-
+    
     // Allow over-requesting but provide information about available quantities
     const quantityExceeded = quantity > totalAvailableQuantity;
     const netWeightExceeded = netWeight > totalAvailableNetWeight;
 
     // If requesting more than available, we'll still proceed but with warnings
     if (quantityExceeded || netWeightExceeded) {
-      logger.warn(`Distribution exceeds available stock. Requested: ${quantity} qty, ${netWeight} kg. Available: ${totalAvailableQuantity} qty, ${totalAvailableNetWeight} kg`);
+      if (isAdminOrEmployee) {
+        logger.info(`Admin/Employee over-distribution allowed. Requested: ${quantity} qty, ${netWeight} kg. Available: ${totalAvailableQuantity} qty, ${totalAvailableNetWeight} kg`);
+      } else {
+        logger.warn(`Distribution exceeds available stock. Requested: ${quantity} qty, ${netWeight} kg. Available: ${totalAvailableQuantity} qty, ${totalAvailableNetWeight} kg`);
+      }
     }
 
     // Create the distribution
@@ -95,9 +109,14 @@ exports.createDistribution = async (req, res) => {
     await distribution.save();
 
     // Update the source loading to reflect the distributed quantities
-    // If requesting more than available, distribute what's available
-    const actualDistributedQuantity = Math.min(quantity, sourceLoadingDoc.remainingQuantity);
-    const actualDistributedNetWeight = Math.min(netWeight, sourceLoadingDoc.remainingNetWeight);
+    // For admin/employee: allow full distribution even if it exceeds available
+    // For others: distribute only what's available
+    const actualDistributedQuantity = isAdminOrEmployee 
+      ? quantity 
+      : Math.min(quantity, sourceLoadingDoc.remainingQuantity);
+    const actualDistributedNetWeight = isAdminOrEmployee 
+      ? netWeight 
+      : Math.min(netWeight, sourceLoadingDoc.remainingNetWeight);
     
     sourceLoadingDoc.distributedQuantity += actualDistributedQuantity;
     sourceLoadingDoc.distributedNetWeight += actualDistributedNetWeight;
@@ -388,26 +407,46 @@ exports.updateDistribution = async (req, res) => {
       return res.status(404).json({ message: 'Source loading not found' });
     }
 
-    const remainingQuantity = Math.max(0, targetLoading.quantity - (targetLoading.distributedQuantity || 0));
-    const remainingNetWeight = Math.max(0, targetLoading.netWeight - (targetLoading.distributedNetWeight || 0));
+    // Check if user is admin (manager) or employee - they can over-distribute
+    const isAdminOrEmployee = req.user && (req.user.role === 'manager' || req.user.role === 'employee');
+    
+    const remainingQuantity = targetLoading.quantity - (targetLoading.distributedQuantity || 0);
+    const remainingNetWeight = targetLoading.netWeight - (targetLoading.distributedNetWeight || 0);
 
-    if (newQuantity > remainingQuantity) {
-      await session.abortTransaction();
-          return res.status(400).json({ 
-        message: `Insufficient quantity in source loading. Available: ${remainingQuantity}, Requested: ${newQuantity}`,
-          });
-        }
+    // For admin/employee: allow over-distribution (negative remaining quantities)
+    // For others: enforce stock limits
+    if (!isAdminOrEmployee) {
+      if (newQuantity > remainingQuantity) {
+        await session.abortTransaction();
+        return res.status(400).json({ 
+          message: `Insufficient quantity in source loading. Available: ${remainingQuantity}, Requested: ${newQuantity}`,
+        });
+      }
 
-    if (newNetWeight > remainingNetWeight) {
-      await session.abortTransaction();
-          return res.status(400).json({ 
-        message: `Insufficient net weight in source loading. Available: ${remainingNetWeight.toFixed(2)}, Requested: ${newNetWeight.toFixed(2)}`,
-      });
+      if (newNetWeight > remainingNetWeight) {
+        await session.abortTransaction();
+        return res.status(400).json({ 
+          message: `Insufficient net weight in source loading. Available: ${remainingNetWeight.toFixed(2)}, Requested: ${newNetWeight.toFixed(2)}`,
+        });
+      }
+    } else if (newQuantity > remainingQuantity || newNetWeight > remainingNetWeight) {
+      // Log over-distribution for admin/employee
+      logger.info(`Admin/Employee over-distribution in update. Quantity: ${newQuantity} (available: ${remainingQuantity}), NetWeight: ${newNetWeight.toFixed(2)} (available: ${remainingNetWeight.toFixed(2)})`);
     }
 
     // Apply new allocation to target loading
-    targetLoading.distributedQuantity = (targetLoading.distributedQuantity || 0) + newQuantity;
-    targetLoading.distributedNetWeight = (targetLoading.distributedNetWeight || 0) + newNetWeight;
+    // If same loading: add delta (new - prev), if different: add full new quantities
+    if (prevSourceLoadingId && prevSourceLoadingId === newSourceLoadingId) {
+      // Same loading: add the difference
+      const quantityDelta = newQuantity - prevQuantity;
+      const netWeightDelta = newNetWeight - prevNetWeight;
+      targetLoading.distributedQuantity = (targetLoading.distributedQuantity || 0) + quantityDelta;
+      targetLoading.distributedNetWeight = (targetLoading.distributedNetWeight || 0) + netWeightDelta;
+    } else {
+      // Different loading: add full new quantities (previous was already restored)
+      targetLoading.distributedQuantity = (targetLoading.distributedQuantity || 0) + newQuantity;
+      targetLoading.distributedNetWeight = (targetLoading.distributedNetWeight || 0) + newNetWeight;
+    }
     await targetLoading.save({ session });
 
     // Update distribution document fields
@@ -621,17 +660,26 @@ exports.getAvailableLoadings = async (req, res) => {
       return res.status(400).json({ message: 'Date and chickenType are required' });
     }
 
+    // Check if user is admin (manager) or employee - they can see loadings with negative remaining quantities
+    const isAdminOrEmployee = req.user && (req.user.role === 'manager' || req.user.role === 'employee');
+
     const targetDate = new Date(date);
     const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
     const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
-    // Find loadings for the same day AND previous days that have remaining quantities
-    // This allows remaining inventory from previous days to be available for distribution
-    const loadings = await Loading.find({
+    // Find loadings for the same day AND previous days
+    // For admin/employee: include all loadings (even with negative remaining quantities for over-distribution)
+    // For others: only include loadings with positive remaining quantities
+    const query = {
       loadingDate: { $lte: endOfDay }, // Include all loadings up to and including the target date
-      chickenType: chickenType,
-      remainingQuantity: { $gt: 0 }
-    })
+      chickenType: chickenType
+    };
+    
+    if (!isAdminOrEmployee) {
+      query.remainingQuantity = { $gt: 0 };
+    }
+
+    const loadings = await Loading.find(query)
     .populate('chickenType', 'name')
     .populate('supplier', 'name')
     .populate('user', 'username')
@@ -653,16 +701,25 @@ exports.getAvailableChickenTypes = async (req, res) => {
       return res.status(400).json({ message: 'Date is required' });
     }
 
+    // Check if user is admin (manager) or employee - they can see all chicken types even if fully distributed
+    const isAdminOrEmployee = req.user && (req.user.role === 'manager' || req.user.role === 'employee');
+
     const targetDate = new Date(date);
     const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
     const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
-    // Find distinct chicken types that have loadings up to and including the specified date with remaining quantities
-    // This allows remaining inventory from previous days to be available for distribution
-    const loadings = await Loading.find({
-      loadingDate: { $lte: endOfDay }, // Include all loadings up to and including the target date
-      remainingQuantity: { $gt: 0 }
-    })
+    // Find distinct chicken types that have loadings up to and including the specified date
+    // For admin/employee: include all loadings (even with zero or negative remaining quantities)
+    // For others: only include loadings with positive remaining quantities
+    const query = {
+      loadingDate: { $lte: endOfDay } // Include all loadings up to and including the target date
+    };
+    
+    if (!isAdminOrEmployee) {
+      query.remainingQuantity = { $gt: 0 };
+    }
+
+    const loadings = await Loading.find(query)
     .populate('chickenType', 'name')
     .distinct('chickenType');
 
@@ -687,17 +744,26 @@ exports.getAvailableQuantities = async (req, res) => {
       return res.status(400).json({ message: 'Date and chickenType are required' });
     }
 
+    // Check if user is admin (manager) or employee - they can see loadings with negative remaining quantities
+    const isAdminOrEmployee = req.user && (req.user.role === 'manager' || req.user.role === 'employee');
+
     const targetDate = new Date(date);
     const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
     const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
-    // Find loadings for the same day AND previous days that have remaining quantities
-    // This allows remaining inventory from previous days to be available for distribution
-    const loadings = await Loading.find({
+    // Find loadings for the same day AND previous days
+    // For admin/employee: include all loadings (even with negative remaining quantities for over-distribution)
+    // For others: only include loadings with positive remaining quantities
+    const query = {
       loadingDate: { $lte: endOfDay }, // Include all loadings up to and including the target date
-      chickenType: chickenType,
-      remainingQuantity: { $gt: 0 }
-    })
+      chickenType: chickenType
+    };
+    
+    if (!isAdminOrEmployee) {
+      query.remainingQuantity = { $gt: 0 };
+    }
+
+    const loadings = await Loading.find(query)
     .populate('chickenType', 'name')
     .populate('supplier', 'name')
     .sort({ loadingDate: -1 });

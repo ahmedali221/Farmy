@@ -696,7 +696,9 @@ class _PaymentDetailsPage extends StatelessWidget {
             .toDouble();
     final customerName = customer?['name'] ?? 'عميل غير معروف';
     final paymentId = payment['_id']?.toString().substring(0, 8) ?? 'غير معروف';
-    final createdAt = _formatDateTime(payment['createdAt']);
+    final createdAt = _formatDateTime(
+      payment['paymentDate'] ?? payment['createdAt'],
+    );
     final paymentMethod = _getPaymentMethodText(payment['paymentMethod']);
 
     return '''
@@ -781,7 +783,9 @@ class _PaymentDetailsPage extends StatelessWidget {
       final tempDir = await getTemporaryDirectory();
       final paymentId = payment['_id']?.toString().substring(0, 8) ?? 'unknown';
       final customerName = payment['customer']?['name'] ?? 'عميل غير معروف';
-      final createdAt = _formatDateTime(payment['createdAt']);
+      final createdAt = _formatDateTime(
+      payment['paymentDate'] ?? payment['createdAt'],
+    );
       final dateStr = createdAt
           .replaceAll('/', '-')
           .replaceAll(' ', '_')

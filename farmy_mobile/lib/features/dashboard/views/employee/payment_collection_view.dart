@@ -77,8 +77,8 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
     });
     if (id != null) {
       final customer = customers.firstWhere((c) => c['_id'] == id);
-      final outstanding = (customer['outstandingDebts'] as num? ?? 0)
-          .toDouble();
+      final outstanding =
+          (customer['outstandingDebts'] as num? ?? 0).toDouble();
       _totalOutstandingController.text = outstanding.toStringAsFixed(2);
       _paidAmountController.text = '';
       _discountController.text = '0';
@@ -150,6 +150,7 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
         'paidAmount': paidAmount,
         'discount': discount,
         'paymentMethod': _selectedPaymentMethod,
+        'paymentDate': DateTime.now().toIso8601String(),
       };
 
       await paymentService.createPayment(paymentData);
@@ -209,8 +210,7 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
       final remaining = _remainingController.text;
       final method = _selectedPaymentMethod == 'cash' ? 'نقداً' : 'غير محدد';
 
-      final html =
-          '''
+      final html = '''
 <div dir="rtl" style="font-family: NotoArabic, sans-serif;">
   <div style="display:flex;justify-content:space-between;align-items:center;background:#e3f2fd;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
     <div style="font-weight:700;font-size:18px;color:#0d47a1;">$appName</div>
@@ -361,7 +361,6 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
                           const SizedBox(height: 8),
                           _HeaderBar(onRefresh: _loadCustomers),
                           const SizedBox(height: 18),
-
                           if (isLoading)
                             const Center(child: CircularProgressIndicator())
                           else if (customers.isEmpty)
@@ -391,28 +390,25 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
                                         child: Autocomplete<String>(
                                           optionsBuilder:
                                               (TextEditingValue value) {
-                                                final query = value.text
-                                                    .trim()
-                                                    .toLowerCase();
-                                                if (query.isEmpty) {
-                                                  return const Iterable<
-                                                    String
-                                                  >.empty();
-                                                }
-                                                return customers
-                                                    .map(
-                                                      (c) =>
-                                                          c['name']
-                                                              ?.toString() ??
-                                                          '',
-                                                    )
-                                                    .where(
-                                                      (name) => name
-                                                          .toLowerCase()
-                                                          .contains(query),
-                                                    )
-                                                    .take(10);
-                                              },
+                                            final query =
+                                                value.text.trim().toLowerCase();
+                                            if (query.isEmpty) {
+                                              return const Iterable<
+                                                  String>.empty();
+                                            }
+                                            return customers
+                                                .map(
+                                                  (c) =>
+                                                      c['name']?.toString() ??
+                                                      '',
+                                                )
+                                                .where(
+                                                  (name) => name
+                                                      .toLowerCase()
+                                                      .contains(query),
+                                                )
+                                                .take(10);
+                                          },
                                           onSelected: (String selection) {
                                             _customerNameController.text =
                                                 selection;
@@ -432,90 +428,78 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
                                               );
                                             } catch (_) {}
                                           },
-                                          fieldViewBuilder:
-                                              (
-                                                context,
-                                                textEditingController,
-                                                focusNode,
-                                                onFieldSubmitted,
-                                              ) {
-                                                textEditingController.text =
-                                                    _customerNameController
-                                                        .text;
-                                                textEditingController
-                                                        .selection =
-                                                    TextSelection.fromPosition(
-                                                      TextPosition(
-                                                        offset:
-                                                            textEditingController
-                                                                .text
-                                                                .length,
-                                                      ),
-                                                    );
-                                                return TextFormField(
-                                                  controller:
-                                                      _customerNameController,
-                                                  focusNode: focusNode,
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        labelText: 'اسم العميل',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                      ),
-                                                  onChanged: (_) {
-                                                    // Clear selected id until user selects a suggestion
-                                                    setState(() {
-                                                      selectedCustomerId = null;
-                                                    });
-                                                  },
-                                                  validator: (_) {
-                                                    if (selectedCustomerId ==
-                                                        null) {
-                                                      return 'يرجى اختيار العميل من القائمة';
-                                                    }
-                                                    return null;
-                                                  },
-                                                );
+                                          fieldViewBuilder: (
+                                            context,
+                                            textEditingController,
+                                            focusNode,
+                                            onFieldSubmitted,
+                                          ) {
+                                            textEditingController.text =
+                                                _customerNameController.text;
+                                            textEditingController.selection =
+                                                TextSelection.fromPosition(
+                                              TextPosition(
+                                                offset: textEditingController
+                                                    .text.length,
+                                              ),
+                                            );
+                                            return TextFormField(
+                                              controller:
+                                                  _customerNameController,
+                                              focusNode: focusNode,
+                                              decoration: const InputDecoration(
+                                                labelText: 'اسم العميل',
+                                                border: OutlineInputBorder(),
+                                              ),
+                                              onChanged: (_) {
+                                                // Clear selected id until user selects a suggestion
+                                                setState(() {
+                                                  selectedCustomerId = null;
+                                                });
                                               },
+                                              validator: (_) {
+                                                if (selectedCustomerId ==
+                                                    null) {
+                                                  return 'يرجى اختيار العميل من القائمة';
+                                                }
+                                                return null;
+                                              },
+                                            );
+                                          },
                                           optionsViewBuilder:
                                               (context, onSelected, options) {
-                                                return Align(
-                                                  alignment: Alignment.topRight,
-                                                  child: Material(
-                                                    elevation: 4,
-                                                    child: SizedBox(
-                                                      width:
-                                                          MediaQuery.of(
-                                                            context,
-                                                          ).size.width -
-                                                          32,
-                                                      child: ListView.builder(
-                                                        padding:
-                                                            EdgeInsets.zero,
-                                                        itemCount:
-                                                            options.length,
-                                                        itemBuilder:
-                                                            (context, index) {
-                                                              final option =
-                                                                  options
-                                                                      .elementAt(
-                                                                        index,
-                                                                      );
-                                                              return ListTile(
-                                                                title: Text(
-                                                                  option,
-                                                                ),
-                                                                onTap: () =>
-                                                                    onSelected(
-                                                                      option,
-                                                                    ),
-                                                              );
-                                                            },
-                                                      ),
-                                                    ),
+                                            return Align(
+                                              alignment: Alignment.topRight,
+                                              child: Material(
+                                                elevation: 4,
+                                                child: SizedBox(
+                                                  width: MediaQuery.of(
+                                                        context,
+                                                      ).size.width -
+                                                      32,
+                                                  child: ListView.builder(
+                                                    padding: EdgeInsets.zero,
+                                                    itemCount: options.length,
+                                                    itemBuilder:
+                                                        (context, index) {
+                                                      final option =
+                                                          options.elementAt(
+                                                        index,
+                                                      );
+                                                      return ListTile(
+                                                        title: Text(
+                                                          option,
+                                                        ),
+                                                        onTap: () => onSelected(
+                                                          option,
+                                                        ),
+                                                      );
+                                                    },
                                                   ),
-                                                );
-                                              },
+                                                ),
+                                              ),
+                                            );
+                                          },
                                         ),
                                       ),
                                     ),
@@ -616,14 +600,12 @@ class _PaymentCollectionViewState extends State<PaymentCollectionView> {
                                                   amount < 0) {
                                                 return 'يرجى إدخال مبلغ صحيح';
                                               }
-                                              final total =
-                                                  double.tryParse(
+                                              final total = double.tryParse(
                                                     _totalOutstandingController
                                                         .text,
                                                   ) ??
                                                   0;
-                                              final discount =
-                                                  double.tryParse(
+                                              final discount = double.tryParse(
                                                     _discountController.text,
                                                   ) ??
                                                   0;
@@ -1191,71 +1173,79 @@ class _PaymentHistoryDialogState extends State<_PaymentHistoryDialog> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error, size: 64, color: Colors.red),
-                        const SizedBox(height: 16),
-                        Text('خطأ: $_error'),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () => _loadPaymentsForDate(_selectedDate),
-                          child: const Text('إعادة المحاولة'),
-                        ),
-                      ],
-                    ),
-                  )
-                : _filteredPayments.isEmpty
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.inbox, size: 64, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text('لا توجد مدفوعات في هذا التاريخ'),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _filteredPayments.length,
-                    itemBuilder: (context, index) {
-                      final payment = _filteredPayments[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.green[100],
-                            child: const Icon(
-                              Icons.payment,
-                              color: Colors.green,
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error,
+                                size: 64, color: Colors.red),
+                            const SizedBox(height: 16),
+                            Text('خطأ: $_error'),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () =>
+                                  _loadPaymentsForDate(_selectedDate),
+                              child: const Text('إعادة المحاولة'),
                             ),
-                          ),
-                          title: Text(
-                            payment['customer']?['name'] ?? 'عميل غير معروف',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'المبلغ المدفوع: ${payment['paidAmount']} ج.م',
-                              ),
-                              Text('الخصم: ${payment['discount']} ج.م'),
-                              Text(
-                                'طريقة الدفع: ${_getPaymentMethodText(payment['paymentMethod'])}',
-                              ),
-                              Text(
-                                'التاريخ: ${_formatDateTime(payment['createdAt'])}',
-                              ),
-                            ],
-                          ),
-                          isThreeLine: true,
+                          ],
                         ),
-                      );
-                    },
-                  ),
+                      )
+                    : _filteredPayments.isEmpty
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.inbox, size: 64, color: Colors.grey),
+                                SizedBox(height: 16),
+                                Text('لا توجد مدفوعات في هذا التاريخ'),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _filteredPayments.length,
+                            itemBuilder: (context, index) {
+                              final payment = _filteredPayments[index];
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.green[100],
+                                    child: const Icon(
+                                      Icons.payment,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    payment['customer']?['name'] ??
+                                        'عميل غير معروف',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'المبلغ المدفوع: ${payment['paidAmount']} ج.م',
+                                      ),
+                                      Text('الخصم: ${payment['discount']} ج.م'),
+                                      Text(
+                                        'طريقة الدفع: ${_getPaymentMethodText(payment['paymentMethod'])}',
+                                      ),
+                                      Text(
+                                        'التاريخ: ${_formatDateTime(
+                                          payment['paymentDate'] ??
+                                              payment['createdAt'],
+                                        )}',
+                                      ),
+                                    ],
+                                  ),
+                                  isThreeLine: true,
+                                ),
+                              );
+                            },
+                          ),
           ),
         ],
       ),

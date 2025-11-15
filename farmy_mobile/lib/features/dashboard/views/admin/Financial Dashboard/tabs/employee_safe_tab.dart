@@ -237,6 +237,8 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
                                       (collected + transfersIn - transfersOut))
                                   as num)
                               .toDouble();
+                      final double extra = _sumEmployeeExpenses(managerId);
+                      final double net = netAvailable - extra;
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         child: Card(
@@ -260,9 +262,27 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
                               ),
                             ),
                             subtitle: Text(
-                              'تحصيل: ${collected.toStringAsFixed(2)}  •  صافي: ${netAvailable.toStringAsFixed(2)}',
+                              'تحصيل: ${collected.toStringAsFixed(2)}  •  صافي: ${net.toStringAsFixed(2)}',
                               style: TextStyle(color: Colors.grey[700]),
                             ),
+                            trailing: const Icon(Icons.chevron_left),
+                            onTap: () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => _EmployeeSafeDetailsPage(
+                                    employeeId: managerId,
+                                    employeeName: name,
+                                    collected: collected,
+                                    transfersIn: transfersIn,
+                                    transfersOut: transfersOut,
+                                    initialOtherExpenses:
+                                        _otherExpensesByEmployee[managerId] ??
+                                        const [],
+                                  ),
+                                ),
+                              );
+                              _loadData();
+                            },
                           ),
                         ),
                       );

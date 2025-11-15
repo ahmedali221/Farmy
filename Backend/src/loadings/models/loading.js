@@ -113,13 +113,13 @@ const loadingSchema = new mongoose.Schema({
   },
   remainingQuantity: {
     type: Number,
-    default: function() { return this.quantity; },
-    min: 0
+    default: function() { return this.quantity; }
+    // Removed min: 0 to allow negative values for over-distribution tracking
   },
   remainingNetWeight: {
     type: Number,
-    default: function() { return this.netWeight; },
-    min: 0
+    default: function() { return this.netWeight; }
+    // Removed min: 0 to allow negative values for over-distribution tracking
   },
   
   // بيانات المراجعة (اختيارية)
@@ -160,9 +160,9 @@ loadingSchema.pre('save', function(next) {
   // حساب إجمالي التحميل باستخدام الوزن الصافي المدخل
   this.totalLoading = this.netWeight * this.loadingPrice;
   
-  // حساب الكميات المتبقية
-  this.remainingQuantity = Math.max(0, this.quantity - (this.distributedQuantity || 0));
-  this.remainingNetWeight = Math.max(0, this.netWeight - (this.distributedNetWeight || 0));
+  // حساب الكميات المتبقية (يسمح بقيم سالبة لتتبع التوزيع الزائد)
+  this.remainingQuantity = this.quantity - (this.distributedQuantity || 0);
+  this.remainingNetWeight = this.netWeight - (this.distributedNetWeight || 0);
   
   next();
 });

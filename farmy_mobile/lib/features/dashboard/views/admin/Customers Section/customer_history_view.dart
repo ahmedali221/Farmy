@@ -70,8 +70,8 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
 
       // Sort by date (newest first)
       customerPayments.sort((a, b) {
-        final dateA = a['createdAt'] ?? '';
-        final dateB = b['createdAt'] ?? '';
+        final dateA = a['paymentDate'] ?? a['createdAt'] ?? '';
+        final dateB = b['paymentDate'] ?? b['createdAt'] ?? '';
         return dateB.toString().compareTo(dateA.toString());
       });
 
@@ -126,7 +126,9 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
     final Map<String, _DailyHistoryGroup> dateToGroup = {};
 
     for (final payment in payments) {
-      final k = keyFor(payment['createdAt']);
+      final k = keyFor(
+        payment['paymentDate'] ?? payment['createdAt'],
+      );
       dateToGroup.putIfAbsent(k, () => _DailyHistoryGroup(dateKey: k));
       dateToGroup[k]!.payments.add(payment);
     }
@@ -143,8 +145,8 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
     // Sort items within each day (newest first)
     for (final group in groups) {
       group.payments.sort((a, b) {
-        final dateA = a['createdAt'] ?? '';
-        final dateB = b['createdAt'] ?? '';
+        final dateA = a['paymentDate'] ?? a['createdAt'] ?? '';
+        final dateB = b['paymentDate'] ?? b['createdAt'] ?? '';
         return dateB.toString().compareTo(dateA.toString());
       });
 
@@ -199,23 +201,23 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
           body: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _error != null
-              ? _buildErrorWidget()
-              : RefreshIndicator(
-                  onRefresh: _loadAllData,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildCustomerDebtSummary(),
-                        if (_timelineEntries.isNotEmpty)
-                          _buildTimelineSection(),
-                        ..._buildGroupedPaymentsWidgets(),
-                      ],
+                  ? _buildErrorWidget()
+                  : RefreshIndicator(
+                      onRefresh: _loadAllData,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildCustomerDebtSummary(),
+                            if (_timelineEntries.isNotEmpty)
+                              _buildTimelineSection(),
+                            ..._buildGroupedPaymentsWidgets(),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
         ),
       ),
     );
@@ -276,9 +278,9 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
 
     final currentDebt =
         (totalDistributionValue - totalPaidValue - totalDiscount).clamp(
-          0.0,
-          double.infinity,
-        );
+      0.0,
+      double.infinity,
+    );
     final isDebtFree = currentDebt <= 0;
 
     return Container(
@@ -311,8 +313,8 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundColor: (isDebtFree ? Colors.green : Colors.grey)
-                    .withOpacity(0.2),
+                backgroundColor:
+                    (isDebtFree ? Colors.green : Colors.grey).withOpacity(0.2),
                 child: Icon(
                   isDebtFree
                       ? Icons.check_circle
@@ -401,7 +403,9 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
     final events = <_TimelineEvent>[];
 
     for (final payment in payments) {
-      final ts = _parseTimestamp(payment['createdAt']);
+      final ts = _parseTimestamp(
+        payment['paymentDate'] ?? payment['createdAt'],
+      );
       final paidAmount = _toDouble(
         payment['paidAmount'] ?? payment['amount'] ?? 0,
       );
@@ -1035,16 +1039,16 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
     final paymentId = idStr.length >= 8
         ? idStr.substring(0, 8)
         : (idStr.isEmpty ? 'غير معروف' : idStr);
-    final createdAt = _formatDateTime(payment['createdAt']);
+    final createdAt = _formatDateTime(
+      payment['paymentDate'] ?? payment['createdAt'],
+    );
     final totalPriceValue = payment['totalPrice'] ?? 0;
     final paidAmountValue = payment['paidAmount'] ?? payment['amount'] ?? 0;
 
-    final totalPrice = totalPriceValue is num
-        ? totalPriceValue.toDouble()
-        : 0.0;
-    final paidAmount = paidAmountValue is num
-        ? paidAmountValue.toDouble()
-        : 0.0;
+    final totalPrice =
+        totalPriceValue is num ? totalPriceValue.toDouble() : 0.0;
+    final paidAmount =
+        paidAmountValue is num ? paidAmountValue.toDouble() : 0.0;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 4),
@@ -1143,8 +1147,8 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
     final totalAmount = totalAmountValue is num
         ? totalAmountValue.toDouble()
         : (totalAmountValue is String
-              ? double.tryParse(totalAmountValue) ?? 0.0
-              : 0.0);
+            ? double.tryParse(totalAmountValue) ?? 0.0
+            : 0.0);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 4),
@@ -1197,8 +1201,8 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
         return;
       }
 
-      final detailedDistribution = await _distributionService
-          .getDistributionById(distributionId);
+      final detailedDistribution =
+          await _distributionService.getDistributionById(distributionId);
 
       // Debug: Print the received data
       print('Detailed Distribution Data: $detailedDistribution');
@@ -1299,7 +1303,9 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
               ),
               _buildDetailRow(
                 'تاريخ الدفع',
-                _formatDateTime(payment['createdAt']),
+                _formatDateTime(
+                  payment['paymentDate'] ?? payment['createdAt'],
+                ),
               ),
               if (payment['employee'] != null)
                 _buildDetailRow(
@@ -1352,11 +1358,11 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
   }
 
   Widget _buildDebtProgressionSection(Map<String, dynamic> distribution) {
-    final debtBefore = (distribution['outstandingBeforeDistribution'] ?? 0)
-        .toDouble();
+    final debtBefore =
+        (distribution['outstandingBeforeDistribution'] ?? 0).toDouble();
     final distributionAmount = (distribution['totalAmount'] ?? 0).toDouble();
-    final debtAfter = (distribution['outstandingAfterDistribution'] ?? 0)
-        .toDouble();
+    final debtAfter =
+        (distribution['outstandingAfterDistribution'] ?? 0).toDouble();
 
     // Debug: Print the values being used
     print('Debt Before: $debtBefore');
@@ -1503,7 +1509,6 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
           ],
         ),
         const SizedBox(height: 12),
-
         _buildDetailRow('الكمية', '${distribution['quantity'] ?? 0} وحدة'),
         _buildDetailRow(
           'الوزن القائم',
