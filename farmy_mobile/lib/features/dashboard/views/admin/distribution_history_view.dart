@@ -664,7 +664,7 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
         final d = _filteredDistributions[index];
         final String title = d['customer']?['name'] ?? 'عميل غير معروف';
         final String subtitle = _formatDateTime(
-          d['createdAt'] ?? d['distributionDate'],
+          d['distributionDate'] ?? d['createdAt'],
         );
         final num totalAmount = (d['totalAmount'] ?? 0) as num;
         return Padding(
@@ -849,7 +849,7 @@ class _DistributionHistoryViewState extends State<DistributionHistoryView> {
     final orderId =
         distribution['_id']?.toString().substring(0, 8) ?? 'غير معروف';
     final createdAt = _formatDateTime(
-      distribution['createdAt'] ?? distribution['distributionDate'],
+      distribution['distributionDate'] ?? distribution['createdAt'],
     );
     final customerName = distribution['customer']?['name'] ?? 'غير معروف';
     final userName = distribution['user']?['username'] ?? 'غير معروف';
@@ -1044,7 +1044,7 @@ class _DistributionDetailsPage extends StatelessWidget {
     final orderId =
         distribution['_id']?.toString().substring(0, 8) ?? 'غير معروف';
     final createdAt = _formatDateTime(
-      distribution['createdAt'] ?? distribution['distributionDate'],
+      distribution['distributionDate'] ?? distribution['createdAt'],
     );
     final customerName = distribution['customer']?['name'] ?? 'غير معروف';
     final userName = distribution['user']?['username'] ?? 'غير معروف';
@@ -1362,12 +1362,15 @@ class _EditDistributionDialogState extends State<_EditDistributionDialog> {
   late final TextEditingController _quantityCtrl;
   late final TextEditingController _grossCtrl;
   late final TextEditingController _priceCtrl;
+  late final TextEditingController _emptyWeightCtrl;
+  late final TextEditingController _netWeightCtrl;
   late DateTime _selectedDate;
   String? _selectedCustomerId;
   String? _selectedChickenTypeId;
   String? _selectedLoadingId;
   List<Map<String, dynamic>> _loadingOptions = [];
   bool _loadingLoadings = false;
+  double _totalAmount = 0.0;
 
   @override
   void initState() {
@@ -1375,6 +1378,8 @@ class _EditDistributionDialogState extends State<_EditDistributionDialog> {
     _quantityCtrl = TextEditingController(text: widget.initialQuantity);
     _grossCtrl = TextEditingController(text: widget.initialGrossWeight);
     _priceCtrl = TextEditingController(text: widget.initialPrice);
+    _emptyWeightCtrl = TextEditingController();
+    _netWeightCtrl = TextEditingController();
     _selectedDate = widget.initialDate;
     _selectedCustomerId = widget.initialCustomerId;
     _selectedChickenTypeId = widget.initialChickenTypeId;
@@ -1389,6 +1394,10 @@ class _EditDistributionDialogState extends State<_EditDistributionDialog> {
         _refreshLoadings();
       });
     }
+    // Calculate initial values
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _recalculate();
+    });
   }
 
   @override
@@ -1396,7 +1405,25 @@ class _EditDistributionDialogState extends State<_EditDistributionDialog> {
     _quantityCtrl.dispose();
     _grossCtrl.dispose();
     _priceCtrl.dispose();
+    _emptyWeightCtrl.dispose();
+    _netWeightCtrl.dispose();
     super.dispose();
+  }
+
+  void _recalculate() {
+    final quantity = int.tryParse(_quantityCtrl.text) ?? 0;
+    final gross = double.tryParse(_grossCtrl.text) ?? 0;
+    final price = double.tryParse(_priceCtrl.text) ?? 0;
+
+    final emptyWeight = quantity * 8;
+    final net = (gross - emptyWeight).clamp(0, double.infinity);
+    final totalAmount = price * net;
+
+    setState(() {
+      _emptyWeightCtrl.text = emptyWeight.toStringAsFixed(2);
+      _netWeightCtrl.text = net.toStringAsFixed(2);
+      _totalAmount = totalAmount;
+    });
   }
 
   String _labelForLoading(Map<String, dynamic> loading) {
@@ -1518,6 +1545,7 @@ class _EditDistributionDialogState extends State<_EditDistributionDialog> {
                     labelText: 'الكمية (عدد)',
                     border: OutlineInputBorder(),
                   ),
+                  onChanged: (_) => _recalculate(),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'الكمية مطلوبة';
@@ -1539,6 +1567,7 @@ class _EditDistributionDialogState extends State<_EditDistributionDialog> {
                     labelText: 'الوزن القائم (كجم)',
                     border: OutlineInputBorder(),
                   ),
+                  onChanged: (_) => _recalculate(),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'القيمة مطلوبة';
@@ -1552,6 +1581,24 @@ class _EditDistributionDialogState extends State<_EditDistributionDialog> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
+                  controller: _emptyWeightCtrl,
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'الوزن الفارغ (يُحسب تلقائياً)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _netWeightCtrl,
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'الوزن الصافي (يُحسب تلقائياً)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
                   controller: _priceCtrl,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -1560,6 +1607,7 @@ class _EditDistributionDialogState extends State<_EditDistributionDialog> {
                     labelText: 'السعر (ج.م/كجم)',
                     border: OutlineInputBorder(),
                   ),
+                  onChanged: (_) => _recalculate(),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'القيمة مطلوبة';
@@ -1570,6 +1618,24 @@ class _EditDistributionDialogState extends State<_EditDistributionDialog> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.withOpacity(0.2)),
+                  ),
+                  child: Text(
+                    'إجمالي المبلغ: ${_totalAmount.toStringAsFixed(2)} ج.م',
+                    style: const TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -1588,6 +1654,9 @@ class _EditDistributionDialogState extends State<_EditDistributionDialog> {
                   _selectedLoadingId == null) {
                 return;
               }
+
+              // Recalculate to ensure values are up to date
+              _recalculate();
 
               Navigator.pop(context, {
                 'customer': _selectedCustomerId!,

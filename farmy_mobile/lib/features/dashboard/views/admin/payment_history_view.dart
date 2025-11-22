@@ -784,8 +784,8 @@ class _PaymentDetailsPage extends StatelessWidget {
       final paymentId = payment['_id']?.toString().substring(0, 8) ?? 'unknown';
       final customerName = payment['customer']?['name'] ?? 'عميل غير معروف';
       final createdAt = _formatDateTime(
-      payment['paymentDate'] ?? payment['createdAt'],
-    );
+        payment['paymentDate'] ?? payment['createdAt'],
+      );
       final dateStr = createdAt
           .replaceAll('/', '-')
           .replaceAll(' ', '_')

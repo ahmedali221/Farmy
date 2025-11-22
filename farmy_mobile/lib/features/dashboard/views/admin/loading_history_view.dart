@@ -650,7 +650,9 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
       itemBuilder: (context, index) {
         final m = _filteredLoadings[index];
         final String title = m['supplier']?['name'] ?? 'مورد غير معروف';
-        final String subtitle = _formatDateTime(m['createdAt']);
+        final String subtitle = _formatDateTime(
+          m['loadingDate'] ?? m['createdAt'],
+        );
         final num totalLoading = (m['totalLoading'] ?? 0) as num;
         return ListTile(
           leading: CircleAvatar(
@@ -761,7 +763,9 @@ class _LoadingHistoryViewState extends State<LoadingHistoryView> {
     final loadingPrice = (loading['loadingPrice'] ?? 0) as num;
 
     final orderId = loading['_id']?.toString().substring(0, 8) ?? 'غير معروف';
-    final createdAt = _formatDateTime(loading['createdAt']);
+    final createdAt = _formatDateTime(
+      loading['loadingDate'] ?? loading['createdAt'],
+    );
     final chickenType = loading['chickenType']?['name'] ?? 'غير معروف';
     final supplierName = loading['supplier']?['name'] ?? 'غير معروف';
     final userName = loading['user']?['username'] ?? 'غير معروف';
@@ -952,7 +956,9 @@ class _LoadingDetailsPage extends StatelessWidget {
     final quantity = (loading['quantity'] ?? 0) as num;
     final loadingPrice = (loading['loadingPrice'] ?? 0) as num;
     final orderId = loading['_id']?.toString().substring(0, 8) ?? 'غير معروف';
-    final createdAt = _formatDateTime(loading['createdAt']);
+    final createdAt = _formatDateTime(
+      loading['loadingDate'] ?? loading['createdAt'],
+    );
     final chickenType = loading['chickenType']?['name'] ?? 'غير معروف';
     final supplierName = loading['supplier']?['name'] ?? 'غير معروف';
     final userName = loading['user']?['username'] ?? 'غير معروف';
@@ -1052,7 +1058,9 @@ class _LoadingDetailsPage extends StatelessWidget {
       final tempDir = await getTemporaryDirectory();
       final orderId = loading['_id']?.toString().substring(0, 8) ?? 'unknown';
       final supplierName = loading['supplier']?['name'] ?? 'مورد غير معروف';
-      final createdAt = _formatDateTime(loading['createdAt']);
+      final createdAt = _formatDateTime(
+        loading['loadingDate'] ?? loading['createdAt'],
+      );
       final dateStr = createdAt
           .replaceAll('/', '-')
           .replaceAll(' ', '_')
@@ -1433,7 +1441,9 @@ class _EditLoadingDialogState extends State<_EditLoadingDialog> {
                     labelText: 'الوزن الصافي (كجم)',
                     border: OutlineInputBorder(),
                   ),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) {
+                    setState(() {}); // Update total amount display
+                  },
                   validator: (value) {
                     final parsed = _tryParseDouble(value ?? '');
                     if (parsed == null || parsed <= 0) {
@@ -1452,7 +1462,9 @@ class _EditLoadingDialogState extends State<_EditLoadingDialog> {
                     labelText: 'سعر التحميل (ج.م/كجم)',
                     border: OutlineInputBorder(),
                   ),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) {
+                    setState(() {}); // Update total amount display
+                  },
                   validator: (value) {
                     final parsed = _tryParseDouble(value ?? '');
                     if (parsed == null || parsed < 0) {
@@ -1502,10 +1514,11 @@ class _EditLoadingDialogState extends State<_EditLoadingDialog> {
                     border: Border.all(color: Colors.blue.withOpacity(0.2)),
                   ),
                   child: Text(
-                    'الإجمالي التقريبي: ${_totalAmount.toStringAsFixed(2)} ج.م',
+                    'إجمالي المبلغ: ${_totalAmount.toStringAsFixed(2)} ج.م',
                     style: const TextStyle(
                       color: Colors.blue,
                       fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
                   ),
                 ),

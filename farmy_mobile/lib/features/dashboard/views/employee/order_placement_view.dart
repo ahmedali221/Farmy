@@ -1098,7 +1098,10 @@ class _LoadingHistoryDialogState extends State<_LoadingHistoryDialog> {
       // Filter loadings by selected date
       final filteredLoadings = allLoadings.where((loading) {
         final loadingDate = DateTime.parse(
-          loading['createdAt'] ?? loading['date'] ?? '',
+          loading['loadingDate'] ??
+              loading['createdAt'] ??
+              loading['date'] ??
+              '',
         );
         return loadingDate.year == date.year &&
             loadingDate.month == date.month &&
@@ -1364,7 +1367,7 @@ class _LoadingHistoryDialogState extends State<_LoadingHistoryDialog> {
                                 'إجمالي التحميل: ${loading['totalLoading']} ج.م',
                               ),
                               Text(
-                                'التاريخ: ${_formatDateTime(loading['createdAt'])}',
+                                'التاريخ: ${_formatDateTime(loading['loadingDate'] ?? loading['createdAt'])}',
                               ),
                             ],
                           ),

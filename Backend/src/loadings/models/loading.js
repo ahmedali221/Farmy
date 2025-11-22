@@ -101,15 +101,30 @@ const loadingSchema = new mongoose.Schema({
   },
   
   // بيانات التوزيع
+  // Allow negative values for over-distribution tracking when restoring quantities
   distributedQuantity: {
     type: Number,
     default: 0,
-    min: 0
+    // Removed min: 0 to allow negative values when restoring over-distributed quantities
+    validate: {
+      validator: function(v) {
+        // Allow any number (including negative) for over-distribution tracking
+        return v !== null && v !== undefined && !isNaN(v);
+      },
+      message: 'distributedQuantity must be a number'
+    }
   },
   distributedNetWeight: {
     type: Number,
     default: 0,
-    min: 0
+    // Removed min: 0 to allow negative values when restoring over-distributed quantities
+    validate: {
+      validator: function(v) {
+        // Allow any number (including negative) for over-distribution tracking
+        return v !== null && v !== undefined && !isNaN(v);
+      },
+      message: 'distributedNetWeight must be a number'
+    }
   },
   remainingQuantity: {
     type: Number,
