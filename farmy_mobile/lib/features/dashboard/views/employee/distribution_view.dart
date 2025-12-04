@@ -1000,7 +1000,7 @@ class _DistributionViewState extends State<DistributionView> {
                               controller: _emptyWeightCtrl,
                               readOnly: true,
                               decoration: const InputDecoration(
-                                labelText: 'الوزن الفارغ (يُحسب تلقائياً)',
+                                labelText: 'الوزن الفارغ',
                                 border: OutlineInputBorder(),
                               ),
                             ),
@@ -1009,7 +1009,7 @@ class _DistributionViewState extends State<DistributionView> {
                               controller: _netWeightCtrl,
                               readOnly: true,
                               decoration: const InputDecoration(
-                                labelText: 'الوزن الصافي (يُحسب تلقائياً)',
+                                labelText: 'الوزن الصافي',
                                 border: OutlineInputBorder(),
                               ),
                             ),

@@ -122,6 +122,11 @@ class _EmployeeManagementViewState extends State<EmployeeManagementView> {
             ),
             actions: [
               IconButton(
+                icon: const Icon(Icons.account_balance_wallet),
+                onPressed: () => context.push('/admin-transfer-money'),
+                tooltip: 'تحويل أموال',
+              ),
+              IconButton(
                 icon: const Icon(Icons.add),
                 onPressed: _showAddEmployeeUserDialog,
               ),

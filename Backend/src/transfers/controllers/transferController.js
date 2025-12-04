@@ -17,7 +17,11 @@ exports.createTransfer = async (req, res) => {
   if (error) return res.status(400).json({ message: error.details[0].message });
 
   const { fromUser, toUser, amount, note = '' } = req.body;
-  if (fromUser === toUser) {
+  const requesterRole = req.user?.role;
+  const isAdmin = requesterRole === 'manager';
+
+  // Allow admin to transfer to themselves, but prevent regular users from doing so
+  if (!isAdmin && fromUser === toUser) {
     return res.status(400).json({ message: 'fromUser and toUser must be different' });
   }
 
@@ -53,9 +57,12 @@ exports.createTransfer = async (req, res) => {
     const totalInExisting = fromTransfersInAgg ? fromTransfersInAgg.totalIn : 0;
 
     // Enforce non-negative net after expenses: payments - expenses + in - out
-    const netAvailable = fromCollected - fromExpenses + totalInExisting - totalOutExisting;
-    if (netAvailable < amount) {
-      return res.status(400).json({ message: 'Insufficient available collected amount for transfer' });
+    // Skip balance check for admin transfers
+    if (!isAdmin) {
+      const netAvailable = fromCollected - fromExpenses + totalInExisting - totalOutExisting;
+      if (netAvailable < amount) {
+        return res.status(400).json({ message: 'Insufficient available collected amount for transfer' });
+      }
     }
 
     const transfer = await Transfer.create([{

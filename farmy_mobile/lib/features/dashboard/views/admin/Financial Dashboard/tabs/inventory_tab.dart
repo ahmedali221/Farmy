@@ -351,12 +351,6 @@ class _InventoryTabState extends State<InventoryTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'المعادلة: (وزن صافي التحميل - وزن صافي التوزيع) - قيمة',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 16),
-
                       // Net loading (read-only)
                       _SectionLabel('وزن صافي التحميل'),
                       const SizedBox(height: 8),
@@ -379,7 +373,7 @@ class _InventoryTabState extends State<InventoryTab> {
                       ),
 
                       const SizedBox(height: 16),
-                      _SectionLabel('وزن صافي التوزيع (محسوب تلقائياً)'),
+                      _SectionLabel('وزن صافي التوزيع'),
                       const SizedBox(height: 8),
                       InkWell(
                         onTap: () {
@@ -441,7 +435,7 @@ class _InventoryTabState extends State<InventoryTab> {
                       ),
 
                       const SizedBox(height: 16),
-                      _SectionLabel('المخزون اليومي (ناتج المعادلة)'),
+                      _SectionLabel('المخزون اليومي'),
                       const SizedBox(height: 8),
                       _MetricTile(
                         label: 'المخزون اليومي',
@@ -488,8 +482,7 @@ class _InventoryTabState extends State<InventoryTab> {
                           );
                         },
                         child: _MetricTile(
-                          label:
-                              'الربح = إجمالي التوزيعات - إجمالي التحميل - إجمالي المصروفات - إجمالي الخصومات',
+                          label: 'الربح',
                           value: profit,
                           color: Colors.teal,
                         ),
@@ -751,8 +744,7 @@ class _DailyProfitDetailsPageState extends State<_DailyProfitDetailsPage> {
                 children: [
                   // إجمالي الربح
                   _MetricTile(
-                    label:
-                        'الربح الإجمالي = إجمالي التوزيعات - إجمالي التحميل - إجمالي المصروفات - إجمالي الخصومات',
+                    label: 'الربح الإجمالي',
                     value: widget.profit,
                     color: Colors.teal,
                   ),

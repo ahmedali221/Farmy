@@ -84,11 +84,9 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
 
     // Only calculate if all required values are provided
     if (count != null && loadingPrice != null) {
-      // الوزن الفارغ = العدد × 8
       final emptyWeight = count * 8;
       _emptyWeightController.text = emptyWeight.toStringAsFixed(2);
 
-      // إجمالي التحميل = الوزن الصافي × سعر التحميل (إذا كان الوزن الصافي مدخل)
       if (netWeight != null) {
         final totalLoading = netWeight * loadingPrice;
         _totalLoadingController.text = totalLoading.toStringAsFixed(2);
@@ -703,8 +701,7 @@ class _OrderPlacementViewState extends State<OrderPlacementView> {
                                           const SizedBox(height: 12),
 
                                           _NumField(
-                                            label:
-                                                'الوزن الفارغ (يحسب تلقائياً)',
+                                            label: 'الوزن الفارغ',
                                             controller: _emptyWeightController,
                                             enabled: false,
                                           ),

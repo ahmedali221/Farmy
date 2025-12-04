@@ -257,8 +257,9 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
                                       final customerStats = _getCustomerStats(
                                         customer['_id'],
                                       );
-                                      final remaining =
-                                          customerStats['remaining'] ?? 0.0;
+                                      final outstandingDebts =
+                                          customerStats['outstandingDebts'] ??
+                                          0.0;
                                       final totalDistributions =
                                           customerStats['totalDistributions'] ??
                                           0;
@@ -269,28 +270,31 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
+                                          // Outstanding Debts (Main Display)
                                           Row(
                                             children: [
                                               Icon(
-                                                remaining > 0
+                                                outstandingDebts > 0
                                                     ? Icons.pending_actions
                                                     : Icons.check_circle,
                                                 size: 16,
-                                                color: remaining > 0
+                                                color: outstandingDebts > 0
                                                     ? Colors.red
                                                     : Colors.green,
                                               ),
                                               const SizedBox(width: 4),
-                                              Text(
-                                                remaining > 0
-                                                    ? 'متبقي: ج.م ${remaining.toStringAsFixed(2)}'
-                                                    : 'مدفوع بالكامل',
-                                                style: TextStyle(
-                                                  color: remaining > 0
-                                                      ? Colors.red
-                                                      : Colors.green,
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.bold,
+                                              Expanded(
+                                                child: Text(
+                                                  outstandingDebts > 0
+                                                      ? 'المديونية: ج.م ${outstandingDebts.toStringAsFixed(2)}'
+                                                      : 'مدفوع بالكامل',
+                                                  style: TextStyle(
+                                                    color: outstandingDebts > 0
+                                                        ? Colors.red
+                                                        : Colors.green,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
                                               ),
                                             ],
@@ -483,13 +487,23 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
   Map<String, dynamic> _getCustomerStats(String? customerId) {
     if (customerId == null) {
       return {
-        'totalValue': 0.0,
-        'totalPaid': 0.0,
-        'remaining': 0.0,
+        'outstandingDebts': 0.0,
         'totalDistributions': 0,
         'totalPayments': 0,
       };
     }
+
+    // Get the customer's outstanding debts directly from database
+    final customer = customers.firstWhere(
+      (c) => c['_id'] == customerId,
+      orElse: () => {},
+    );
+    final outstandingDebtsValue = customer['outstandingDebts'] ?? 0;
+    final outstandingDebts = outstandingDebtsValue is num
+        ? outstandingDebtsValue.toDouble()
+        : (outstandingDebtsValue is String
+              ? double.tryParse(outstandingDebtsValue) ?? 0.0
+              : 0.0);
 
     final customerDistributions = distributions
         .where((dist) => dist['customer']?['_id'] == customerId)
@@ -499,32 +513,8 @@ class _CustomerManagementViewState extends State<CustomerManagementView> {
         .where((payment) => payment['customer']?['_id'] == customerId)
         .toList();
 
-    final totalValue = customerDistributions.fold(0.0, (sum, dist) {
-      final amount = dist['totalAmount'];
-      if (amount is num) {
-        return sum + amount.toDouble();
-      } else if (amount is String) {
-        return sum + (double.tryParse(amount) ?? 0.0);
-      }
-      return sum;
-    });
-
-    final totalPaid = customerPayments.fold(0.0, (sum, payment) {
-      final paidAmount = payment['paidAmount'] ?? payment['amount'] ?? 0;
-      if (paidAmount is num) {
-        return sum + paidAmount.toDouble();
-      } else if (paidAmount is String) {
-        return sum + (double.tryParse(paidAmount) ?? 0.0);
-      }
-      return sum;
-    });
-
-    final remaining = (totalValue - totalPaid).clamp(0.0, double.infinity);
-
     return {
-      'totalValue': totalValue,
-      'totalPaid': totalPaid,
-      'remaining': remaining,
+      'outstandingDebts': outstandingDebts,
       'totalDistributions': customerDistributions.length,
       'totalPayments': customerPayments.length,
     };
@@ -553,6 +543,7 @@ class _CustomerFormDialogState extends State<_CustomerFormDialog> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
+  final _initialDebtController = TextEditingController();
   bool isEditing = false;
 
   @override
@@ -564,6 +555,10 @@ class _CustomerFormDialogState extends State<_CustomerFormDialog> {
       _phoneController.text = widget.customer!['contactInfo']?['phone'] ?? '';
       _addressController.text =
           widget.customer!['contactInfo']?['address'] ?? '';
+      _initialDebtController.text = (widget.customer!['outstandingDebts'] ?? 0)
+          .toString();
+    } else {
+      _initialDebtController.text = '0';
     }
   }
 
@@ -572,18 +567,21 @@ class _CustomerFormDialogState extends State<_CustomerFormDialog> {
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
+    _initialDebtController.dispose();
     super.dispose();
   }
 
   void _save() {
     if (_formKey.currentState!.validate()) {
+      final initialDebt =
+          double.tryParse(_initialDebtController.text.trim()) ?? 0.0;
       final customerData = {
         'name': _nameController.text.trim(),
         'contactInfo': {
           'phone': _phoneController.text.trim(),
           'address': _addressController.text.trim(),
         },
-        'outstandingDebts': 0,
+        'outstandingDebts': initialDebt,
         'orders': [],
         'payments': [],
         'receipts': [],
@@ -644,6 +642,30 @@ class _CustomerFormDialogState extends State<_CustomerFormDialog> {
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'العنوان مطلوب';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _initialDebtController,
+                  decoration: InputDecoration(
+                    labelText: isEditing
+                        ? 'المديونية'
+                        : 'المديونية (افتراضي: 0)',
+                    hintText: '0',
+                    border: const OutlineInputBorder(),
+                    helperText: isEditing
+                        ? 'يمكنك تعديل المديونية للعميل'
+                        : 'يمكنك إدخال مديونية للعميل (سيتم تحديثها تلقائياً عند التوزيعات والمدفوعات)',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value != null && value.trim().isNotEmpty) {
+                      final debt = double.tryParse(value.trim());
+                      if (debt == null || debt < 0) {
+                        return 'يجب أن يكون المبلغ رقمًا موجبًا';
+                      }
                     }
                     return null;
                   },

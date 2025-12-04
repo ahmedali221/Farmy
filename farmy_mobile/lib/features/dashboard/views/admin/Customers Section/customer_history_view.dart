@@ -242,46 +242,15 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
   }
 
   Widget _buildCustomerDebtSummary() {
-    // Calculate current debt
-    final totalDistributionValue = _distributions.fold(0.0, (
-      sum,
-      distribution,
-    ) {
-      final amount = distribution['totalAmount'] ?? 0;
-      if (amount is num) {
-        return sum + amount.toDouble();
-      } else if (amount is String) {
-        return sum + (double.tryParse(amount) ?? 0.0);
-      }
-      return sum;
-    });
-
-    final totalPaidValue = _payments.fold(0.0, (sum, payment) {
-      final paidAmount = payment['paidAmount'] ?? payment['amount'] ?? 0;
-      if (paidAmount is num) {
-        return sum + paidAmount.toDouble();
-      } else if (paidAmount is String) {
-        return sum + (double.tryParse(paidAmount) ?? 0.0);
-      }
-      return sum;
-    });
-
-    final totalDiscount = _payments.fold(0.0, (sum, payment) {
-      final discount = payment['discount'] ?? 0;
-      if (discount is num) {
-        return sum + discount.toDouble();
-      } else if (discount is String) {
-        return sum + (double.tryParse(discount) ?? 0.0);
-      }
-      return sum;
-    });
-
-    final currentDebt =
-        (totalDistributionValue - totalPaidValue - totalDiscount).clamp(
-      0.0,
-      double.infinity,
-    );
-    final isDebtFree = currentDebt <= 0;
+    // Get the customer's outstanding debts directly from database
+    final outstandingDebtsValue = widget.customer['outstandingDebts'] ?? 0;
+    final outstandingDebts = outstandingDebtsValue is num
+        ? outstandingDebtsValue.toDouble()
+        : (outstandingDebtsValue is String
+            ? double.tryParse(outstandingDebtsValue) ?? 0.0
+            : 0.0);
+    
+    final isDebtFree = outstandingDebts <= 0;
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -355,7 +324,7 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${currentDebt.toStringAsFixed(2)} ج.م',
+                  '${outstandingDebts.toStringAsFixed(2)} ج.م',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -443,6 +412,10 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
 
     events.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
+    // Start with 0, then add initial debt if customer was created with debt
+    // The outstandingDebts in database is updated automatically by backend
+    // when distributions/payments are added, so we need to calculate it forward
+    // from the initial debt value
     double runningDebt = 0.0;
     final timeline = <_TimelineEntry>[];
 
@@ -673,6 +646,14 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
   }
 
   void _showSummaryDialog() {
+    // Get the customer's outstanding debts directly from database
+    final outstandingDebtsValue = widget.customer['outstandingDebts'] ?? 0;
+    final outstandingDebts = outstandingDebtsValue is num
+        ? outstandingDebtsValue.toDouble()
+        : (outstandingDebtsValue is String
+            ? double.tryParse(outstandingDebtsValue) ?? 0.0
+            : 0.0);
+
     final totalPayments = _payments.length;
     final totalDistributions = _distributions.length;
 
@@ -709,9 +690,6 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
       return sum;
     });
 
-    final remaining = (totalDistributionValue - totalPaidValue - totalDiscount)
-        .clamp(0.0, double.infinity);
-
     showDialog(
       context: context,
       builder: (context) => Directionality(
@@ -721,6 +699,14 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              _buildSummaryCard(
+                'المديونية',
+                'ج.م ${outstandingDebts.toStringAsFixed(2)}',
+                Icons.account_balance_wallet,
+                outstandingDebts > 0 ? Colors.red : Colors.green,
+                outstandingDebts > 0 ? 'مطلوب الدفع' : 'مدفوع بالكامل',
+              ),
+              const SizedBox(height: 12),
               _buildSummaryCard(
                 'إجمالي التوزيعات',
                 'ج.م ${totalDistributionValue.toStringAsFixed(2)}',
@@ -743,14 +729,6 @@ class _CustomerHistoryViewState extends State<CustomerHistoryView> {
                 Icons.percent,
                 Colors.deepOrange,
                 'خصومات مطبقة',
-              ),
-              const SizedBox(height: 12),
-              _buildSummaryCard(
-                'المتبقي',
-                'ج.م ${remaining.toStringAsFixed(2)}',
-                Icons.pending_actions,
-                remaining > 0 ? Colors.red : Colors.green,
-                remaining > 0 ? 'مطلوب الدفع' : 'مدفوع بالكامل',
               ),
             ],
           ),

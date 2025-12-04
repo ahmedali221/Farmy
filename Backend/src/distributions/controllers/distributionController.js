@@ -70,8 +70,14 @@ exports.createDistribution = async (req, res) => {
     }
 
     // Calculate total available quantities across all loadings
-    const totalAvailableQuantity = availableLoadings.reduce((sum, loading) => sum + loading.remainingQuantity, 0);
-    const totalAvailableNetWeight = availableLoadings.reduce((sum, loading) => sum + loading.remainingNetWeight, 0);
+    // Treat negative values as 0 (don't let previous deficits reduce new loading availability)
+    // Each loading is independent - previous over-distributions don't affect new loadings
+    const totalAvailableQuantity = availableLoadings.reduce((sum, loading) => {
+      return sum + Math.max(0, loading.remainingQuantity || 0);
+    }, 0);
+    const totalAvailableNetWeight = availableLoadings.reduce((sum, loading) => {
+      return sum + Math.max(0, loading.remainingNetWeight || 0);
+    }, 0);
 
     // Find the loading with the most remaining quantity (prefer the largest one)
     // For admin/employee: this can include loadings with negative remaining quantities
@@ -773,8 +779,14 @@ exports.getAvailableQuantities = async (req, res) => {
     .sort({ loadingDate: -1 });
 
     // Calculate total available quantities
-    const totalAvailableQuantity = loadings.reduce((sum, loading) => sum + loading.remainingQuantity, 0);
-    const totalAvailableNetWeight = loadings.reduce((sum, loading) => sum + loading.remainingNetWeight, 0);
+    // Treat negative values as 0 (don't let previous deficits reduce new loading availability)
+    // Each loading is independent - previous over-distributions don't affect new loadings
+    const totalAvailableQuantity = loadings.reduce((sum, loading) => {
+      return sum + Math.max(0, loading.remainingQuantity || 0);
+    }, 0);
+    const totalAvailableNetWeight = loadings.reduce((sum, loading) => {
+      return sum + Math.max(0, loading.remainingNetWeight || 0);
+    }, 0);
 
     res.json({
       chickenType: loadings[0]?.chickenType?.name || 'Unknown',

@@ -6,8 +6,8 @@ class ApiConstants {
   // Use actual IP for physical device testing
   static const String baseUrl =
       // 'https://farmy-c9hb-git-main-ahmed-alis-projects-588ffe47.vercel.app/api';
-      'http://172.20.10.2:6000/api';
-  // 'http://192.168.8.128:6000/api';
+      // 'http://172.20.10.2:6000/api';
+      'http://192.168.1.8:6000/api';
   // "http://127.0.0.1:3000/api";
 
   // Alternative URLs for different environments

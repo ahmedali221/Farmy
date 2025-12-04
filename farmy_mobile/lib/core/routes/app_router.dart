@@ -27,6 +27,7 @@ import '../../features/dashboard/views/admin/loading_history_view.dart';
 import '../../features/dashboard/views/admin/distribution_history_view.dart';
 import '../../features/dashboard/views/admin/payment_history_view.dart';
 import '../../features/dashboard/views/admin/Financial Dashboard/transfer_money_view.dart';
+import '../../features/dashboard/views/admin/Financial Dashboard/admin_transfer_money_view.dart';
 
 class AppRouter {
   static GoRouter createRouter(AuthCubit authCubit) {
@@ -247,6 +248,11 @@ class AppRouter {
           path: '/payment-history',
           name: 'payment-history',
           builder: (context, state) => const PaymentHistoryView(),
+        ),
+        GoRoute(
+          path: '/admin-transfer-money',
+          name: 'admin-transfer-money',
+          builder: (context, state) => const AdminTransferMoneyView(),
         ),
         GoRoute(
           path: '/transfer-money',
