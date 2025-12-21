@@ -79,11 +79,24 @@ exports.createDistribution = async (req, res) => {
       return sum + Math.max(0, loading.remainingNetWeight || 0);
     }, 0);
 
-    // Find the loading with the most remaining quantity (prefer the largest one)
+    // Find the loading to use as source
+    // Prefer: 1) Newest loading (most recent date), 2) Then largest remaining quantity
+    // This ensures we use new loadings first, then fall back to older ones with remaining stock
     // For admin/employee: this can include loadings with negative remaining quantities
-    let sourceLoadingDoc = availableLoadings.reduce((max, loading) => 
-      loading.remainingQuantity > max.remainingQuantity ? loading : max
-    );
+    let sourceLoadingDoc = availableLoadings.reduce((best, loading) => {
+      // Compare by date first (newer is better)
+      const bestDate = new Date(best.loadingDate).getTime();
+      const loadingDate = new Date(loading.loadingDate).getTime();
+      
+      if (loadingDate > bestDate) {
+        return loading; // Newer date wins
+      } else if (loadingDate < bestDate) {
+        return best; // Keep the newer one
+      } else {
+        // Same date - prefer the one with more remaining quantity
+        return loading.remainingQuantity > best.remainingQuantity ? loading : best;
+      }
+    });
     
     // Allow over-requesting but provide information about available quantities
     const quantityExceeded = quantity > totalAvailableQuantity;

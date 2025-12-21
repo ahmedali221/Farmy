@@ -23,11 +23,13 @@ import '../../features/dashboard/views/employee/employee_financial_view.dart';
 import '../../features/dashboard/views/employee/employee_payment_history_view.dart';
 import '../../features/dashboard/views/employee/employee_expense_history_view.dart';
 import '../../features/dashboard/views/employee/employee_daily_detail_view.dart';
+import '../../features/dashboard/views/employee/employee_transfer_money_view.dart';
 import '../../features/dashboard/views/admin/loading_history_view.dart';
 import '../../features/dashboard/views/admin/distribution_history_view.dart';
 import '../../features/dashboard/views/admin/payment_history_view.dart';
 import '../../features/dashboard/views/admin/Financial Dashboard/transfer_money_view.dart';
 import '../../features/dashboard/views/admin/Financial Dashboard/admin_transfer_money_view.dart';
+import '../../features/dashboard/views/admin/admin_financial_view.dart';
 
 class AppRouter {
   static GoRouter createRouter(AuthCubit authCubit) {
@@ -80,6 +82,11 @@ class AppRouter {
           path: '/admin-dashboard',
           name: 'admin-dashboard',
           builder: (context, state) => const AdminDashboardView(),
+        ),
+        GoRoute(
+          path: '/admin-financial',
+          name: 'admin-financial',
+          builder: (context, state) => const AdminFinancialView(),
         ),
         // Admin Management Routes
         GoRoute(
@@ -232,6 +239,11 @@ class AppRouter {
           path: '/employee-payment-history',
           name: 'employee-payment-history',
           builder: (context, state) => const EmployeePaymentHistoryView(),
+        ),
+        GoRoute(
+          path: '/employee-transfer-money',
+          name: 'employee-transfer-money',
+          builder: (context, state) => const EmployeeTransferMoneyView(),
         ),
         // History Routes
         GoRoute(

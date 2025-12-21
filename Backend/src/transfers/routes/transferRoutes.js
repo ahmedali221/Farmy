@@ -3,8 +3,8 @@ const router = express.Router();
 const transferController = require('../controllers/transferController');
 const auth = require('../../middleware/auth');
 
-// Create transfer (manager only)
-router.post('/', auth(['manager']), transferController.createTransfer);
+// Create transfer (manager and employee)
+router.post('/', auth(['manager', 'employee']), transferController.createTransfer);
 
 // List transfers (manager can view all, employee restricted in controller)
 router.get('/', transferController.listTransfers);

@@ -5,6 +5,7 @@ const employeeController = require('../controllers/employeeController');
 router.post('/', employeeController.createEmployee);
 router.get('/', employeeController.getAllEmployees);
 router.get('/users', employeeController.getAllEmployeeUsers);
+router.get('/users/all', employeeController.getAllUsers); // Get all users (employees + managers)
 router.post('/users', employeeController.createEmployeeUser);
 router.get('/users/:id', employeeController.getEmployeeUserById);
 router.put('/users/:id', employeeController.updateEmployeeUser);

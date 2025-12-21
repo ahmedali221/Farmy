@@ -56,6 +56,18 @@ exports.getAllEmployeeUsers = async (req, res) => {
   }
 };
 
+// Get all users (employees + managers) - for transfer selection
+exports.getAllUsers = async (req, res) => {
+  try {
+    const allUsers = await User.find().select('-password');
+    logger.info('Fetched all users');
+    res.json(allUsers);
+  } catch (err) {
+    logger.error(`Error fetching all users: ${err.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 exports.createEmployeeUser = async (req, res) => {
   try {
     const { username, password } = req.body;

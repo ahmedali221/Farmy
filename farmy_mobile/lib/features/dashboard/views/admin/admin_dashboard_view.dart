@@ -112,12 +112,9 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
               icon: const Icon(Icons.refresh),
               onPressed: _loadDashboardData,
             ),
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () => _showLogoutDialog(context),
-            ),
           ],
         ),
+        drawer: _buildDrawer(context, user),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -418,6 +415,118 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
       MaterialPageRoute(
         builder: (context) => actionView,
         fullscreenDialog: false,
+      ),
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context, user) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.white,
+                    child: Text(
+                      user?.username.substring(0, 1).toUpperCase() ?? 'م',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    user?.username ?? 'المدير',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'مدير النظام',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.dashboard),
+              title: const Text('لوحة التحكم'),
+              onTap: () {
+                Navigator.pop(context);
+                if (ModalRoute.of(context)?.settings.name != '/admin-dashboard') {
+                  context.go('/admin-dashboard');
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.account_balance_wallet),
+              title: const Text('البيانات المالية'),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/admin-financial');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.analytics),
+              title: const Text('لوحة التحكم المالية'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/financial-dashboard');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.group),
+              title: const Text('إدارة الموظفين'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/employee-management');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('إدارة العملاء'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/customer-management');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.business),
+              title: const Text('إدارة الموردين'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/supplier-management');
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('تسجيل الخروج', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                _showLogoutDialog(context);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

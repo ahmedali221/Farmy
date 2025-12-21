@@ -157,6 +157,13 @@ class EmployeeDashboardView extends StatelessWidget {
                         Colors.purple,
                         () => context.push('/employee-financial'),
                       ),
+                      _buildActionCard(
+                        context,
+                        'تحويل أموال',
+                        Icons.swap_horiz,
+                        Colors.teal,
+                        () => context.push('/employee-transfer-money'),
+                      ),
                     ],
                   ),
                 ],

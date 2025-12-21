@@ -18,15 +18,19 @@ exports.createTransfer = async (req, res) => {
 
   const { fromUser, toUser, amount, note = '' } = req.body;
   const requesterRole = req.user?.role;
+  const requesterId = req.user?.id;
   const isAdmin = requesterRole === 'manager';
+
+  // If employee is making the transfer, ensure they can only transfer from themselves
+  if (!isAdmin && fromUser !== requesterId) {
+    return res.status(403).json({ message: 'Employees can only transfer from their own account' });
+  }
 
   // Allow admin to transfer to themselves, but prevent regular users from doing so
   if (!isAdmin && fromUser === toUser) {
     return res.status(400).json({ message: 'fromUser and toUser must be different' });
   }
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
   try {
     // Optional: ensure fromUser has enough collected amount if enforcing limits
     const [fromAgg] = await Payment.aggregate([
@@ -65,23 +69,19 @@ exports.createTransfer = async (req, res) => {
       }
     }
 
-    const transfer = await Transfer.create([{
+    const transfer = await Transfer.create({
       fromUser,
       toUser,
       amount,
       note,
       createdBy: req.user.id
-    }], { session });
+    });
 
-    await session.commitTransaction();
-    logger.info(`Transfer created ${transfer[0]._id} from ${fromUser} to ${toUser} amount ${amount}`);
-    res.status(201).json(transfer[0]);
+    logger.info(`Transfer created ${transfer._id} from ${fromUser} to ${toUser} amount ${amount}`);
+    res.status(201).json(transfer);
   } catch (err) {
-    await session.abortTransaction();
     logger.error(`Error creating transfer: ${err.message}`);
     res.status(500).json({ message: 'Server error' });
-  } finally {
-    session.endSession();
   }
 };
 

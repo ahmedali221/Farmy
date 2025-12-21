@@ -180,6 +180,30 @@ class EmployeeApiService {
     }
   }
 
+  /// Get all users (employees + managers) - for transfer selection
+  Future<List<Map<String, dynamic>>> getAllUsers() async {
+    try {
+      final headers = await _getAuthHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/employees/users/all'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw ApiException(
+          message: 'Failed to load all users',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
+
   /// Get employee by ID
   Future<Map<String, dynamic>?> getEmployeeById(String id) async {
     try {

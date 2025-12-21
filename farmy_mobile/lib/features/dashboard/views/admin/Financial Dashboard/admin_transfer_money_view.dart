@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import '../../../../../core/services/transfer_api_service.dart';
 import '../../../../../core/services/employee_api_service.dart';
 import '../../../../../core/services/payment_api_service.dart';
-import '../../../../authentication/cubit/auth_cubit.dart';
 
 class AdminTransferMoneyView extends StatefulWidget {
   const AdminTransferMoneyView({super.key});
@@ -20,8 +18,7 @@ class _AdminTransferMoneyViewState extends State<AdminTransferMoneyView> {
   String? _fromEmployeeId;
   String? _toUserId;
   bool _submitting = false;
-  List<Map<String, dynamic>> _employees = [];
-  List<Map<String, dynamic>> _allUsers = []; // Employees + Admin
+  List<Map<String, dynamic>> _allUsers = []; // All users (Employees + Managers)
   bool _loading = true;
   double? _availableAmount;
 
@@ -41,34 +38,11 @@ class _AdminTransferMoneyViewState extends State<AdminTransferMoneyView> {
   Future<void> _loadInitial() async {
     setState(() => _loading = true);
     try {
-      // Get all employees
-      final employees = await _employeeService.getAllEmployeeUsers();
-      
-      // Get current admin user - use WidgetsBinding to ensure context is ready
-      await Future.delayed(Duration.zero);
-      if (!mounted) return;
-      
-      final authCubit = context.read<AuthCubit>();
-      final currentUser = authCubit.currentUser;
-      
-      // Combine employees with admin user for destination selection
-      final allUsers = <Map<String, dynamic>>[];
-      
-      // Add admin user if exists
-      if (currentUser != null && currentUser.isAdmin) {
-        allUsers.add({
-          '_id': currentUser.id,
-          'username': currentUser.username,
-          'role': 'manager',
-        });
-      }
-      
-      // Add all employees
-      allUsers.addAll(employees);
+      // Get all users (employees + managers)
+      final allUsers = await _employeeService.getAllUsers();
       
       if (mounted) {
         setState(() {
-          _employees = employees;
           _allUsers = allUsers;
         });
       }
@@ -81,8 +55,8 @@ class _AdminTransferMoneyViewState extends State<AdminTransferMoneyView> {
     }
   }
 
-  Future<void> _loadAvailableAmount(String? employeeId) async {
-    if (employeeId == null || employeeId.isEmpty) {
+  Future<void> _loadAvailableAmount(String? userId) async {
+    if (userId == null || userId.isEmpty) {
       setState(() => _availableAmount = null);
       return;
     }
@@ -92,7 +66,7 @@ class _AdminTransferMoneyViewState extends State<AdminTransferMoneyView> {
       double? available;
       for (final it in summary) {
         final String id = (it['userId'] ?? '').toString();
-        if (id == employeeId) {
+        if (id == userId) {
           if (it.containsKey('netAfterExpenses')) {
             available = ((it['netAfterExpenses'] ?? 0) as num).toDouble();
           } else {
@@ -184,7 +158,7 @@ class _AdminTransferMoneyViewState extends State<AdminTransferMoneyView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // From Employee Selection
+                        // From User Selection (Any User)
                         Card(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -196,7 +170,7 @@ class _AdminTransferMoneyViewState extends State<AdminTransferMoneyView> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'من (الموظف)',
+                                  'من (أي مستخدم)',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
@@ -206,13 +180,24 @@ class _AdminTransferMoneyViewState extends State<AdminTransferMoneyView> {
                                 DropdownButtonFormField<String>(
                                   value: _fromEmployeeId,
                                   isExpanded: true,
-                                  items: _employees
+                                  items: _allUsers
                                       .map(
-                                        (e) => DropdownMenuItem<String>(
-                                          value: (e['_id'] ?? '').toString(),
-                                          child: Text(
-                                            (e['username'] ?? 'موظف')
-                                                .toString(),
+                                        (u) => DropdownMenuItem<String>(
+                                          value: (u['_id'] ?? '').toString(),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                u['role'] == 'manager'
+                                                    ? Icons.admin_panel_settings
+                                                    : Icons.person,
+                                                size: 18,
+                                                color: u['role'] == 'manager'
+                                                    ? Colors.purple
+                                                    : Colors.blue,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(_getUserDisplayName(u)),
+                                            ],
                                           ),
                                         ),
                                       )
@@ -225,12 +210,12 @@ class _AdminTransferMoneyViewState extends State<AdminTransferMoneyView> {
                                     _loadAvailableAmount(v);
                                   },
                                   decoration: const InputDecoration(
-                                    labelText: 'اختر الموظف',
+                                    labelText: 'اختر المرسل',
                                     border: OutlineInputBorder(),
                                   ),
                                   validator: (v) =>
                                       (v == null || v.isEmpty)
-                                          ? 'اختر موظفًا'
+                                          ? 'اختر المرسل'
                                           : null,
                                 ),
                                 if (_availableAmount != null) ...[
@@ -341,7 +326,7 @@ class _AdminTransferMoneyViewState extends State<AdminTransferMoneyView> {
                                       SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          'يمكنك التحويل إلى أي موظف أو إلى نفسك (الأدمن)',
+                                          'يمكنك التحويل من وإلى أي موظف أو مدير',
                                           style: TextStyle(
                                             color: Colors.green,
                                             fontSize: 12,
