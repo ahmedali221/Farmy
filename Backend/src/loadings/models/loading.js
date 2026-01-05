@@ -202,4 +202,5 @@ loadingSchema.index({ supplier: 1, loadingDate: -1 });
 loadingSchema.index({ chickenType: 1, loadingDate: -1 });
 loadingSchema.index({ loadingDate: -1 });
 
-module.exports = mongoose.model('Loading', loadingSchema);
+// Prevent model re-compilation error
+module.exports = mongoose.models.Loading || mongoose.model('Loading', loadingSchema);

@@ -36,14 +36,18 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final list = await _paymentService.getUserCollectionsSummary();
+      if (!mounted) return;
+      
       try {
         final users = await _employeeService.getAllEmployeeUsers();
+        if (!mounted) return;
         _employeeIdToName.clear();
         _managerIdToName.clear();
         for (final u in users) {
@@ -62,6 +66,7 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
 
       final Map<String, List<Map<String, dynamic>>> serverExpenses = {};
       for (final it in list) {
+        if (!mounted) return;
         final String empId = (it['userId'] ?? '').toString();
         if (empId.isEmpty) continue;
         try {
@@ -70,6 +75,7 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
         } catch (_) {}
       }
 
+      if (!mounted) return;
       // Split list by role maps
       final employeesOnly = list.where((it) {
         final String id = (it['userId'] ?? '').toString();
@@ -81,6 +87,7 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
         return id.isNotEmpty && !_employeeIdToName.containsKey(id);
       }).toList();
 
+      if (!mounted) return;
       setState(() {
         _employeeCollections = employeesOnly;
         _managerCollections = managersOnly;
@@ -89,6 +96,7 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
           ..addAll(serverExpenses);
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _employeeCollections = [];
@@ -189,7 +197,23 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
                               'تحصيل: ${collected.toStringAsFixed(2)}  •  صافي: ${net.toStringAsFixed(2)}',
                               style: TextStyle(color: Colors.grey[700]),
                             ),
-                            trailing: const Icon(Icons.chevron_left),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (net > 0)
+                                  IconButton(
+                                    icon: const Icon(Icons.swap_horiz, color: Colors.green),
+                                    onPressed: () => _showTransferDialogForEmployee(
+                                      context,
+                                      employeeId,
+                                      name,
+                                      net,
+                                    ),
+                                    tooltip: 'تحويل أموال',
+                                  ),
+                                const Icon(Icons.chevron_left),
+                              ],
+                            ),
                             onTap: () async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -265,7 +289,23 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
                               'تحصيل: ${collected.toStringAsFixed(2)}  •  صافي: ${net.toStringAsFixed(2)}',
                               style: TextStyle(color: Colors.grey[700]),
                             ),
-                            trailing: const Icon(Icons.chevron_left),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (net > 0)
+                                  IconButton(
+                                    icon: const Icon(Icons.swap_horiz, color: Colors.green),
+                                    onPressed: () => _showTransferDialogForEmployee(
+                                      context,
+                                      managerId,
+                                      name,
+                                      net,
+                                    ),
+                                    tooltip: 'تحويل أموال',
+                                  ),
+                                const Icon(Icons.chevron_left),
+                              ],
+                            ),
                             onTap: () async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -321,6 +361,46 @@ class _EmployeeSafeTabState extends State<EmployeeSafeTab> {
       ),
     );
   }
+
+  Future<void> _showTransferDialogForEmployee(
+    BuildContext context,
+    String employeeId,
+    String employeeName,
+    double availableAmount,
+  ) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _TransferDialog(
+        fromUserId: employeeId,
+        fromUserName: employeeName,
+        availableAmount: availableAmount,
+      ),
+    );
+
+    if (result != null) {
+      try {
+        final transferService = serviceLocator<TransferApiService>();
+        await transferService.createTransfer(
+          fromUser: result['fromUser'] as String,
+          toUser: result['toUser'] as String,
+          amount: result['amount'] as double,
+          note: result['note'] as String?,
+        );
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم إجراء التحويل بنجاح')),
+        );
+
+        _loadData();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('فشل في إجراء التحويل: $e')),
+        );
+      }
+    }
+  }
 }
 
 class _EmployeeSafeDetailsPage extends StatefulWidget {
@@ -348,17 +428,22 @@ class _EmployeeSafeDetailsPage extends StatefulWidget {
 class _EmployeeSafeDetailsPageState extends State<_EmployeeSafeDetailsPage> {
   late final EmployeeExpenseApiService _employeeExpenseService;
   late final TransferApiService _transferService;
+  late final PaymentApiService _paymentService;
   late List<Map<String, dynamic>> _otherExpenses;
   List<Map<String, dynamic>> _transfers = [];
+  List<Map<String, dynamic>> _payments = [];
   bool _transfersLoading = false;
+  bool _paymentsLoading = false;
 
   @override
   void initState() {
     super.initState();
     _employeeExpenseService = serviceLocator<EmployeeExpenseApiService>();
     _transferService = serviceLocator<TransferApiService>();
+    _paymentService = serviceLocator<PaymentApiService>();
     _otherExpenses = [...widget.initialOtherExpenses];
     _loadTransfers();
+    _loadPayments();
   }
 
   double get _extraTotal => _otherExpenses.fold<double>(
@@ -372,6 +457,7 @@ class _EmployeeSafeDetailsPageState extends State<_EmployeeSafeDetailsPage> {
   double get _net => _netAvailable - _extraTotal;
 
   Future<void> _loadTransfers() async {
+    if (!mounted) return;
     setState(() => _transfersLoading = true);
     try {
       final list = await _transferService.listTransfers(
@@ -385,9 +471,32 @@ class _EmployeeSafeDetailsPageState extends State<_EmployeeSafeDetailsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _transfersLoading = false);
+      if (mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('فشل تحميل التحويلات: $e')));
+      }
+    }
+  }
+
+  Future<void> _loadPayments() async {
+    if (!mounted) return;
+    setState(() => _paymentsLoading = true);
+    try {
+      final list = await _paymentService.getPaymentsByUser(widget.employeeId);
+      if (!mounted) return;
+      setState(() {
+        _payments = list;
+        _paymentsLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _paymentsLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('فشل تحميل المدفوعات: $e')));
+      }
     }
   }
 
@@ -404,6 +513,7 @@ class _EmployeeSafeDetailsPageState extends State<_EmployeeSafeDetailsPage> {
           ((result['value'] ?? 0) as num).toDouble(),
           note: (result['note'] ?? '') as String,
         );
+        if (!mounted) return;
         setState(() {
           _otherExpenses.add(created);
         });
@@ -422,6 +532,7 @@ class _EmployeeSafeDetailsPageState extends State<_EmployeeSafeDetailsPage> {
       if (id != null && id.isNotEmpty) {
         await _employeeExpenseService.deleteExpense(id);
       }
+      if (!mounted) return;
       setState(() {
         _otherExpenses.removeAt(index);
       });
@@ -458,7 +569,9 @@ class _EmployeeSafeDetailsPageState extends State<_EmployeeSafeDetailsPage> {
         ).showSnackBar(const SnackBar(content: Text('تم إجراء التحويل بنجاح')));
 
         await _loadTransfers();
+        if (mounted) {
         Navigator.of(context).pop();
+        }
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(
@@ -731,6 +844,100 @@ class _EmployeeSafeDetailsPageState extends State<_EmployeeSafeDetailsPage> {
             const SizedBox(height: 8),
             Row(
               children: [
+                const Icon(Icons.payment, color: Colors.green, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'سجل المدفوعات',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (_paymentsLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (_payments.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'لا توجد مدفوعات لهذا المستخدم بعد.',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              )
+            else
+              Column(
+                children: _payments.map((payment) {
+                  final double paidAmount = ((payment['paidAmount'] ?? 0) as num).toDouble();
+                  final double discount = ((payment['discount'] ?? 0) as num).toDouble();
+                  final String createdAtStr = (payment['createdAt'] ?? '').toString();
+                  final dynamic customerField = payment['customer'];
+                  DateTime? createdAt;
+                  try {
+                    createdAt = DateTime.parse(createdAtStr).toLocal();
+                  } catch (_) {}
+                  final String dateLabel = createdAt != null
+                      ? '${createdAt.year}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')} ${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}'
+                      : 'تاريخ غير معروف';
+                  final String customerName = customerField is Map<String, dynamic>
+                      ? (customerField['name'] ?? 'عميل').toString()
+                      : 'عميل';
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    elevation: 1,
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.green.withOpacity(0.1),
+                        child: const Icon(Icons.payments, color: Colors.green),
+                      ),
+                      title: Text(
+                        'تحصيل: ${paidAmount.toStringAsFixed(2)} ج.م',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('العميل: $customerName'),
+                          if (discount > 0)
+                            Text(
+                              'خصم: ${discount.toStringAsFixed(2)} ج.م',
+                              style: TextStyle(color: Colors.orange[700], fontSize: 12),
+                            ),
+                          Text(
+                            dateLabel,
+                            style: const TextStyle(fontSize: 12, color: Colors.black54),
+                          ),
+                        ],
+                      ),
+                      trailing: Text(
+                        '${paidAmount.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            Row(
+              children: [
                 const Icon(Icons.swap_horiz, color: Colors.teal, size: 20),
                 const SizedBox(width: 8),
                 Text(
@@ -973,7 +1180,8 @@ class _TransferDialogState extends State<_TransferDialog> {
   Future<void> _loadAvailableUsers() async {
     try {
       final employeeService = serviceLocator<EmployeeApiService>();
-      final users = await employeeService.getAllEmployeeUsers();
+      final users = await employeeService.getAllUsers();
+      if (!mounted) return;
       setState(() {
         _availableUsers = users
             .where((user) => user['_id']?.toString() != widget.fromUserId)
@@ -981,6 +1189,7 @@ class _TransferDialogState extends State<_TransferDialog> {
         _loadingUsers = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _loadingUsers = false);
     }
   }
@@ -1010,9 +1219,22 @@ class _TransferDialogState extends State<_TransferDialog> {
                   border: OutlineInputBorder(),
                 ),
                 items: _availableUsers.map((user) {
+                  final role = user['role']?.toString() ?? 'employee';
+                  final username = user['username']?.toString() ?? 'غير معروف';
+                  final displayName = role == 'manager' ? '$username (أدمن)' : username;
                   return DropdownMenuItem<String>(
                     value: user['_id']?.toString(),
-                    child: Text(user['username']?.toString() ?? 'غير معروف'),
+                    child: Row(
+                      children: [
+                        Icon(
+                          role == 'manager' ? Icons.admin_panel_settings : Icons.person,
+                          size: 18,
+                          color: role == 'manager' ? Colors.purple : Colors.blue,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(displayName),
+                      ],
+                    ),
                   );
                 }).toList(),
                 onChanged: (value) {

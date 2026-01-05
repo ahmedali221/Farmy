@@ -58,3 +58,19 @@
 {"level":"error","message":"Error updating distribution: Loading validation failed: distributedQuantity: Path `distributedQuantity` (-17) is less than minimum allowed value (0).","timestamp":"2025-11-22T14:42:22.566Z"}
 {"level":"error","message":"Error updating distribution: Loading validation failed: distributedQuantity: Path `distributedQuantity` (-6) is less than minimum allowed value (0).","timestamp":"2025-11-22T15:03:28.989Z"}
 {"level":"error","message":"Error creating transfer: Transaction numbers are only allowed on a replica set member or mongos","timestamp":"2025-12-21T10:43:20.396Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:36:21.764Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:36:23.509Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:36:24.651Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:36:25.212Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:36:25.611Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:36:25.895Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:36:26.927Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:36:39.676Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:36:49.744Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:36:50.258Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:36:50.455Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:36:51.647Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:37:01.645Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:37:02.378Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:37:02.885Z"}
+{"level":"error","message":"Error fetching user collection summary: Cannot overwrite `Loading` model once compiled.","timestamp":"2025-12-24T18:37:13.099Z"}

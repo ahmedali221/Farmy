@@ -7,6 +7,7 @@ const logger = require('../../utils/logger');
 const mongoose = require('mongoose');
 const Transfer = require('../../transfers/models/Transfer');
 const EmployeeExpense = require('../../employeeExpenses/models/EmployeeExpense');
+const Loading = require('../../loadings/models/loading');
 
 // Validation schemas
 const paymentSchema = Joi.object({
@@ -325,16 +326,21 @@ exports.getUserCollectionSummary = async (req, res) => {
       { $group: { _id: '$fromUser', totalOut: { $sum: { $ifNull: ['$amount', 0] } } } }
     ]);
 
-    const toMap = (arr, key) => arr.reduce((m, r) => { m[String(r._id)] = r[key]; return m; }, {});
-    const inMap = toMap(transfersIn, 'totalIn');
-    const outMap = toMap(transfersOut, 'totalOut');
-
     // User expenses by user
     const expenses = await EmployeeExpense.aggregate([
       { $group: { _id: '$user', totalExpenses: { $sum: { $ifNull: ['$value', 0] } } } }
     ]);
 
+    // Total loading by user (sum of all loadings created by each user)
+    const loadings = await Loading.aggregate([
+      { $group: { _id: '$user', totalLoading: { $sum: { $ifNull: ['$totalLoading', 0] } } } }
+    ]);
+
+    const toMap = (arr, key) => arr.reduce((m, r) => { m[String(r._id)] = r[key]; return m; }, {});
+    const inMap = toMap(transfersIn, 'totalIn');
+    const outMap = toMap(transfersOut, 'totalOut');
     const expMap = toMap(expenses, 'totalExpenses');
+    const loadingMap = toMap(loadings, 'totalLoading');
 
     // Create a map for collected payments
     const collectedMap = {};
@@ -345,29 +351,35 @@ exports.getUserCollectionSummary = async (req, res) => {
       };
     });
 
-    // Collect all unique user IDs from payments, transfers, and expenses
+    // Collect all unique user IDs from payments, transfers, expenses, and loadings
     const allUserIds = new Set();
     collected.forEach(row => allUserIds.add(String(row._id)));
     transfersIn.forEach(row => allUserIds.add(String(row._id)));
     transfersOut.forEach(row => allUserIds.add(String(row._id)));
     expenses.forEach(row => allUserIds.add(String(row._id)));
+    loadings.forEach(row => allUserIds.add(String(row._id)));
 
-    // Build result for all users (including those with only transfers)
+    // Build result for all users (including those with only transfers or loadings)
     const result = Array.from(allUserIds).map(userId => {
       const collectedData = collectedMap[userId] || { totalCollected: 0, count: 0 };
       const totalIn = inMap[userId] || 0;
       const totalOut = outMap[userId] || 0;
       const totalExpenses = expMap[userId] || 0;
+      const totalLoading = loadingMap[userId] || 0;
       const net = collectedData.totalCollected + totalIn - totalOut;
       const netAfterExpenses = net - totalExpenses;
+      // Admin balance: same as employee but subtract total loading
+      const adminBalance = netAfterExpenses - totalLoading;
       return {
         userId: userId,
         totalCollected: collectedData.totalCollected,
         transfersIn: totalIn,
         transfersOut: totalOut,
         totalExpenses,
+        totalLoading,
         netAvailable: net,
         netAfterExpenses,
+        adminBalance, // New field: employee balance - total loading
         count: collectedData.count
       };
     }).sort((a, b) => b.netAvailable - a.netAvailable);

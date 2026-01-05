@@ -4,6 +4,8 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../core/services/payment_api_service.dart';
 import '../../../../core/services/customer_api_service.dart';
 import '../../../../core/services/transfer_api_service.dart';
+import '../../../../core/services/loading_api_service.dart';
+import '../../../../core/services/employee_expense_api_service.dart';
 import '../../../authentication/cubit/auth_cubit.dart';
 
 class AdminFinancialView extends StatefulWidget {
@@ -16,6 +18,8 @@ class AdminFinancialView extends StatefulWidget {
 class _AdminFinancialViewState extends State<AdminFinancialView> {
   late final PaymentApiService _paymentService;
   late final TransferApiService _transferService;
+  late final LoadingApiService _loadingService;
+  late final EmployeeExpenseApiService _employeeExpenseService;
   final Map<String, String> _customerNameCache = {};
 
   bool _loading = true;
@@ -30,11 +34,17 @@ class _AdminFinancialViewState extends State<AdminFinancialView> {
   double _netTransfers = 0.0;
   double _finalBalance = 0.0;
 
+  // Loading and expenses
+  double _totalLoading = 0.0;
+  double _totalExpenses = 0.0;
+
   @override
   void initState() {
     super.initState();
     _paymentService = serviceLocator<PaymentApiService>();
     _transferService = serviceLocator<TransferApiService>();
+    _loadingService = serviceLocator<LoadingApiService>();
+    _employeeExpenseService = serviceLocator<EmployeeExpenseApiService>();
     _loadData();
   }
 
@@ -54,31 +64,58 @@ class _AdminFinancialViewState extends State<AdminFinancialView> {
 
       final adminId = currentUser.id;
 
-      // Get user collections summary (overall totals)
+      // Get user collections summary (includes backend-calculated values)
       final collectionsSummary = await _paymentService
           .getUserCollectionsSummary();
 
       // Find current user's data
       final userData = collectionsSummary.firstWhere(
         (item) => (item['userId'] ?? '').toString() == adminId,
-        orElse: () => {'totalCollected': 0},
+        orElse: () => {
+          'totalCollected': 0,
+          'transfersIn': 0,
+          'transfersOut': 0,
+          'totalExpenses': 0,
+          'totalLoading': 0,
+          'adminBalance': 0,
+        },
       );
 
       _totalCollected = ((userData['totalCollected'] ?? 0) as num).toDouble();
+      final double transfersIn = ((userData['transfersIn'] ?? 0) as num)
+          .toDouble();
+      final double transfersOut = ((userData['transfersOut'] ?? 0) as num)
+          .toDouble();
+      _totalExpenses = ((userData['totalExpenses'] ?? 0) as num).toDouble();
+      _totalLoading = ((userData['totalLoading'] ?? 0) as num).toDouble();
+
+      // Use backend-calculated adminBalance if available, otherwise calculate
+      if (userData.containsKey('adminBalance')) {
+        _finalBalance = ((userData['adminBalance'] ?? 0) as num).toDouble();
+      } else {
+        // Fallback calculation: employee balance - total loading
+        // Employee balance = totalCollected + transfersIn - transfersOut - totalExpenses
+        // Admin balance = employee balance - totalLoading
+        _finalBalance =
+            _totalCollected +
+            transfersIn -
+            transfersOut -
+            _totalExpenses -
+            _totalLoading;
+      }
 
       // Get user daily grouped collections (history)
       _dailyCollections = await _paymentService.getUserDailyCollections(
         adminId,
       );
 
-      // Load transfers for current user
+      // Load transfers for current user (for display)
       _transfers = await _transferService.listTransfers(userId: adminId);
 
-      // Calculate transfer totals
+      // Calculate transfer totals for display
       _totalTransfersOut = _transfers
           .where(
-            (transfer) =>
-                transfer['fromUser']?['_id']?.toString() == adminId,
+            (transfer) => transfer['fromUser']?['_id']?.toString() == adminId,
           )
           .fold<double>(
             0.0,
@@ -97,7 +134,6 @@ class _AdminFinancialViewState extends State<AdminFinancialView> {
           );
 
       _netTransfers = _totalTransfersIn - _totalTransfersOut;
-      _finalBalance = _totalCollected + _netTransfers;
 
       setState(() {
         _loading = false;
@@ -232,10 +268,9 @@ class _AdminFinancialViewState extends State<AdminFinancialView> {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary
-                                            .withOpacity(0.15),
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary.withOpacity(0.15),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
@@ -265,7 +300,21 @@ class _AdminFinancialViewState extends State<AdminFinancialView> {
                       ),
                       const SizedBox(height: 12),
                       _buildSummaryCard(
-                        'الرصيد النهائي (بعد التحويلات)',
+                        'إجمالي التحميل',
+                        _totalLoading,
+                        Icons.local_shipping,
+                        Colors.blue,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSummaryCard(
+                        'إجمالي المصروفات',
+                        _totalExpenses,
+                        Icons.money_off,
+                        Colors.orange,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSummaryCard(
+                        'الرصيد النهائي (بعد التحويلات والمصروفات والتحميل)',
                         _finalBalance,
                         Icons.account_balance_wallet,
                         _finalBalance >= 0 ? Colors.green : Colors.red,
@@ -531,7 +580,9 @@ class _AdminFinancialViewState extends State<AdminFinancialView> {
           ),
         ),
         title: Text(
-          isOutgoing ? 'تحويل إلى: $otherUserName$roleLabel' : 'تحويل من: $otherUserName$roleLabel',
+          isOutgoing
+              ? 'تحويل إلى: $otherUserName$roleLabel'
+              : 'تحويل من: $otherUserName$roleLabel',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
@@ -628,4 +679,3 @@ class _AdminFinancialViewState extends State<AdminFinancialView> {
     }
   }
 }
-

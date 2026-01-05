@@ -23,7 +23,6 @@ import '../../features/dashboard/views/employee/employee_financial_view.dart';
 import '../../features/dashboard/views/employee/employee_payment_history_view.dart';
 import '../../features/dashboard/views/employee/employee_expense_history_view.dart';
 import '../../features/dashboard/views/employee/employee_daily_detail_view.dart';
-import '../../features/dashboard/views/employee/employee_transfer_money_view.dart';
 import '../../features/dashboard/views/admin/loading_history_view.dart';
 import '../../features/dashboard/views/admin/distribution_history_view.dart';
 import '../../features/dashboard/views/admin/payment_history_view.dart';
@@ -239,11 +238,6 @@ class AppRouter {
           path: '/employee-payment-history',
           name: 'employee-payment-history',
           builder: (context, state) => const EmployeePaymentHistoryView(),
-        ),
-        GoRoute(
-          path: '/employee-transfer-money',
-          name: 'employee-transfer-money',
-          builder: (context, state) => const EmployeeTransferMoneyView(),
         ),
         // History Routes
         GoRoute(
