@@ -17,6 +17,9 @@ router.get('/supplier/:supplierId', loadingController.getLoadingsBySupplier);
 // Get loadings by date
 router.get('/by-date', loadingController.getLoadingsByDate);
 
+// Get total loading amount
+router.get('/total-amount', loadingController.getTotalLoadingAmount);
+
 // Get loading statistics
 router.get('/stats', loadingController.getLoadingStats);
 

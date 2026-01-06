@@ -5,11 +5,10 @@ const Customer = require('../customers/models/Customer');
 const ChickenType = require('../managers/models/ChickenType');
 const dotenv = require('dotenv');
 
-// Load environment variables
-dotenv.config({ path: '../../.env' });
+require('dotenv').config();
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/farmy', {
+mongoose.connect(process.env.MONGO_URI , {
   serverSelectionTimeoutMS: 30000, // 30 seconds
   socketTimeoutMS: 45000, // 45 seconds
   maxPoolSize: 10,

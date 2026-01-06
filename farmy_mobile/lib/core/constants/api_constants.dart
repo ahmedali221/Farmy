@@ -5,10 +5,10 @@ class ApiConstants {
   // Use localhost for web/desktop development
   // Use actual IP for physical device testing
   static const String baseUrl =
-      // 'https://farmy-c9hb-git-main-ahmed-alis-projects-588ffe47.vercel.app/api';
-      // 'https://farmy-c9hb.vercel.app/api';
+      // 'https://farmy-c9hb-94qs41bqx-ahmed-alis-projects-588ffe47.vercel.app/api';
+      // 'https://farmy-rho.vercel.app/api';
       // 'http://172.10.60.35:6000/api';
-      'http://192.168.1.5:6000/api';
+      'http://192.168.1.2:6000/api';
   // "http://127.0.0.1:3000/api";
 
   // Alternative URLs for different environments

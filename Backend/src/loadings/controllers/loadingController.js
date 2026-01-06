@@ -385,6 +385,37 @@ exports.getLoadingsByDate = async (req, res) => {
   }
 };
 
+// Get total loading amount
+exports.getTotalLoadingAmount = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    let matchQuery = {};
+    if (startDate && endDate) {
+      matchQuery.loadingDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+
+    const result = await Loading.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: null,
+          totalLoadingAmount: { $sum: '$totalLoading' }
+        }
+      }
+    ]);
+
+    logger.info('Total loading amount calculated');
+    res.json({ totalLoadingAmount: result[0]?.totalLoadingAmount || 0 });
+  } catch (err) {
+    logger.error(`Error calculating total loading amount: ${err.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // Get loading statistics
 exports.getLoadingStats = async (req, res) => {
   try {

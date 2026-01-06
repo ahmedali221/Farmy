@@ -282,4 +282,34 @@ class LoadingApiService {
       throw ApiException(message: 'Network error: $e', statusCode: 0);
     }
   }
+
+  /// Get total loading amount
+  Future<double> getTotalLoadingAmount({
+    String? startDate,
+    String? endDate,
+  }) async {
+    try {
+      final headers = await _getAuthHeaders();
+      String url = '$baseUrl/loadings/total-amount';
+
+      if (startDate != null && endDate != null) {
+        url += '?startDate=$startDate&endDate=$endDate';
+      }
+
+      final response = await http.get(Uri.parse(url), headers: headers);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return ((data['totalLoadingAmount'] ?? 0) as num).toDouble();
+      } else {
+        throw ApiException(
+          message: 'Failed to load total loading amount',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Network error: $e', statusCode: 0);
+    }
+  }
 }

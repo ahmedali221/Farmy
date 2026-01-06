@@ -68,6 +68,9 @@ class _AdminFinancialViewState extends State<AdminFinancialView> {
       final collectionsSummary = await _paymentService
           .getUserCollectionsSummary();
 
+      // Get total loading amount from dedicated endpoint
+      final totalLoadingAmount = await _loadingService.getTotalLoadingAmount();
+
       // Find current user's data
       final userData = collectionsSummary.firstWhere(
         (item) => (item['userId'] ?? '').toString() == adminId,
@@ -87,7 +90,7 @@ class _AdminFinancialViewState extends State<AdminFinancialView> {
       final double transfersOut = ((userData['transfersOut'] ?? 0) as num)
           .toDouble();
       _totalExpenses = ((userData['totalExpenses'] ?? 0) as num).toDouble();
-      _totalLoading = ((userData['totalLoading'] ?? 0) as num).toDouble();
+      _totalLoading = totalLoadingAmount;
 
       // Use backend-calculated adminBalance if available, otherwise calculate
       if (userData.containsKey('adminBalance')) {
@@ -304,6 +307,109 @@ class _AdminFinancialViewState extends State<AdminFinancialView> {
                         _totalLoading,
                         Icons.local_shipping,
                         Colors.blue,
+                      ),
+                      const SizedBox(height: 12),
+                      // Total Loading Placeholder
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.blue.withOpacity(0.3),
+                            width: 2,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.local_shipping,
+                              color: Colors.blue[700],
+                              size: 28,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'إجمالي التحميل من الخادم',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue[700],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'ج.م ${_totalLoading.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue[900],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Debug: Show calculation breakdown
+                      Card(
+                        elevation: 1,
+                        color: Colors.amber[50],
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'تفاصيل الحساب (للتصحيح)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber[900],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'التحصيل: ${_totalCollected.toStringAsFixed(2)}',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              Text(
+                                'التحويلات الواردة: ${_totalTransfersIn.toStringAsFixed(2)}',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              Text(
+                                'التحويلات المرسلة: ${_totalTransfersOut.toStringAsFixed(2)}',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              Text(
+                                'المصروفات: ${_totalExpenses.toStringAsFixed(2)}',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              Text(
+                                'التحميل: $_totalLoading',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'الرصيد النهائي: ${_finalBalance.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       _buildSummaryCard(
